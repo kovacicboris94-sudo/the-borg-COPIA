@@ -38,6 +38,7 @@ export const BLOCCHI = [
   ['THE BORG - MODELLI GLB:', 'src/borgo/modelli-glb.js'],
   ['THE BORG - MODELLI DELLA PIAZZA', 'src/borgo/piazza-modelli.js'],
   ['BORGO LUME 3D - IL MONDO:', 'src/borgo/piazza.js'],
+  ['THE BORG - MURA E CAMPAGNA', 'src/borgo/campagna.js'],
   ['BORGO LUME 3D - LA TUA CASA:', 'src/borgo/casa.js'],
   ['Logo di Laugh Tale Collectibles (data URL)', 'src/dati/logo-laughtale.js'],
   ['THE BORG 3D - LAUGH TALE COLLECTIBLES: insegna', 'src/negozi/laughtale-insegna.js'],

@@ -32,41 +32,13 @@
     const gm = M('#fff').gradientMap;
     const PZ = CFG.plaza;
 
-    /* ---------- suolo: lastra di selciato che fluttua nel cielo ---------- */
+    /* ---------- suolo: il selciato della piazza (fuori dalle mura c'e' la campagna, js/campagna.js) ---------- */
     const W = PZ.w, D = PZ.d, CZ = PZ.cz;
     // pietre irregolari con rilievo e macchie di colore (B3.PM, piazza-modelli.js)
     const suolo = B.PM.suolo(W, D, [W / 4.5, D / 4.5]); suolo.position.z = CZ; scene.add(suolo);
     scene.add(mesh(new T.BoxGeometry(W + 0.4, 1.4, D + 0.4), M('#8a7a82'), { y: -0.71, z: CZ, lb: 0.05 }));
-    // rocce sotto l'isola: niente ombre (con il suolo nuovo facevano comparire macchie sul selciato)
-    for (let i = 0; i < 14; i++) { const c = mesh(new T.ConeGeometry(rnd(1.2, 2.6), rnd(1.6, 3.4), 7), M('#6f6270'), { x: rnd(PZ.x0 + 2, PZ.x1 - 2), y: -1.4 - rnd(0.2, 0.9), z: rnd(PZ.z0 + 2, PZ.z1 - 2), cast: false }); c.rotation.x = PI; scene.add(c); }
     // disco a mosaico attorno alla fontana
     const mo = B.PM.discoAnelli(6.3); mo.position.set(0, 0.02, 3.2 + DZ); scene.add(mo);   // anelli di pietra e stella della cometa
-    // nuvole sotto e attorno all'isola
-    const nuvole = [];
-    for (let i = 0; i < 12; i++) {
-      const g = new T.Group(), a = i / 12 * 6.283 + rnd(-0.2, 0.2), rx = W / 2 + rnd(2, 7), rz = D / 2 + rnd(2, 6);
-      g.position.set(Math.cos(a) * rx, rnd(-5.5, -2.2), CZ + Math.sin(a) * rz);
-      const n = 3 + (i % 3);
-      for (let k = 0; k < n; k++) { const b = mesh(new T.IcosahedronGeometry(rnd(1.1, 2.0), 1), new T.MeshBasicMaterial({ color: 0xfff1e8, transparent: true, opacity: 0.88 }), { cast: false, recv: false }); b.position.set((k - n / 2) * 1.6, rnd(-0.2, 0.4), rnd(-0.6, 0.6)); b.scale.y = 0.6; g.add(b); }
-      g.userData.base = g.position.x; g.userData.v = rnd(0.1, 0.25); g.userData.f = rnd(0, 6); scene.add(g); nuvole.push(g);
-    }
-    anim.push(t => nuvole.forEach(g => { g.position.x = g.userData.base + Math.sin(t * g.userData.v + g.userData.f) * 1.4; }));
-
-    /* ---------- muretto di bordo (sud, est, ovest, nord ai lati) con pilastrini ---------- */
-    function muretto(x0, z0, x1, z1) {
-      const L = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(x1 - x0, z1 - z0);
-      const m = mesh(new T.BoxGeometry(0.45, 0.55, L), M(pietra), { lb: 0.025 }); m.position.set((x0 + x1) / 2, 0.275, (z0 + z1) / 2); m.rotation.y = a; scene.add(m);
-      const c = mesh(new T.BoxGeometry(0.6, 0.12, L + 0.1), M('#cdbfb8'), { lb: 0.02 }); c.position.set((x0 + x1) / 2, 0.61, (z0 + z1) / 2); c.rotation.y = a; scene.add(c);
-      const n = Math.max(2, Math.round(L / 4));
-      for (let i = 0; i <= n; i++) {
-        const px = x0 + (x1 - x0) * i / n, pz = z0 + (z1 - z0) * i / n;
-        const p = mesh(new T.BoxGeometry(0.7, 1.1, 0.7), M('#c4b4ad'), { lb: 0.03 }); p.position.set(px, 0.55, pz); scene.add(p);
-        const cap = mesh(new T.ConeGeometry(0.5, 0.35, 4), M('#a28f8c'), { l: 0.0 }); cap.position.set(px, 1.28, pz); cap.rotation.y = PI / 4; scene.add(cap);
-      }
-    }
-    muretto(PZ.x0 + 0.3, PZ.z1 - 0.3, PZ.x1 - 0.3, PZ.z1 - 0.3);
-    muretto(PZ.x1 - 0.3, PZ.z0 + 0.3, PZ.x1 - 0.3, PZ.z1 - 0.3);
-    muretto(PZ.x0 + 0.3, PZ.z0 + 0.3, PZ.x0 + 0.3, PZ.z1 - 0.3);
 
     /* ---------- edificio generico ---------- */
     function trave(g, w, h, x, y, z, rz) { const b = mesh(new T.BoxGeometry(w, h, 0.1), M(legno), { x, y, z, lb: 0.012 }); if (rz) b.rotation.z = rz; g.add(b); }
@@ -259,8 +231,8 @@
     if (B.CasaScacchi) B.CasaScacchi.decoraPiazza(scene, { ostCer });
     const gt = torre(-51.4, 26); gt.rotation.y = PI / 2; edifici.push({ g: gt, x: -51.4, z: 26, w: 3.2, d: 3.2, nome: 'Torre' });
     porte.push({ id: 'porta-torre', nome: 'Torre dell\'Orologio', x: -51.4 + 1.5 + 0.9, z: 26, r: 1.2, verso: null });
-    // pezzi di muro ai lati della fila nord
-    muretto(PZ.x0 + 0.3, PZ.z0 + 0.3, PZ.x1 - 0.3, PZ.z0 + 0.3);
+    // le mura con le torri e la Porta del Borgo, e fuori la campagna (js/campagna.js)
+    if (B.costruisciMuraCampagna) B.costruisciMuraCampagna({ scene, ostacoli, anim, fadeVoci, edifici });
 
     /* ---------- fontana con statua ---------- */
     (function fontana(x, z) {
