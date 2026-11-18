@@ -447,11 +447,14 @@
     const st = a.stanza(), io = a.io, C = a.C, c = cvs.getContext('2d'), W = cvs.width, H = cvs.height;
     const grande = cvs.classList.contains('grande'), r0 = st.rect;
     const s = grande ? W / (st.id === 'piazza' ? 76 : st.id === 'sala' ? 60 : st.id === 'collectibles' ? 30 : st.id === 'tcg' ? 52 : st.id === 'biblioteca' ? 20 : st.id === 'scacchi' ? 24 : 28) : (st.id === 'piazza' ? 8.5 : st.id === 'sala' ? 13 : st.id === 'collectibles' || st.id === 'biblioteca' || st.id === 'scacchi' ? 11 : 14) * (W / 196);
-    const mx = grande ? (r0.x0 + r0.x1) / 2 : io.x, mz = grande ? (r0.z0 + r0.z1) / 2 : io.z;       // centro della mappa
+    // mappa grande: centrata sulla stanza; in piazza, se sei fuori dalle mura (in campagna), centrata su di te
+    const fuori = st.id === 'piazza' && (io.x < r0.x0 || io.x > r0.x1 || io.z < r0.z0 || io.z > r0.z1);
+    const mx = grande && !fuori ? (r0.x0 + r0.x1) / 2 : io.x, mz = grande && !fuori ? (r0.z0 + r0.z1) / 2 : io.z;       // centro della mappa
     c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = st.sfondo; c.fillRect(0, 0, W, H);
     c.translate(W / 2, H / 2); c.rotate(C.az); c.scale(s, s); c.translate(-mx, -mz);
     const r = st.rect;
     if (st.id === 'piazza') {
+      if (B.Campagna) B.Campagna.mappa(c);   // campi, strade e mura attorno alla piazza
       c.fillStyle = '#e3cfae'; const PX = B.CFG.plaza; c.fillRect(r.x0, r.z0, PX.x1 - r.x0, r.z1 - r.z0);;
       c.fillStyle = '#8fcbc5'; c.beginPath(); c.arc(0, 30, 6.3, 0, 7); c.fill();
       c.fillStyle = '#f1e7dc'; { const BL = B.BEL; c.fillRect(BL.x0, BL.z0, BL.x1 - BL.x0, BL.z1 - BL.z0); }
