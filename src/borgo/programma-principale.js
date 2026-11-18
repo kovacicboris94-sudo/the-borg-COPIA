@@ -434,7 +434,9 @@
     io.av.sedT = 0; io.av.sdrT = 0; io.av.root.rotation.order = 'YXZ'; io.av.root.rotation.x = -PI / 2 * io.av.sdr;
     const sa = Math.sin(C.az), ca = Math.cos(C.az);
     const wx = ca * jx + (-sa) * (-jy), wz = -sa * jx + (-ca) * (-jy);
-    const n = Math.hypot(wx, wz) || 1, vmax = CFG.velocita * (io.bici ? 1.9 : 1) * (forza > 0.02 ? (0.45 + 0.55 * forza) : 0);
+    // corsa: tasto 🏃 (o Maiuscolo tenuto premuto), in piazza e nelle stanze; la bici va ancora piu' veloce
+    const corre = io.corre || tasti['shift'];
+    const n = Math.hypot(wx, wz) || 1, vmax = CFG.velocita * (io.bici ? 2.5 : corre ? 1.7 : 1) * (forza > 0.02 ? (0.45 + 0.55 * forza) : 0);
     const acc = 1 - Math.exp(-dt * (forza > 0.02 ? 11 : 15));
     io.vx += (wx / n * vmax - io.vx) * acc; io.vz += (wz / n * vmax - io.vz) * acc;
     const vel = Math.hypot(io.vx, io.vz);
@@ -509,6 +511,7 @@
 
   { const bc = $('#btn-cam'); if (bc) bc.addEventListener('click', () => setSegui(!C.segui)); }
   { const bb = $('#btn-bici'); if (bb) bb.addEventListener('click', () => setBici(!io.bici)); }
+  { const bc = $('#btn-corri'); if (bc) bc.addEventListener('click', () => { io.corre = !io.corre; bc.classList.toggle('attivo', io.corre); G.emetti('toast', io.corre ? 'Corsa attiva: ti muovi più veloce' : 'Si torna a camminare'); }); }
   B.app = {
     io, gC, vistaAlto, assegnaLuci, ricostruisciCasa, casaOspite, setBici, creaBici, npc, C, cam, scene, renderer, stanze, G, joy, entraStanza, usaPorta, portaVicina, misura, atmosfera, impostaZoom,
     inclina, emote, mostraBolla, ruota: d => { C.azT += d * PI / 2; setSegui(false); },

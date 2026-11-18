@@ -450,6 +450,7 @@ body.orizz #inizio .nota { grid-column: 1; grid-row: 4; align-self: start; }
 body.orizz #inizio-anteprima { width: 120px; height: 140px; }
 
 #btn-bici.attivo { background: #d8453b; border-color: #fff; }
+#btn-corri.attivo { background: #2f8f5b; border-color: #fff; }
 #btn-cam.attivo { background: #3b7fd6; border-color: #fff; }
 
 /* ---------- STARLIGHT, la moneta del borgo: bastoncino che brilla come la luce del giorno ---------- */
