@@ -445,13 +445,13 @@
   UI.disegnaMinimappa = function () {
     const cvs = $('#minimappa'), a = B.app; if (!a || !a.gioco() || !cvs.offsetParent) return;
     const st = a.stanza(), io = a.io, C = a.C, c = cvs.getContext('2d'), W = cvs.width, H = cvs.height;
-    const grande = cvs.classList.contains('grande'), r0 = st.rect;
-    const s = grande ? W / (st.id === 'piazza' ? 76 : st.id === 'sala' ? 60 : st.id === 'collectibles' ? 30 : st.id === 'tcg' ? 52 : st.id === 'biblioteca' ? 20 : st.id === 'scacchi' ? 24 : 28) : (st.id === 'piazza' ? 8.5 : st.id === 'sala' ? 13 : st.id === 'collectibles' || st.id === 'biblioteca' || st.id === 'scacchi' ? 11 : 14) * (W / 196);
+    const grande = cvs.classList.contains('grande'), r0 = st.rect, est = st.id === 'piazza' || st.luogo === 'piazza';   // il tetto della torre e' piazza
+    const s = grande ? W / (est ? 76 : st.id === 'sala' ? 60 : st.id === 'collectibles' ? 30 : st.id === 'tcg' ? 52 : st.id === 'biblioteca' ? 20 : st.id === 'scacchi' ? 24 : 28) : (est ? 8.5 : st.id === 'sala' ? 13 : st.id === 'collectibles' || st.id === 'biblioteca' || st.id === 'scacchi' ? 11 : 14) * (W / 196);
     const mx = grande ? (r0.x0 + r0.x1) / 2 : io.x, mz = grande ? (r0.z0 + r0.z1) / 2 : io.z;       // centro della mappa
     c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = st.sfondo; c.fillRect(0, 0, W, H);
     c.translate(W / 2, H / 2); c.rotate(C.az); c.scale(s, s); c.translate(-mx, -mz);
     const r = st.rect;
-    if (st.id === 'piazza') {
+    if (est) {
       if (B.Mura) B.Mura.mappa(c);   // le mura attorno alla piazza
       c.fillStyle = '#e3cfae'; const PX = B.CFG.plaza; c.fillRect(r.x0, r.z0, PX.x1 - r.x0, r.z1 - r.z0);;
       c.fillStyle = '#8fcbc5'; c.beginPath(); c.arc(0, 30, 6.3, 0, 7); c.fill();
@@ -467,13 +467,13 @@
     c.fillStyle = 'rgba(70,45,70,.55)';
     st.ostacoli.forEach(o => { if (o.t === 'f') return; if (o.t === 'b') c.fillRect(o.x0, o.z0, o.x1 - o.x0, o.z1 - o.z0); else { c.beginPath(); c.arc(o.x, o.z, Math.max(o.r, 0.3), 0, 7); c.fill(); } });
     st.porte.forEach(p => { c.fillStyle = p.verso ? '#ffd98a' : '#c9c1d6'; c.beginPath(); c.arc(p.x, p.z, 0.5, 0, 7); c.fill(); });
-    if (st.id === 'piazza') a.npc.forEach(n => { if (n.bloccato) return; c.fillStyle = '#ffffff'; c.beginPath(); c.arc(n.x, n.z, 0.45, 0, 7); c.fill(); });
+    if (est) a.npc.forEach(n => { if (n.bloccato) return; c.fillStyle = '#ffffff'; c.beginPath(); c.arc(n.x, n.z, 0.45, 0, 7); c.fill(); });
     c.setTransform(1, 0, 0, 1, 0, 0);
     // il giocatore e' sempre al centro, con la freccia che indica dove guarda
     const dx = Math.sin(io.yaw), dz = Math.cos(io.yaw), cs = Math.cos(C.az), sn = Math.sin(C.az);
     const fx = dx * cs - dz * sn, fy = dx * sn + dz * cs, ang = Math.atan2(fy, fx);
     const proj = (x, z) => { const px = (x - mx) * s, pz = (z - mz) * s; return [W / 2 + px * cs - pz * sn, H / 2 + px * sn + pz * cs]; };
-    if (grande && st.id === 'piazza') {                       // nomi dei luoghi, dritti e leggibili
+    if (grande && est) {                       // nomi dei luoghi, dritti e leggibili
       c.font = '700 ' + Math.round(W / 40) + 'px system-ui,sans-serif'; c.textAlign = 'center'; c.lineWidth = 4; c.strokeStyle = 'rgba(30,18,45,.85)'; c.fillStyle = '#fff3d6';
       st.edifici.forEach(e => { if (!e.nome) return; const q = proj(e.x, e.z); c.strokeText(e.nome, q[0], q[1] + 4); c.fillText(e.nome, q[0], q[1] + 4); });
       const f = proj(0, 30); c.strokeText('Fontana', f[0], f[1]); c.fillText('Fontana', f[0], f[1]);
