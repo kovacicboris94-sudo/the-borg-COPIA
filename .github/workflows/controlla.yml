@@ -22,6 +22,11 @@ jobs:
       - run: node test/scacchi.test.mjs
       - run: node test/sito.test.mjs
       - run: bash server/test/produzione.test.sh
+      - name: Prova il server di gioco e Claude nel borgo (Nakama vero in Docker)
+        run: |
+          docker compose -f server/docker-compose.yml up -d --wait nakama
+          node server/test/stanza.test.mjs
+          node server/test/claude.test.mjs
       - name: Controlla la configurazione del server online
         run: |
           printf 'DOMINIO=a.sslip.io\nDB_PASSWORD=a\nSESSIONE_CHIAVE=a\nSESSIONE_RINNOVO_CHIAVE=a\nRUNTIME_HTTP_KEY=a\nCONSOLE_PASSWORD=a\nCONSOLE_FIRMA=a\n' > /tmp/prova.env

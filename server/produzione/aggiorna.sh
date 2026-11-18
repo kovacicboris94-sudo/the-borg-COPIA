@@ -19,7 +19,8 @@ git fetch -q origin "$RAMO"
 PRIMA=$(git rev-parse HEAD); DOPO=$(git rev-parse "origin/$RAMO")
 if [ "$PRIMA" = "$DOPO" ] && [ $FORZA = 0 ]; then exit 0; fi
 
-CAMBIATI=$(git diff --name-only "$PRIMA" "$DOPO" -- server/ || true)
+# il servizio Claude nel borgo usa anche il filtro della chat del gioco
+CAMBIATI=$(git diff --name-only "$PRIMA" "$DOPO" -- server/ src/chat/filtro.js || true)
 git reset -q --hard "origin/$RAMO"
 echo "$(date -Is) codice aggiornato a $(git rev-parse --short HEAD)"
 
@@ -36,5 +37,6 @@ dc up -d --remove-orphans
 # i moduli e i file di configurazione sono montati: up -d non se ne accorge
 if [ $FORZA = 1 ] || echo "$CAMBIATI" | grep -qE '^server/(nakama/|produzione/nakama\.yml)'; then dc restart nakama; fi
 if [ $FORZA = 1 ] || echo "$CAMBIATI" | grep -q '^server/produzione/Caddyfile'; then dc restart caddy; fi
+if [ $FORZA = 1 ] || echo "$CAMBIATI" | grep -qE '^(server/(claude-mcp|client)/|src/chat/filtro\.js)'; then dc restart claude; fi
 docker image prune -f >/dev/null
 echo "$(date -Is) server riavviato"

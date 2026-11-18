@@ -15,12 +15,12 @@ src/
   chat/                filtro della chat (parolacce, dati personali, modalità lenta)
   negozi/              Laugh Tale Collectibles e negozio TCG
   minigiochi/          go-kart, paintball, cripta, belinverse, borg-bubble, nascondino, scacchi, fronte (Fronte della Cometa), comandi FPS condivisi
-  online/              gioco online con gli amici
+  online/              gioco online con gli amici e Claude nel borgo (claude.js)
   librerie/            three.js, il suo caricatore GLB (gltf-loader.js) e PeerJS (codice di terzi, non si tocca)
   dati/                immagini incollate come testo (loghi)
 img/belinverse/        immagini delle carte di Belinverse (file a parte: il telefono le scarica solo quando servono)
 modelli/               modelli 3D .glb (file a parte, scaricati quando servono; licenze in modelli/LEGGIMI.md)
-server/                server di gioco Nakama (vedi server/README.md)
+server/                server di gioco Nakama e Claude nel borgo (vedi server/README.md e server/claude-mcp/README.md)
 test/                  prove automatiche (node test/filtro.test.mjs, node test/nascondino.test.mjs, node test/scacchi.test.mjs, node test/fronte.test.mjs...)
 strumenti/             costruisci.mjs, scomponi.mjs, pubblica.mjs e impacchetta-glb.mjs (unisce modelli glTF in un .glb)
 ```

@@ -2,6 +2,7 @@
 #   cd server && docker compose up
 # Poi il gioco si collega con ?amici=<codice>&server=127.0.0.1:7350
 # Console di amministrazione: http://127.0.0.1:7351 (admin / password, solo in locale)
+# Claude nel borgo (server MCP): http://127.0.0.1:7352/mcp
 services:
   postgres:
     image: postgres:16-alpine
@@ -38,6 +39,22 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Claude nel borgo: server MCP (claude-mcp/), legge client e filtro della chat dal repository
+  claude:
+    image: node:22-alpine
+    depends_on:
+      nakama:
+        condition: service_healthy
+    working_dir: /app
+    command: ["node", "server/claude-mcp/servizio.mjs"]
+    environment:
+      NAKAMA: http://nakama:7350
+      RUNTIME_HTTP_KEY: defaulthttpkey   # la chiave predefinita di Nakama, solo in locale
+    volumes:
+      - ..:/app:ro
+    ports:
+      - "7352:7352"
 
 volumes:
   dati:

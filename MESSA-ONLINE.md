@@ -9,6 +9,7 @@
 | `https://tuodominio.it` (e `www.`) | Il gioco | Cloudflare Pages (gratis) |
 | `https://api.tuodominio.it` | Server online: stanze amici, poi account e salvataggi | VPS Hetzner (pochi euro al mese) |
 | `https://console.api.tuodominio.it` | Console di amministrazione del server | stesso VPS |
+| `https://api.tuodominio.it/mcp` | Claude nel borgo: i giocatori lo aggiungono in Claude come connettore | stesso VPS |
 
 Il gioco aperto dal dominio si collega da solo a `api.` del suo dominio: non serve cambiare il codice quando si sceglie il nome. Il link con `?amici=codice` passa dal server; il vecchio link di GitHub resta com'è (PeerJS).
 

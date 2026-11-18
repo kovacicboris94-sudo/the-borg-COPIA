@@ -6,7 +6,9 @@
   "scripts": {
     "build": "node strumenti/costruisci.mjs",
     "controlla": "node strumenti/costruisci.mjs --controlla",
-    "test:server": "node server/test/stanza.test.mjs"
+    "test:server": "node server/test/stanza.test.mjs",
+    "test:claude": "node server/test/claude.test.mjs",
+    "claude-mcp": "node server/claude-mcp/servizio.mjs"
   },
   "engines": {
     "node": ">=18"

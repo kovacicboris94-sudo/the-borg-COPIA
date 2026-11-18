@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="96d51c9f938d">
+  <meta name="versione" content="34b535a57f2b">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -650,6 +650,8 @@ body.orizz #inizio-anteprima { width: 120px; height: 140px; }
         <div id="bloccati-lista"></div>
         <button id="btn-regole" class="btn-secondario">Le regole della chat</button>
       </div>
+      <h3 class="titolo-sezione">Claude nel borgo</h3>
+      <div class="info-box sicurezza-box" id="claude-box"></div>
       <h3 class="titolo-sezione">Informazioni sul prototipo</h3>
       <div class="info-box">
         <p><strong>Funziona davvero (in locale):</strong> mondo 3D con joystick e collisioni, piazza con belvedere e scale, casa con terrazza, cambio stanza dalle porte, minimappa, avatar personalizzabile (capelli, colori, vestiti, accessori), nickname e aspetto salvati sul dispositivo, rotazione della visuale, zoom, atmosfere.</p>
@@ -30609,6 +30611,9 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
    chiede al server la partita del codice (rpc stanza_entra) e ci entra;
    da li' manda la sua presenza (op 1) e riceve quella degli altri.
    Se la connessione cade riprova da solo, con attese crescenti.
+   opz.accedi: funzione che restituisce { token } al posto dell'accesso anonimo
+   (la usa il compagno Claude, server/claude-mcp/); opz.fine(motivo) se non si puo' piu' entrare.
+   rpc(id, dati): chiama una RPC del server con la sessione del giocatore (es. claude_codice).
    Indirizzo del server: "host:porta" (senza https, per lo sviluppo in locale)
    oppure "https://host" (in produzione, websocket sicuro).
    ===================================================================== */
@@ -30616,7 +30621,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
   'use strict';
   const B = window.B3 = window.B3 || {};
   const CHIAVE = 'defaultkey';   // chiave pubblica del server (non e' un segreto: sta in ogni client)
-  const OP_PRESENZA = 1, OP_TUTTI = 2, OP_VIA = 3, MAX_BYTE = 8192;
+  const OP_PRESENZA = 1, OP_TUTTI = 2, OP_VIA = 3, OP_FINE = 4, MAX_BYTE = 8192;
 
   // testo <-> base64 in UTF-8 (il protocollo JSON di Nakama manda i dati in base64)
   const a64 = s => { const b = new TextEncoder().encode(s); let t = ''; for (let i = 0; i < b.length; i += 0x8000) t += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(t); };
@@ -30686,18 +30691,24 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
         d.l.slice(0, 64).forEach(x => Array.isArray(x) && metti(x[0], x[1]));
         [...altri.keys()].forEach(k => { if (!ks.includes(k)) via(k); });
       } else if (op === OP_VIA && d.id) via(d.id);
+      else if (op === OP_FINE) { chiuso = true; try { ws.close(); } catch (e) { } if (opz.fine) opz.fine(String(d.motivo || 'scollegato')); }   // solo per il compagno Claude
     }
 
     async function collega() {
       if (chiuso) return;
       ws = null;
       try {
-        const r = await fetch(url.http + '/v2/account/authenticate/device?create=true', {
-          method: 'POST', headers: { 'Authorization': 'Basic ' + btoa(CHIAVE + ':'), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: dispositivo })
-        });
-        if (!r.ok) throw new Error('accesso ' + r.status);
-        const sess = await r.json();
+        let sess;
+        if (opz.accedi) {
+          try { sess = await opz.accedi(); } catch (e) { if (e && e.fine) { chiuso = true; if (opz.fine) opz.fine(e.message); return; } throw e; }
+        } else {
+          const r = await fetch(url.http + '/v2/account/authenticate/device?create=true', {
+            method: 'POST', headers: { 'Authorization': 'Basic ' + btoa(CHIAVE + ':'), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: dispositivo })
+          });
+          if (!r.ok) throw new Error('accesso ' + r.status);
+          sess = await r.json();
+        }
         try { mioId = JSON.parse(atob(sess.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).uid; } catch (e) { }
         const s = ws = new WebSocket(url.ws + '/ws?lang=it&status=false&format=json&token=' + encodeURIComponent(sess.token));
         s.onmessage = ricevi;
@@ -30730,6 +30741,10 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
       presence(patch) { mia = Object.assign({}, mia, patch); mandaMia(); return Promise.resolve(); },
       onPeers(f) { subs.push(f); return () => { const i = subs.indexOf(f); if (i >= 0) subs.splice(i, 1); }; },
       chiudi() { chiuso = true; if (ws) try { ws.close(); } catch (e) { } },
+      rpc(id, dati) {
+        if (!aperto || !ws || ws.readyState !== 1) return Promise.reject(new Error('non collegato al server'));
+        return chiedi({ rpc: { id, payload: JSON.stringify(dati || {}) } }).then(m => JSON.parse((m.rpc && m.rpc.payload) || '{}'));
+      },
       stato: () => ({ server: url.http, aperto, mioId, matchId, altri: altri.size })
     };
   };
@@ -30819,7 +30834,8 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     const av = B.unisciAvatar ? B.unisciAvatar(grezzo) : grezzo;
     av.root.traverse(q => { if (q.isMesh) { q.castShadow = false; q.receiveShadow = false; } });
     const nick = testo(pr.nick, 20) || 'Amico';
-    const et = B.etichetta(nick, { sfondo: '#7fd6a4', colore: '#163322', altezza: 0.38 }); et.position.y = 2.52; av.root.add(et);
+    // il compagno Claude di un giocatore (il segno ai lo mette solo il server): etichetta diversa, con 🤖
+    const et = pr.ai === 1 ? B.etichetta('🤖 ' + nick, { sfondo: '#e8a37c', colore: '#3a1d0e', altezza: 0.38 }) : B.etichetta(nick, { sfondo: '#7fd6a4', colore: '#163322', altezza: 0.38 }); et.position.y = 2.52; av.root.add(et);
     app.scene.add(av.root);
     const a = { peer, av, nick, eqK: eq, lookK: JSON.stringify(look), x: num(pr.x, 0), z: num(pr.z, 0), y: num(pr.y, 0), r: num(pr.r, 0), vel: 0, bolla: null, durBolla: 0, nMsg: pr.msg ? pr.msg.n : 0, nEm: pr.em ? pr.em.n : 0, nDm: maxDm(pr), nEv: maxN(pr.ev), nMo: maxN(pr.mo), nRe: maxN(pr.re), pr, q: null, off: null, buf: [], bk: null, vis: false };
     noti.set(nick.toLowerCase(), { nick, look });
@@ -30865,7 +30881,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     let a = amici.get(peer);
     // arrivato in ritardo dopo uno piu' nuovo: si butta (ogni aggiornamento contiene gia' tutto)
     if (a && a.q != null && typeof pr.q === 'number' && pr.q <= a.q && !(typeof pr.t === 'number' && pr.t < a.tm - 2000)) return;   // t molto piu' piccolo: ha ricaricato la pagina
-    if (a && (JSON.stringify(lookDa(pr.look)) !== a.lookK || eqDa(pr.eq) !== a.eqK || (testo(pr.nick, 20) || 'Amico') !== a.nick)) { const vecchio = a; togli(peer); a = crea(peer, pr); a.nMsg = vecchio.nMsg; a.nEm = vecchio.nEm; a.nDm = vecchio.nDm; a.nEv = vecchio.nEv; a.nMo = vecchio.nMo; a.nRe = vecchio.nRe; }
+    if (a && ((pr.ai === 1) !== (a.pr.ai === 1) || JSON.stringify(lookDa(pr.look)) !== a.lookK || eqDa(pr.eq) !== a.eqK || (testo(pr.nick, 20) || 'Amico') !== a.nick)) { const vecchio = a; togli(peer); a = crea(peer, pr); a.nMsg = vecchio.nMsg; a.nEm = vecchio.nEm; a.nDm = vecchio.nDm; a.nEv = vecchio.nEv; a.nMo = vecchio.nMo; a.nRe = vecchio.nRe; }
     if (!a) {
       a = crea(peer, pr);
       if (G.stato.giocatore) G.emetti('toast', a.nick + ' è online');
@@ -30979,7 +30995,8 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     const s = a ? String(a.pr.s || '') : '', st = a && B.app.stanze && B.app.stanze[s];
     const casaDi = s.indexOf('casa:') === 0 ? s.slice(5) : null;
     return { id, nick: a ? a.nick : n.nick, look: a ? lookDa(a.pr.look) : n.look, online: !!a, amico: true,
-      dove: !a ? 'Non in linea' : casaDi ? (stessoLuogo(casaDi, a.nick) ? 'A casa sua' : stessoLuogo(casaDi, mioNick()) ? 'A casa tua' : 'A casa di ' + testo(casaDi, 20)) : (NOMI[s] || (st && st.nome ? 'In ' + st.nome : 'Nel borgo')), bio: 'Collegato con il vostro codice amici: i messaggi privati arrivano davvero.' };
+      dove: !a ? 'Non in linea' : casaDi ? (stessoLuogo(casaDi, a.nick) ? 'A casa sua' : stessoLuogo(casaDi, mioNick()) ? 'A casa tua' : 'A casa di ' + testo(casaDi, 20)) : (NOMI[s] || (st && st.nome ? 'In ' + st.nome : 'Nel borgo')),
+      bio: a && a.pr.ai === 1 ? '🤖 Un\'intelligenza artificiale (Claude) collegata da ' + testo(a.pr.di, 20) + ': risponde quando ' + testo(a.pr.di, 20) + ' la usa. Non scriverle dati personali.' : 'Collegato con il vostro codice amici: i messaggi privati arrivano davvero.' };
   };
   G.inviaDM = function (id, t) {
     if (typeof id !== 'string' || id.indexOf('amico:') !== 0) return inviaOrig(id, t);
@@ -31265,8 +31282,113 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
   }).catch(() => { });
   // chi e' nel tuo stesso luogo (per i suggerimenti delle @menzioni)
   const qui = () => [...amici.values()].filter(a => stessoLuogo(a.pr.s, luogo()) && !bloccato(a)).map(a => ({ id: idAmico(a.nick), nick: a.nick }));
-  B.Online = { visita, raggiungi, compra, qui, annunci: () => [...amici.values()].reduce((o, a) => o.concat(annunciDi(a)), []), inLinea: () => !!room, stato: () => room && room.stato ? room.stato() : null, amici: () => [...amici.values()].map(a => ({ nick: a.nick, s: a.pr.s, x: a.x, z: a.z, bici: !!a.bk })) };
+  // per Claude nel borgo (src/online/claude.js): le RPC del server con la sessione di questo telefono
+  const rpc = (id, dati) => (room && room.rpc ? room.rpc(id, dati) : Promise.reject(new Error('serve il server di gioco')));
+  B.Online = { visita, raggiungi, compra, qui, rpc, codice: CODICE, server: CODICE ? SERVER : '', mioNick, annunci: () => [...amici.values()].reduce((o, a) => o.concat(annunciDi(a)), []), inLinea: () => !!room, stato: () => room && room.stato ? room.stato() : null, amici: () => [...amici.values()].map(a => ({ nick: a.nick, s: a.pr.s, x: a.x, z: a.z, bici: !!a.bk })) };
   ciclo();
+})();
+</script>
+<script>
+/* =====================================================================
+   CLAUDE NEL BORGO (Profilo -> "Claude nel borgo")
+   Ognuno puo' far entrare il SUO Claude (claude.ai, app di Claude, Claude Code)
+   come compagno: un avatar con 🤖 che lo segue, legge la chat e parla.
+   Niente API a pagamento: Claude si collega al server di gioco come connettore
+   MCP (server/claude-mcp/) e lavora dentro l'abbonamento di chi lo usa.
+   Qui si crea il codice (RPC claude_codice, vale 12 ore) da dare a Claude
+   e si scollega (RPC claude_revoca). Serve una stanza amici sul server Nakama.
+   ===================================================================== */
+(function () {
+  'use strict';
+  const B = window.B3, G = window.Gioco;
+  const box = document.getElementById('claude-box');
+  if (!B || !G || !box) return;
+  const CHIAVE = 'borg_claude';
+
+  function indirizzoMcp(server) {
+    const s = String(server || '').trim().replace(/\/+$/, '');
+    const sicuro = /^https:\/\//i.test(s) || (!/^http:\/\//i.test(s) && !/^(localhost|127\.|192\.168\.|10\.)/.test(s.replace(/^https?:\/\//i, '')) && !/:\d+$/.test(s));
+    const host = s.replace(/^https?:\/\//i, '');
+    return sicuro ? 'https://' + host + '/mcp' : 'http://' + host.replace(/:\d+$/, '') + ':7352/mcp';   // in locale il servizio ha la sua porta
+  }
+  const leggi = () => { try { const v = JSON.parse(localStorage.getItem(CHIAVE) || 'null'); return v && v.scade > Date.now() && O() && v.stanza === O().codice ? v : null; } catch (e) { return null; } };
+  const salva = v => { try { if (v) localStorage.setItem(CHIAVE, JSON.stringify(v)); else localStorage.removeItem(CHIAVE); } catch (e) { } };
+  const O = () => B.Online;
+  const toast = t => G.emetti('toast', t);
+  const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+
+  function copia(t, fatto) {
+    const vecchio = () => { const ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0'; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) { } ta.remove(); return ok; };
+    const ok = () => toast(fatto), ko = () => toast('Non riesco a copiare: scrivilo a mano');
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, () => (vecchio() ? ok() : ko()));
+    else (vecchio() ? ok() : ko());
+  }
+  function riga(etichetta, valore, msgCopia) {
+    const d = el('div'); d.style.cssText = 'display:flex;gap:8px;align-items:center';
+    const v = el('code', null, valore); v.style.cssText = 'flex:1;min-width:0;overflow-wrap:anywhere;padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.25);font:600 13px ui-monospace,monospace;color:var(--crema)';
+    const b = el('button', 'btn-secondario', 'Copia'); b.type = 'button'; b.style.cssText = 'padding:8px 12px;flex:none';
+    b.addEventListener('click', () => copia(valore, msgCopia));
+    d.append(v, b);
+    const w = el('div'); w.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+    w.append(el('p', null, etichetta), d);
+    return w;
+  }
+
+  let occupato = false;
+  async function crea() {
+    if (occupato) return; occupato = true;
+    try {
+      const nick = O().mioNick();
+      if (!nick) { toast('Prima scegli un nickname'); return; }
+      const r = await O().rpc('claude_codice', { stanza: O().codice, nick });
+      salva({ codice: r.codice, scade: r.scade, stanza: O().codice });
+      toast('Codice pronto: dallo al tuo Claude');
+    } catch (e) { toast('Non riesco a creare il codice: ' + ((e && e.message) || 'server non raggiungibile')); }
+    finally { occupato = false; disegna(); }
+  }
+  async function scollega() {
+    if (occupato) return; occupato = true;
+    try { await O().rpc('claude_revoca', {}); salva(null); toast('Claude scollegato: il codice non vale più'); }
+    catch (e) { toast('Non riesco a scollegare Claude: riprova'); }
+    finally { occupato = false; disegna(); }
+  }
+
+  function disegna() {
+    box.textContent = '';
+    box.append(el('p', null, 'Fai entrare nel borgo il tuo Claude: compare accanto a te con 🤖, ti segue, legge la chat e parla con te e con i tuoi amici. Usa il tuo account Claude (anche dal telefono, nell\'app di Claude): non costa niente in più.'));
+    const o = O();
+    if (!o || !o.server || !o.rpc) {
+      box.append(el('p', null, 'Funziona quando giochi online con una stanza amici sul server del borgo (link con ?amici=…).'));
+      return;
+    }
+    if (!o.inLinea() || !(o.stato() && o.stato().aperto)) {
+      box.append(el('p', null, 'Mi sto collegando al server… riapri questa pagina tra un attimo.'));
+      return;
+    }
+    const v = leggi(), url = indirizzoMcp(o.server);
+    if (!v) {
+      const b = el('button', 'btn-primario', 'Collega il mio Claude'); b.type = 'button';
+      b.addEventListener('click', crea);
+      box.append(b);
+      return;
+    }
+    const ore = Math.max(1, Math.round((v.scade - Date.now()) / 3600000));
+    box.append(
+      riga('1. Solo la prima volta: in Claude apri Impostazioni → Connettori → Aggiungi connettore personalizzato, chiamalo "The Borg" e incolla questo indirizzo:', url, 'Indirizzo copiato'),
+      riga('2. Scrivi a Claude (vale ancora circa ' + ore + (ore === 1 ? ' ora' : ' ore') + '):', 'Entra in The Borg con il codice ' + v.codice, 'Frase copiata: incollala in Claude'),
+      el('p', null, 'Chi ha il codice comanda il tuo Claude nel borgo: non darlo a nessuno. Claude risponde quando gli scrivi nell\'app, oppure se gli chiedi di restare in ascolto della chat.')
+    );
+    const fila = el('div'); fila.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
+    const nuovo = el('button', 'btn-secondario', 'Nuovo codice'); nuovo.type = 'button'; nuovo.addEventListener('click', crea);
+    const via = el('button', 'btn-secondario', 'Scollega Claude'); via.type = 'button'; via.style.color = '#ffb3a8'; via.addEventListener('click', scollega);
+    fila.append(nuovo, via); box.append(fila);
+  }
+
+  // si ridisegna quando si apre il profilo (lo stato del server puo' essere cambiato)
+  const pagina = document.getElementById('pagina-profilo');
+  if (pagina && window.MutationObserver) new MutationObserver(() => { if (!pagina.hidden) disegna(); }).observe(pagina, { attributes: true, attributeFilter: ['hidden'] });
+  disegna();
+  B.ClaudeBorgo = { indirizzoMcp, disegna };
 })();
 
 </script>

@@ -1,9 +1,15 @@
 # Caddy fa da porta d'ingresso: prende da solo i certificati HTTPS (Let's Encrypt)
-# e passa le richieste a Nakama. DOMINIO arriva da /etc/the-borg/.env.
+# e passa le richieste a Nakama (e quelle di /mcp al servizio Claude nel borgo). DOMINIO arriva da /etc/the-borg/.env.
 
 {$DOMINIO} {
 	encode gzip
-	reverse_proxy nakama:7350
+	# Claude nel borgo (server MCP)
+	handle /mcp* {
+		reverse_proxy claude:7352
+	}
+	handle {
+		reverse_proxy nakama:7350
+	}
 }
 
 console.{$DOMINIO} {

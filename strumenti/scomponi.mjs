@@ -88,6 +88,7 @@ export const BLOCCHI = [
   // il client del server vive in server/ (lo usa anche il test): niente copie
   ['STANZA AMICI SUL SERVER NAKAMA', 'server/client/nakama-stanza.js'],
   ['ONLINE CON GLI AMICI', 'src/online/amici.js'],
+  ['CLAUDE NEL BORGO (Profilo', 'src/online/claude.js'],
 ];
 
 // Immagini incollate dentro l'HTML (attributo src="data:...") portate in file a parte.

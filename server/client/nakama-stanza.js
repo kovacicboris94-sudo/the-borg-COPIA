@@ -6,6 +6,9 @@
    chiede al server la partita del codice (rpc stanza_entra) e ci entra;
    da li' manda la sua presenza (op 1) e riceve quella degli altri.
    Se la connessione cade riprova da solo, con attese crescenti.
+   opz.accedi: funzione che restituisce { token } al posto dell'accesso anonimo
+   (la usa il compagno Claude, server/claude-mcp/); opz.fine(motivo) se non si puo' piu' entrare.
+   rpc(id, dati): chiama una RPC del server con la sessione del giocatore (es. claude_codice).
    Indirizzo del server: "host:porta" (senza https, per lo sviluppo in locale)
    oppure "https://host" (in produzione, websocket sicuro).
    ===================================================================== */
@@ -13,7 +16,7 @@
   'use strict';
   const B = window.B3 = window.B3 || {};
   const CHIAVE = 'defaultkey';   // chiave pubblica del server (non e' un segreto: sta in ogni client)
-  const OP_PRESENZA = 1, OP_TUTTI = 2, OP_VIA = 3, MAX_BYTE = 8192;
+  const OP_PRESENZA = 1, OP_TUTTI = 2, OP_VIA = 3, OP_FINE = 4, MAX_BYTE = 8192;
 
   // testo <-> base64 in UTF-8 (il protocollo JSON di Nakama manda i dati in base64)
   const a64 = s => { const b = new TextEncoder().encode(s); let t = ''; for (let i = 0; i < b.length; i += 0x8000) t += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(t); };
@@ -83,18 +86,24 @@
         d.l.slice(0, 64).forEach(x => Array.isArray(x) && metti(x[0], x[1]));
         [...altri.keys()].forEach(k => { if (!ks.includes(k)) via(k); });
       } else if (op === OP_VIA && d.id) via(d.id);
+      else if (op === OP_FINE) { chiuso = true; try { ws.close(); } catch (e) { } if (opz.fine) opz.fine(String(d.motivo || 'scollegato')); }   // solo per il compagno Claude
     }
 
     async function collega() {
       if (chiuso) return;
       ws = null;
       try {
-        const r = await fetch(url.http + '/v2/account/authenticate/device?create=true', {
-          method: 'POST', headers: { 'Authorization': 'Basic ' + btoa(CHIAVE + ':'), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: dispositivo })
-        });
-        if (!r.ok) throw new Error('accesso ' + r.status);
-        const sess = await r.json();
+        let sess;
+        if (opz.accedi) {
+          try { sess = await opz.accedi(); } catch (e) { if (e && e.fine) { chiuso = true; if (opz.fine) opz.fine(e.message); return; } throw e; }
+        } else {
+          const r = await fetch(url.http + '/v2/account/authenticate/device?create=true', {
+            method: 'POST', headers: { 'Authorization': 'Basic ' + btoa(CHIAVE + ':'), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: dispositivo })
+          });
+          if (!r.ok) throw new Error('accesso ' + r.status);
+          sess = await r.json();
+        }
         try { mioId = JSON.parse(atob(sess.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).uid; } catch (e) { }
         const s = ws = new WebSocket(url.ws + '/ws?lang=it&status=false&format=json&token=' + encodeURIComponent(sess.token));
         s.onmessage = ricevi;
@@ -127,6 +136,10 @@
       presence(patch) { mia = Object.assign({}, mia, patch); mandaMia(); return Promise.resolve(); },
       onPeers(f) { subs.push(f); return () => { const i = subs.indexOf(f); if (i >= 0) subs.splice(i, 1); }; },
       chiudi() { chiuso = true; if (ws) try { ws.close(); } catch (e) { } },
+      rpc(id, dati) {
+        if (!aperto || !ws || ws.readyState !== 1) return Promise.reject(new Error('non collegato al server'));
+        return chiedi({ rpc: { id, payload: JSON.stringify(dati || {}) } }).then(m => JSON.parse((m.rpc && m.rpc.payload) || '{}'));
+      },
       stato: () => ({ server: url.http, aperto, mioId, matchId, altri: altri.size })
     };
   };

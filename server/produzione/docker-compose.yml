@@ -8,6 +8,7 @@
 # Indirizzi (DOMINIO e' per esempio 1-2-3-4.sslip.io finche' non c'e' il dominio vero):
 #   https://DOMINIO           API e websocket del gioco
 #   https://console.DOMINIO   console di amministrazione di Nakama
+#   https://DOMINIO/mcp       Claude nel borgo (server MCP, servizio "claude")
 # Solo Caddy e' raggiungibile da fuori (porte 80 e 443); Nakama e PostgreSQL no.
 name: the-borg
 
@@ -53,11 +54,28 @@ services:
       timeout: 3s
       retries: 10
 
+  # Claude nel borgo: ognuno collega il suo Claude come connettore MCP (server/claude-mcp/)
+  claude:
+    image: node:22-alpine
+    restart: unless-stopped
+    user: node
+    depends_on:
+      nakama:
+        condition: service_healthy
+    working_dir: /app
+    command: ["node", "server/claude-mcp/servizio.mjs"]
+    environment:
+      NAKAMA: http://nakama:7350
+      RUNTIME_HTTP_KEY: ${RUNTIME_HTTP_KEY:?manca RUNTIME_HTTP_KEY}
+    volumes:
+      - ../..:/app:ro
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
       - nakama
+      - claude
     environment:
       DOMINIO: ${DOMINIO:?manca DOMINIO}
     ports:

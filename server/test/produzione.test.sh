@@ -44,7 +44,7 @@ verifica ".env leggibile solo da root" '[ "$(stat -c %a "$ENV")" = 600 ]'
 verifica "password tolta da installa.conf" '! grep -q CONSOLE_PASSWORD "$THEBORG_CONF/installa.conf"'
 verifica "timer installati" '[ -f "$THEBORG_SYSTEMD/the-borg-aggiorna.timer" ] && grep -q "enable --now the-borg-aggiorna.timer the-borg-backup.timer" "$LOG"'
 verifica "firewall acceso" 'grep -q "ufw --force enable" "$LOG"'
-verifica "server avviato" 'grep -q "docker compose .* up -d" "$LOG" && grep -q "restart nakama" "$LOG"'
+verifica "server avviato" 'grep -q "docker compose .* up -d" "$LOG" && grep -q "restart nakama" "$LOG" && grep -q "restart claude" "$LOG"'
 verifica "indirizzo stampato" 'grep -q "https://1-2-3-4.sslip.io" "$T/out1"'
 
 echo "Seconda installazione: i segreti restano"
@@ -66,6 +66,9 @@ verifica "Caddy non riavviato" '! grep -q "restart caddy" "$LOG"'
 echo "# prova" >> "$T/origine/server/produzione/Caddyfile"; salva caddy
 : > "$LOG"; bash "$AGG" > /dev/null
 verifica "cambia il Caddyfile: Caddy riavviato" 'grep -q "restart caddy" "$LOG" && ! grep -q "restart nakama" "$LOG"'
+echo "// prova" >> "$T/origine/server/claude-mcp/mcp.mjs"; salva claude
+: > "$LOG"; bash "$AGG" > /dev/null
+verifica "cambia Claude nel borgo: riavviato solo lui" 'grep -q "restart claude" "$LOG" && ! grep -q "restart nakama" "$LOG" && ! grep -q "restart caddy" "$LOG"'
 
 echo "Dominio lasciato com'era nel cloud config"
 printf 'DOMINIO=api.tuodominio.it\n' > "$THEBORG_CONF/installa.conf"

@@ -1,7 +1,7 @@
 # Server di gioco di The Borg (Nakama)
 
 Il gioco online passa da un server [Nakama](https://heroiclabs.com/nakama/) con database PostgreSQL.
-Per ora il server gestisce le **stanze amici**: chi apre il gioco con lo stesso `?amici=<codice>` entra nella stessa stanza sul server e vede gli altri (posizione, look, chat, emote, messaggi privati, visite in casa, minigiochi, mercatino). È lo stesso protocollo di presenza che prima viaggiava su PeerJS, ma la stanza vive sul server: niente "padrone di casa" che, uscendo, fa cadere tutti.
+Il server gestisce le **stanze amici** e **Claude nel borgo** (ognuno collega il suo Claude come compagno, vedi [`claude-mcp/README.md`](claude-mcp/README.md)). Le stanze amici: chi apre il gioco con lo stesso `?amici=<codice>` entra nella stessa stanza sul server e vede gli altri (posizione, look, chat, emote, messaggi privati, visite in casa, minigiochi, mercatino). È lo stesso protocollo di presenza che prima viaggiava su PeerJS, ma la stanza vive sul server: niente "padrone di casa" che, uscendo, fa cadere tutti.
 
 ## Avviarlo in locale
 
@@ -14,6 +14,7 @@ docker compose up -d
 
 - API e websocket del gioco: `127.0.0.1:7350`
 - Console di amministrazione: http://127.0.0.1:7351 (admin / password, solo per il locale)
+- Claude nel borgo (server MCP): http://127.0.0.1:7352/mcp
 
 Poi apri il gioco con il server:
 
@@ -27,6 +28,7 @@ Da un telefono nella stessa rete Wi-Fi usa l'indirizzo del computer (es. `server
 
 ```sh
 node test/stanza.test.mjs          # tre giocatori finti: stanze, chat, ingressi, uscite, limiti
+node test/claude.test.mjs          # Claude nel borgo: codice, MCP, segue, chat, ascolto, scollega
 bash test/produzione.test.sh      # installazione e aggiornamento automatico del server online
 ```
 
@@ -34,10 +36,12 @@ bash test/produzione.test.sh      # installazione e aggiornamento automatico del
 
 | File | Cosa fa |
 |---|---|
-| `nakama/modules/the-borg.js` | Modulo del server: RPC `stanza_entra` (una sola partita per codice) e partita autoritativa `stanza` (presenze, anti-spam, limite 8 KB, chiusura delle stanze vuote) |
+| `nakama/modules/the-borg.js` | Modulo del server: RPC `stanza_entra` (una sola partita per codice) e partita autoritativa `stanza` (presenze, anti-spam, limite 8 KB, chiusura delle stanze vuote); RPC `claude_codice` / `claude_usa` / `claude_revoca` e segno `ai` dei compagni Claude |
+| `claude-mcp/` | Claude nel borgo: server MCP a cui ognuno collega il suo Claude (vedi il suo README) |
 | `nakama/local.yml` | Configurazione per il locale (le chiavi di produzione arrivano dalle variabili d'ambiente del server, mai dal repo) |
 | `client/nakama-stanza.js` | Client per il gioco: accesso anonimo con id del dispositivo, websocket, riconnessione automatica. **Entra in `index.html` da qui** (lo include `strumenti/costruisci.mjs`, prima del modulo online): se lo cambi, ricostruisci il gioco con `node strumenti/costruisci.mjs` (il test controlla che `index.html` sia aggiornato) |
 | `test/stanza.test.mjs` | Prova automatica con lo stesso client del gioco |
+| `test/claude.test.mjs` | Prova di Claude nel borgo, dal codice nel gioco alla chat |
 
 Nel gioco (`src/online/amici.js`, modulo "ONLINE CON GLI AMICI") il server si sceglie così:
 
@@ -63,10 +67,11 @@ Indirizzi (finché non c'è il dominio vero si usa sslip.io, che trasforma l'IP 
 
 - Gioco: `https://<ip-con-trattini>.sslip.io` → nel gioco `?amici=prova&server=https://<ip-con-trattini>.sslip.io`. Con il dominio vero non serve: il gioco su `https://tuodominio.it` usa da solo `https://api.tuodominio.it` (`B3.serverDelDominio`)
 - Console: `https://console.<ip-con-trattini>.sslip.io` (utente `admin`, la password scelta)
+- Claude nel borgo: `https://<ip-con-trattini>.sslip.io/mcp` (poi `https://api.<dominio>/mcp`), da aggiungere in Claude come connettore personalizzato
 
 ### Cosa fa da solo
 
-- **Aggiornamento automatico**: ogni 5 minuti controlla `main` su GitHub; se sono cambiati file di `server/`, scarica il codice e riavvia solo quello che serve (Nakama per i moduli, Caddy per il `Caddyfile`). Quindi: si unisce la pull request e in pochi minuti il server è aggiornato.
+- **Aggiornamento automatico**: ogni 5 minuti controlla `main` su GitHub; se sono cambiati file di `server/`, scarica il codice e riavvia solo quello che serve (Nakama per i moduli, Caddy per il `Caddyfile`, il servizio `claude` per `claude-mcp/`, `client/` e il filtro della chat). Quindi: si unisce la pull request e in pochi minuti il server è aggiornato.
 - **Backup** del database ogni notte in `/var/backups/the-borg` (tiene 14 giorni).
 - **Firewall**: aperte solo le porte 22 (SSH), 80 e 443. Nakama e il database non sono raggiungibili da fuori.
 - **Segreti** (chiavi di sessione, password del database) creati sul server in `/etc/the-borg/.env`, mai nel repository.

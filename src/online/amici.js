@@ -80,7 +80,8 @@
     const av = B.unisciAvatar ? B.unisciAvatar(grezzo) : grezzo;
     av.root.traverse(q => { if (q.isMesh) { q.castShadow = false; q.receiveShadow = false; } });
     const nick = testo(pr.nick, 20) || 'Amico';
-    const et = B.etichetta(nick, { sfondo: '#7fd6a4', colore: '#163322', altezza: 0.38 }); et.position.y = 2.52; av.root.add(et);
+    // il compagno Claude di un giocatore (il segno ai lo mette solo il server): etichetta diversa, con 🤖
+    const et = pr.ai === 1 ? B.etichetta('🤖 ' + nick, { sfondo: '#e8a37c', colore: '#3a1d0e', altezza: 0.38 }) : B.etichetta(nick, { sfondo: '#7fd6a4', colore: '#163322', altezza: 0.38 }); et.position.y = 2.52; av.root.add(et);
     app.scene.add(av.root);
     const a = { peer, av, nick, eqK: eq, lookK: JSON.stringify(look), x: num(pr.x, 0), z: num(pr.z, 0), y: num(pr.y, 0), r: num(pr.r, 0), vel: 0, bolla: null, durBolla: 0, nMsg: pr.msg ? pr.msg.n : 0, nEm: pr.em ? pr.em.n : 0, nDm: maxDm(pr), nEv: maxN(pr.ev), nMo: maxN(pr.mo), nRe: maxN(pr.re), pr, q: null, off: null, buf: [], bk: null, vis: false };
     noti.set(nick.toLowerCase(), { nick, look });
@@ -126,7 +127,7 @@
     let a = amici.get(peer);
     // arrivato in ritardo dopo uno piu' nuovo: si butta (ogni aggiornamento contiene gia' tutto)
     if (a && a.q != null && typeof pr.q === 'number' && pr.q <= a.q && !(typeof pr.t === 'number' && pr.t < a.tm - 2000)) return;   // t molto piu' piccolo: ha ricaricato la pagina
-    if (a && (JSON.stringify(lookDa(pr.look)) !== a.lookK || eqDa(pr.eq) !== a.eqK || (testo(pr.nick, 20) || 'Amico') !== a.nick)) { const vecchio = a; togli(peer); a = crea(peer, pr); a.nMsg = vecchio.nMsg; a.nEm = vecchio.nEm; a.nDm = vecchio.nDm; a.nEv = vecchio.nEv; a.nMo = vecchio.nMo; a.nRe = vecchio.nRe; }
+    if (a && ((pr.ai === 1) !== (a.pr.ai === 1) || JSON.stringify(lookDa(pr.look)) !== a.lookK || eqDa(pr.eq) !== a.eqK || (testo(pr.nick, 20) || 'Amico') !== a.nick)) { const vecchio = a; togli(peer); a = crea(peer, pr); a.nMsg = vecchio.nMsg; a.nEm = vecchio.nEm; a.nDm = vecchio.nDm; a.nEv = vecchio.nEv; a.nMo = vecchio.nMo; a.nRe = vecchio.nRe; }
     if (!a) {
       a = crea(peer, pr);
       if (G.stato.giocatore) G.emetti('toast', a.nick + ' è online');
@@ -240,7 +241,8 @@
     const s = a ? String(a.pr.s || '') : '', st = a && B.app.stanze && B.app.stanze[s];
     const casaDi = s.indexOf('casa:') === 0 ? s.slice(5) : null;
     return { id, nick: a ? a.nick : n.nick, look: a ? lookDa(a.pr.look) : n.look, online: !!a, amico: true,
-      dove: !a ? 'Non in linea' : casaDi ? (stessoLuogo(casaDi, a.nick) ? 'A casa sua' : stessoLuogo(casaDi, mioNick()) ? 'A casa tua' : 'A casa di ' + testo(casaDi, 20)) : (NOMI[s] || (st && st.nome ? 'In ' + st.nome : 'Nel borgo')), bio: 'Collegato con il vostro codice amici: i messaggi privati arrivano davvero.' };
+      dove: !a ? 'Non in linea' : casaDi ? (stessoLuogo(casaDi, a.nick) ? 'A casa sua' : stessoLuogo(casaDi, mioNick()) ? 'A casa tua' : 'A casa di ' + testo(casaDi, 20)) : (NOMI[s] || (st && st.nome ? 'In ' + st.nome : 'Nel borgo')),
+      bio: a && a.pr.ai === 1 ? '🤖 Un\'intelligenza artificiale (Claude) collegata da ' + testo(a.pr.di, 20) + ': risponde quando ' + testo(a.pr.di, 20) + ' la usa. Non scriverle dati personali.' : 'Collegato con il vostro codice amici: i messaggi privati arrivano davvero.' };
   };
   G.inviaDM = function (id, t) {
     if (typeof id !== 'string' || id.indexOf('amico:') !== 0) return inviaOrig(id, t);
@@ -526,6 +528,8 @@
   }).catch(() => { });
   // chi e' nel tuo stesso luogo (per i suggerimenti delle @menzioni)
   const qui = () => [...amici.values()].filter(a => stessoLuogo(a.pr.s, luogo()) && !bloccato(a)).map(a => ({ id: idAmico(a.nick), nick: a.nick }));
-  B.Online = { visita, raggiungi, compra, qui, annunci: () => [...amici.values()].reduce((o, a) => o.concat(annunciDi(a)), []), inLinea: () => !!room, stato: () => room && room.stato ? room.stato() : null, amici: () => [...amici.values()].map(a => ({ nick: a.nick, s: a.pr.s, x: a.x, z: a.z, bici: !!a.bk })) };
+  // per Claude nel borgo (src/online/claude.js): le RPC del server con la sessione di questo telefono
+  const rpc = (id, dati) => (room && room.rpc ? room.rpc(id, dati) : Promise.reject(new Error('serve il server di gioco')));
+  B.Online = { visita, raggiungi, compra, qui, rpc, codice: CODICE, server: CODICE ? SERVER : '', mioNick, annunci: () => [...amici.values()].reduce((o, a) => o.concat(annunciDi(a)), []), inLinea: () => !!room, stato: () => room && room.stato ? room.stato() : null, amici: () => [...amici.values()].map(a => ({ nick: a.nick, s: a.pr.s, x: a.x, z: a.z, bici: !!a.bk })) };
   ciclo();
 })();
