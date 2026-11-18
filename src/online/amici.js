@@ -39,7 +39,7 @@
     const st = app.stanza();
     if (st.id === 'casa') return 'casa:' + mioNick();
     if (st.id === 'ospite') return 'casa:' + st.ospite;
-    return st.pubblica ? st.id : 'casa';
+    return st.pubblica ? (st.luogo || st.id) : 'casa';   // il tetto della torre conta come piazza
   }
   const stessoLuogo = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
 
@@ -402,6 +402,7 @@
       if (p) bussa(p); else G.emetti('toast', a.nick + ' è a casa di ' + testo(prop, 20));
       return;
     }
+    if (s === 'piazza' && num(a.pr.y, 0) > 5 && app.stanze.tetto) { G.emetti('transizione', () => app.entraStanza('tetto')); return; }   // e' sul tetto della torre
     if (s === 'casa' || !app.stanze[s] || s === 'ospite') { G.emetti('toast', a.nick + ' è in un posto dove non puoi seguirlo'); return; }
     G.emetti('transizione', () => app.entraStanza(s, { x: num(a.pr.x, a.x), z: num(a.pr.z, a.z), yaw: num(a.pr.r, a.r) }));
   }

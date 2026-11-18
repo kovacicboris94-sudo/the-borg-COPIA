@@ -156,49 +156,6 @@
     }
     /* ---------- torre dell'orologio (con l'ora vera) ---------- */
     const lancette = [];
-    function torre(x, z) {
-      const g = new T.Group(); g.position.set(x, 0, z); scene.add(g);
-      const w = 3.0, d = 3.0, H1 = 6.0, pie = '#a89a8c';
-      g.add(mesh(new T.BoxGeometry(w + 0.5, 0.6, d + 0.5), M(pietra), { y: 0.3, lb: 0.03 }));
-      g.add(mesh(new T.BoxGeometry(w, H1, d), M('#dccdb4'), { y: 0.6 + H1 / 2, lb: 0.03 }));
-      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(c => g.add(mesh(new T.BoxGeometry(0.3, H1, 0.3), M(pie), { x: c[0] * w / 2, y: 0.6 + H1 / 2, z: c[1] * d / 2, lb: 0.015 })));
-      [2.4, 4.6].forEach(y => g.add(mesh(new T.BoxGeometry(w + 0.16, 0.18, d + 0.16), M(pie), { y, lb: 0.012 })));
-      // porta e finestre
-      g.add(mesh(new T.BoxGeometry(1.2, 1.9, 0.12), M(pietra), { y: 0.6 + 0.95, z: d / 2 + 0.04, lb: 0.01 }));
-      g.add(mesh(new T.BoxGeometry(0.9, 1.7, 0.12), M('#6b3f27'), { y: 0.6 + 0.85, z: d / 2 + 0.09, lb: 0.01 }));
-      [[0, 1], [1, 0], [-1, 0]].forEach(lat => [3.5, 5.5].forEach(y => {
-        const f = new T.Mesh(new T.PlaneGeometry(0.42, 0.8), B.Mluce('#ffc060', 0.95));
-        f.position.set(lat[0] * (w / 2 + 0.03), y, lat[1] * (d / 2 + 0.03)); f.rotation.y = Math.atan2(lat[0], lat[1]); g.add(f);
-        const cn = mesh(new T.BoxGeometry(0.56, 0.94, 0.06), M(legno), { lb: 0.008 }); cn.position.copy(f.position).addScaledVector(new T.Vector3(lat[0], 0, lat[1]), -0.02); cn.rotation.y = f.rotation.y; g.add(cn);
-      }));
-      // piano dell'orologio
-      const yo = 0.6 + H1, Ho = 1.9;
-      g.add(mesh(new T.BoxGeometry(w + 0.5, Ho, d + 0.5), M('#e6d6bc'), { y: yo + Ho / 2, lb: 0.03 }));
-      g.add(mesh(new T.BoxGeometry(w + 0.8, 0.22, d + 0.8), M(pie), { y: yo + 0.11, lb: 0.02 }));
-      g.add(mesh(new T.BoxGeometry(w + 0.8, 0.22, d + 0.8), M(pie), { y: yo + Ho, lb: 0.02 }));
-      [0, 1, 2, 3].forEach(i => {
-        const f = new T.Group(); f.rotation.y = i * PI / 2; g.add(f);
-        const pz = (d + 0.5) / 2 + 0.03;
-        const quad = new T.Mesh(new T.CircleGeometry(0.72, 32), new T.MeshBasicMaterial({ map: B.texOrologio() })); quad.position.set(0, yo + Ho / 2 + 0.02, pz); f.add(quad);
-        const mk = (lun, sp, col) => { const p = new T.Group(); p.position.set(0, yo + Ho / 2 + 0.02, pz + 0.03); const b = new T.Mesh(new T.BoxGeometry(sp, lun, 0.02), new T.MeshBasicMaterial({ color: col })); b.position.y = lun / 2 - 0.05; p.add(b); f.add(p); return p; };
-        lancette.push({ o: mk(0.38, 0.06, 0x2a1a2e), m: mk(0.56, 0.04, 0x2a1a2e) });
-      });
-      // cella campanaria con archi
-      const yb = yo + Ho + 0.11, Hb = 1.4;
-      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(c => g.add(mesh(new T.BoxGeometry(0.4, Hb, 0.4), M('#e6d6bc'), { x: c[0] * (w / 2 - 0.1), y: yb + Hb / 2, z: c[1] * (d / 2 - 0.1), lb: 0.02 })));
-      g.add(mesh(new T.CylinderGeometry(0.28, 0.4, 0.5, 12), M('#c8923a'), { y: yb + 0.7, l: 0.02 }));
-      g.add(mesh(new T.BoxGeometry(w + 0.4, 0.2, d + 0.4), M(pie), { y: yb + Hb + 0.1, lb: 0.02 }));
-      // tetto a piramide e banderuola a mezzaluna
-      const tt = B.texTegole('#2f3f8f'); tt.repeat.set(3, 2);
-      const tetto = mesh(new T.ConeGeometry((w + 0.9) / Math.SQRT2, 2.8, 4, 1), new T.MeshToonMaterial({ map: tt, gradientMap: gm }), { l: 0.03, y: yb + Hb + 0.2 + 1.4 }); tetto.rotation.y = PI / 4; g.add(tetto);
-      g.add(mesh(new T.CylinderGeometry(0.03, 0.03, 0.9, 6), M('#2c2431'), { y: yb + Hb + 0.2 + 3.1 }));
-      const luna = new T.Mesh(new T.TorusGeometry(0.22, 0.05, 8, 18, 4.4), M('#e3a63a', { emissive: new T.Color('#e3a63a'), emissiveIntensity: 0.4 })); luna.position.y = yb + Hb + 0.2 + 3.45; g.add(luna);
-      anim.push(t => { luna.rotation.y = Math.sin(t * 0.7) * 0.5; });
-      // edera
-      for (let i = 0; i < 12; i++) { const b = blob(rnd(0.15, 0.28), ['#4f8a3a', '#5fa045', '#3f7a35'][i % 3], { l: 0 }); b.position.set(w / 2 + 0.05 + rnd(0, 0.15), 0.5 + i * 0.4 + rnd(-0.1, 0.1), rnd(-d / 2, d / 2)); g.add(b); }
-      ostBox(x, z, w + 0.3, d + 0.3);
-      return g;
-    }
     anim.push(() => {
       const d = new Date(), mi = d.getMinutes() + d.getSeconds() / 60, ore = (d.getHours() % 12) + mi / 60;
       lancette.forEach(l => { l.m.rotation.z = -mi / 60 * 2 * PI; l.o.rotation.z = -ore / 12 * 2 * PI; });
@@ -228,8 +185,8 @@
     porte.forEach(p => { if (p.id === 'porta-Arredamenti') { p.arredi = true; p.testo = 'Entra nel negozio di arredi'; } });
     porte.forEach(p => { if (p.verso === 'sala') p.arrivo = { x: 0, z: 12.6, yaw: PI }; if (p.verso === 'negozio') p.arrivo = { x: 0, z: 6.2, yaw: PI }; if (p.verso === 'collectibles') p.arrivo = { x: 0, z: 13.5, yaw: PI }; if (p.verso === 'biblioteca') p.arrivo = { x: 0, z: 6.0, yaw: PI }; if (p.verso === 'scacchi') { p.arrivo = { x: 0, z: 7.0, yaw: PI }; p.testo = 'Entra nella Casa degli Scacchi'; } });
     if (B.CasaScacchi) B.CasaScacchi.decoraPiazza(scene, { ostCer });
-    const gt = torre(-51.4, 26); gt.rotation.y = PI / 2; edifici.push({ g: gt, x: -51.4, z: 26, w: 3.2, d: 3.2, nome: 'Torre' });
-    porte.push({ id: 'porta-torre', nome: 'Torre dell\'Orologio', x: -51.4 + 1.5 + 0.9, z: 26, r: 1.2, verso: null });
+    // la Torre della Cometa, al posto della Torre dell'Orologio: piani da esplorare e il telescopio in cima (js/torre.js)
+    if (B.costruisciTorreEsterna) B.costruisciTorreEsterna(scene, { anim, lancette, ostacoli, porte, edifici });
     // le mura con le torri e la Porta del Borgo, e attorno il cosmo (js/mura-cosmo.js)
     if (B.costruisciMuraCosmo) B.costruisciMuraCosmo({ scene, ostacoli, anim, fadeVoci, edifici });
 

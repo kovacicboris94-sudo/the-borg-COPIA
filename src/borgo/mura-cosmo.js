@@ -23,6 +23,10 @@
   let seme = 20261118;
   const rnd = (a, b) => { seme = (seme * 16807) % 2147483647; return a + (seme / 2147483647) * (b - a); };
 
+  // oggetti del cosmo con un nome: il telescopio della torre dice cosa si sta guardando
+  B.Cosmo = { oggetti: [] };
+  const nomina = (obj, nome) => { obj.userData.nome = nome; B.Cosmo.oggetti.push({ obj, nome }); return obj; };
+
   B.costruisciMuraCosmo = function (o) {
     const { scene, ostacoli, anim, fadeVoci, edifici } = o;
     const ostBox = (cx, cz, w, d) => ostacoli.push({ t: 'b', x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2 });
@@ -172,8 +176,8 @@
       x.fillStyle = g; x.fillRect(0, 0, W, H);
       // nebulose: macchie morbide colorate
       const neb = [['rgba(170,90,220,', 0.45], ['rgba(80,170,230,', 0.35], ['rgba(240,110,170,', 0.32], ['rgba(110,90,240,', 0.4], ['rgba(60,200,190,', 0.26]];
-      for (let i = 0; i < 40; i++) {
-        const n = neb[i % neb.length], px = rnd(0, W), py = rnd(H * 0.3, H * 0.95), r = rnd(80, 300), rg = x.createRadialGradient(px, py, 0, px, py, r);
+      for (let i = 0; i < 52; i++) {
+        const n = neb[i % neb.length], px = rnd(0, W), py = rnd(H * 0.05, H * 0.95), r = rnd(80, 300), rg = x.createRadialGradient(px, py, 0, px, py, r);
         rg.addColorStop(0, n[0] + n[1] + ')'); rg.addColorStop(1, n[0] + '0)');
         x.fillStyle = rg; x.beginPath(); x.ellipse(px, py, r * rnd(1.2, 2.2), r, rnd(-0.4, 0.4), 0, 7); x.fill();
         if (px < r * 2.2) { x.beginPath(); x.ellipse(px + W, py, r * 2, r, 0, 0, 7); x.fill(); }   // si chiude bene sul giro
@@ -182,7 +186,7 @@
       for (let i = 0; i < 2600; i++) { const a = rnd(0.25, 1); x.fillStyle = 'rgba(255,' + Math.round(rnd(225, 255)) + ',' + Math.round(rnd(215, 255)) + ',' + a + ')'; const s = rnd(0, 1) > 0.97 ? 2.4 : rnd(0.8, 1.6); x.fillRect(rnd(0, W), rnd(0, H), s, s); }
       // qualche stella grande con la croce di luce
       for (let i = 0; i < 40; i++) {
-        const px = rnd(0, W), py = rnd(H * 0.35, H), r = rnd(8, 18), rg = x.createRadialGradient(px, py, 0, px, py, r);
+        const px = rnd(0, W), py = rnd(H * 0.05, H), r = rnd(8, 18), rg = x.createRadialGradient(px, py, 0, px, py, r);
         rg.addColorStop(0, 'rgba(255,255,240,1)'); rg.addColorStop(0.25, 'rgba(255,240,220,.6)'); rg.addColorStop(1, 'rgba(255,240,220,0)');
         x.fillStyle = rg; x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
         x.fillStyle = 'rgba(255,250,235,.55)'; x.fillRect(px - r * 1.6, py - 0.7, r * 3.2, 1.4); x.fillRect(px - 0.7, py - r * 1.6, 1.4, r * 3.2);
@@ -198,7 +202,7 @@
     [0, 1].forEach(k => {
       const n = 260, pos = new Float32Array(n * 3);
       for (let i = 0; i < n; i++) {
-        let x, y, z; do { const an = rnd(0, PI * 2), r = rnd(75, 150); x = CX + Math.cos(an) * r; z = CZ + Math.sin(an) * r; y = rnd(-110, 20); } while (Math.abs(x - CX) < 62 && Math.abs(z - CZ) < 50 && y > -40);
+        let x, y, z; do { const an = rnd(0, PI * 2), r = rnd(75, 150); x = CX + Math.cos(an) * r; z = CZ + Math.sin(an) * r; y = rnd(-110, 130); } while (Math.abs(x - CX) < 62 && Math.abs(z - CZ) < 50 && y > -40);
         pos.set([x, y, z], i * 3);
       }
       const ge = new T.BufferGeometry(); ge.setAttribute('position', new T.BufferAttribute(pos, 3));
@@ -219,9 +223,9 @@
     const toon = map => new T.MeshToonMaterial({ map, gradientMap: gm });
     // il gigante a strisce, a nord-ovest
     const giga = pianeta(CX - 80, -14, CZ - 120, 24, toon(texStrisce(['#e7b67a', '#d58e5c', '#f2d3a0', '#c97a52', '#e9c08c'], 14)), 0.05);
-    giga.rotation.z = 0.25;
+    giga.rotation.z = 0.25; nomina(giga, 'Il Gigante a strisce');
     // quello con gli anelli, a est
-    const anello = pianeta(CX + 112, -12, CZ - 40, 13, toon(texStrisce(['#9ec7e8', '#b9d8ef', '#88b2dc', '#cfe4f5'], 9)), 0.08);
+    const anello = nomina(pianeta(CX + 112, -12, CZ - 40, 13, toon(texStrisce(['#9ec7e8', '#b9d8ef', '#88b2dc', '#cfe4f5'], 9)), 0.08), 'Il pianeta con gli anelli');
     {
       const [cv, x] = B.tela(256, 4);
       const g = x.createLinearGradient(0, 0, 256, 0); g.addColorStop(0, 'rgba(240,220,190,0)'); g.addColorStop(0.15, 'rgba(240,220,190,.75)'); g.addColorStop(0.45, 'rgba(210,180,150,.45)'); g.addColorStop(0.55, 'rgba(240,220,190,.85)'); g.addColorStop(1, 'rgba(240,220,190,0)');
@@ -235,15 +239,15 @@
     {
       const [cv, x] = B.tela(256, 128); x.fillStyle = '#d9d4e6'; x.fillRect(0, 0, 256, 128);
       for (let i = 0; i < 45; i++) { const px = rnd(0, 256), py = rnd(0, 128), r = rnd(3, 12); x.fillStyle = 'rgba(120,110,150,.35)'; x.beginPath(); x.arc(px, py, r, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,.25)'; x.beginPath(); x.arc(px - r * 0.25, py - r * 0.25, r * 0.6, 0, 7); x.fill(); }
-      pianeta(CX - 108, -20, CZ + 70, 8, toon(B.tex(cv)), 0.03);
+      nomina(pianeta(CX - 108, -20, CZ + 70, 8, toon(B.tex(cv)), 0.03), 'La Luna del Borgo');
     }
     // un piccolo pianeta rosa, lontano a sud-est
-    pianeta(CX + 95, -40, CZ + 105, 10, toon(texStrisce(['#f2a5c8', '#e58ab4', '#f7c4da'], 8)), 0.06);
+    nomina(pianeta(CX + 95, -40, CZ + 105, 10, toon(texStrisce(['#f2a5c8', '#e58ab4', '#f7c4da'], 8)), 0.06), 'Il pianetino rosa');
     anim.push((t, dt) => pianeti.forEach(q => { q[0].rotation.y = t * q[1]; }));
 
     /* ---------- la cometa: testa luminosa e lunga coda, attraversa il cielo sotto l'isola ---------- */
     (function cometa() {
-      const g = new T.Group(); g.userData.vivo = true; scene.add(g);
+      const g = new T.Group(); g.userData.vivo = true; nomina(g, 'La Cometa'); scene.add(g);
       const testa = new T.Mesh(new T.SphereGeometry(2.2, 16, 12), new T.MeshBasicMaterial({ color: 0xfff6d0 })); g.add(testa);
       const [cv, x] = B.tela(64, 64), rg = x.createRadialGradient(32, 32, 0, 32, 32, 32);
       rg.addColorStop(0, 'rgba(255,240,190,1)'); rg.addColorStop(0.4, 'rgba(255,210,140,.45)'); rg.addColorStop(1, 'rgba(255,200,120,0)'); x.fillStyle = rg; x.fillRect(0, 0, 64, 64);
@@ -268,13 +272,26 @@
       const ge = new T.DodecahedronGeometry(rnd(1.2, 3.4), 0), p = ge.attributes.position;
       for (let k = 0; k < p.count; k++) p.setXYZ(k, p.getX(k) * rnd(0.8, 1.2), p.getY(k) * rnd(0.7, 1.1), p.getZ(k) * rnd(0.8, 1.2));
       ge.computeVertexNormals();
-      const a = mesh(ge, M(roccia[i % 3]), { l: 0.05, cast: false }); a.userData.vivo = true; scene.add(a);
+      const a = mesh(ge, M(roccia[i % 3]), { l: 0.05, cast: false }); a.userData.vivo = true; nomina(a, 'Un asteroide'); scene.add(a);
       asteroidi.push({ m: a, r: rnd(78, 100), an: rnd(0, PI * 2), v: rnd(0.01, 0.03) * (i % 2 ? 1 : -1), y: rnd(-28, -6), f: rnd(0, 6), rot: rnd(0.2, 0.6) });
     }
     anim.push(t => asteroidi.forEach(q => {
       const an = q.an + t * q.v; q.m.position.set(CX + Math.cos(an) * q.r, q.y + Math.sin(t * 0.5 + q.f) * 1.2, CZ + Math.sin(an) * q.r * 0.9);
       q.m.rotation.set(t * q.rot * 0.7, t * q.rot, 0);
     }));
+
+    /* ---------- in alto: la galassia a spirale (si vede bene dal telescopio della torre) ---------- */
+    (function galassia() {
+      const S = 256, [cv, x] = B.tela(S, S), c = S / 2;
+      const rg = x.createRadialGradient(c, c, 0, c, c, c); rg.addColorStop(0, 'rgba(255,240,220,1)'); rg.addColorStop(0.12, 'rgba(255,200,230,.7)'); rg.addColorStop(0.5, 'rgba(150,120,255,.18)'); rg.addColorStop(1, 'rgba(80,60,200,0)');
+      x.fillStyle = rg; x.fillRect(0, 0, S, S);
+      for (let b = 0; b < 2; b++) for (let i = 0; i < 700; i++) {
+        const t = i / 700, an = b * PI + t * PI * 3.2, r = 6 + t * (c - 14), sx = c + Math.cos(an) * r + rnd(-7, 7) * (0.4 + t), sy = c + Math.sin(an) * r * 0.62 + rnd(-6, 6) * (0.4 + t);
+        x.fillStyle = 'rgba(' + (200 + Math.round(rnd(0, 55))) + ',' + (190 + Math.round(rnd(0, 50))) + ',255,' + (0.5 * (1 - t) + 0.15) + ')'; x.fillRect(sx, sy, rnd(1, 2.6), rnd(1, 2.6));
+      }
+      const sp = new T.Sprite(new T.SpriteMaterial({ map: B.tex(cv), blending: T.AdditiveBlending, depthWrite: false, transparent: true }));
+      sp.scale.set(70, 70, 1); sp.position.set(CX + 30, 110, CZ - 70); sp.userData.vivo = true; nomina(sp, 'La Galassia del Borgo'); scene.add(sp);
+    })();
 
     /* ---------- stelle cadenti: una ogni tanto, veloce ---------- */
     (function cadenti() {

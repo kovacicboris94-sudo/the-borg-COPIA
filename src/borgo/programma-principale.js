@@ -31,9 +31,12 @@
   const piazza = B.costruisciMondo(gP, scene);
   let casa = B.costruisciCasa(gC, B.Eco ? B.Eco.stato.liv : 0, B.Eco ? B.Eco.stato.stili : null);
   const negozio = B.costruisciNegozio(gN, { vuota: true }), sala = B.costruisciSala(gS), coll = B.costruisciCollectibles(gL, 'negozio'), tcgR = B.costruisciCollectibles(gT, 'tcg'), bib = B.costruisciBiblioteca(gB), scac = B.costruisciCasaScacchi(gK);
+  // la Torre della Cometa: un gruppo per piano (il tetto invece fa parte della piazza)
+  const gTorre = [0, 1, 2, 3].map(() => { const g = new T.Group(); g.visible = false; scene.add(g); return g; });
+  const piani = B.costruisciPianoTorre ? gTorre.map((g, n) => B.costruisciPianoTorre(g, n)) : [];
   const PZ = CFG.plaza;
   // la scena e le stanze non si muovono mai: cosi' three.js puo' saltare i pezzi fermi e le stanze nascoste
-  const gruppiStanze = [gP, gC, gN, gS, gL, gT, gB, gK];
+  const gruppiStanze = [gP, gC, gN, gS, gL, gT, gB, gK].concat(gTorre);
   [scene].concat(gruppiStanze).forEach(g => { g.updateMatrix(); g.matrixAutoUpdate = false; g.matrixWorldNeedsUpdate = true; });
   const stanze = {
     piazza: { id: 'piazza', nome: 'Piazza del Borgo', pubblica: true, gruppo: gP, m: piazza, ostacoli: piazza.ostacoli, porte: piazza.porte, sedili: piazza.sedili, toccabili: piazza.toccabili,
@@ -54,13 +57,20 @@
     sala: { id: 'sala', nome: 'Sala Giochi', pubblica: true, gruppo: gS, m: sala, ostacoli: sala.ostacoli, porte: sala.porte, sedili: sala.sedili, toccabili: sala.toccabili,
       area: sala.area, alt: () => 0, zoom: 0.8, spawn: { x: 0, z: 12.6, yaw: PI }, rect: { x0: -27, x1: 27, z0: -13, z1: 15 }, edifici: [], sfondo: '#241a40' }
   };
+  piani.forEach((m, n) => {
+    stanze['torre' + n] = { id: 'torre' + n, nome: m.nome, pubblica: true, gruppo: gTorre[n], m, ostacoli: m.ostacoli, porte: m.porte, sedili: m.sedili, toccabili: m.toccabili,
+      area: m.area, alt: () => 0, zoom: 0.8, spawn: m.spawn, rect: { x0: -5.6, x1: 5.6, z0: -5.6, z1: 5.6 }, edifici: [], sfondo: '#2a2040' };
+  });
+  // il tetto della torre e' un pezzo di piazza (stesso gruppo, stessa chat, gli amici ti vedono lassu')
+  if (B.TettoTorre) { const tt = B.TettoTorre; stanze.tetto = { id: 'tetto', luogo: 'piazza', nome: tt.nome, pubblica: true, gruppo: gP, m: piazza, ostacoli: tt.ostacoli, porte: tt.porte, sedili: [], toccabili: [],
+    area: tt.area, alt: tt.alt, zoom: 0.5, az: -PI / 2, spawn: tt.spawn, rect: stanze.piazza.rect, edifici: piazza.edifici, sfondo: stanze.piazza.sfondo }; }
   let stanza = stanze.piazza;
   const luci = piazza.luci;                       // 6 luci puntiformi condivise tra le stanze
   const LUCE_CASA = { giorno: 0.35, tramonto: 0.9, notte: 1.3 };
 
   function assegnaLuci() {
     const a = CFG.atmosfere[G.stato.atmosfera];
-    if (stanza.id === 'piazza') {
+    if (stanza.gruppo === gP) {
       luci.forEach((L, i) => { const q = piazza.luci.posizioni[i]; if (q) { L.position.set(q.x, q.y, q.z); L.intensity = a.lampioni; L.distance = 11; L.color.setHex(0xffb45c); } else L.intensity = 0; });
     } else {
       const lamp = stanza.m.lampade;
@@ -103,6 +113,7 @@
     const k = clamp(a.lampioni / 1.6, 0, 1) * 0.95;
     piazza.aloni.forEach(s => { s.material.opacity = k; });
     casa.atm(nome); if (stanze.ospite) stanze.ospite.m.atm(nome); negozio.atm(nome); sala.atm(nome); coll.atm(nome); tcgR.atm(nome); bib.atm(nome); scac.atm(nome); assegnaLuci();
+    piani.forEach(m => m.atm(nome));
   }
 
   /* ---------- collisioni ---------- */
@@ -226,7 +237,7 @@
   G.su('chat', v => {
     if (v.io) { if (io.av) mostraBolla(io, v.sussurro ? '🤫 ' + v.testo : v.testo, 4.5, v.sussurro ? 'sussurro' : null); return; }
     const o = npc.find(n => n.id === v.id);
-    if (o && !G.stato.bloccati.has(v.id) && stanza.id === 'piazza') {
+    if (o && !G.stato.bloccati.has(v.id) && stanza.gruppo === gP) {
       if (!v.sussurro && Math.hypot(o.x - io.x, o.z - io.z) > RAGGIO_ASCOLTO) v.lontano = true;
       mostraBolla(o, v.sussurro ? '🤫 ' + v.testo : v.testo, 4.5, v.sussurro ? 'sussurro' : null);
     }
@@ -267,14 +278,14 @@
   /* ---------- cambio stanza ---------- */
   function entraStanza(id, arrivo) {
     stanza = stanze[id]; io.st = stanza; io.seduto = null; G.stato.stanzaId = id;
-    gP.visible = id === 'piazza'; gC.visible = id === 'casa'; gN.visible = id === 'negozio'; gS.visible = id === 'sala'; gL.visible = id === 'collectibles'; gT.visible = id === 'tcg'; gB.visible = id === 'biblioteca'; gK.visible = id === 'scacchi'; gO.visible = id === 'ospite';
+    gP.visible = stanza.gruppo === gP; gTorre.forEach(g => { g.visible = stanza.gruppo === g; }); gC.visible = id === 'casa'; gN.visible = id === 'negozio'; gS.visible = id === 'sala'; gL.visible = id === 'collectibles'; gT.visible = id === 'tcg'; gB.visible = id === 'biblioteca'; gK.visible = id === 'scacchi'; gO.visible = id === 'ospite';
     const sp = arrivo || stanza.spawn;
     io.x = sp.x; io.z = sp.z; io.vx = io.vz = 0; io.yaw = sp.yaw === undefined ? 0 : sp.yaw; io.y = stanza.alt(io.x, io.z);
     C.azT = C.az = stanza.az === undefined ? PI / 4 : stanza.az; impostaZoom(stanza.zoom); if (stanza.elev) { C.elev = stanza.elev; C.elevAuto = true; } else if (C.elevAuto) { C.elev = 28; C.elevAuto = false; } C.tx = io.x; C.tz = io.z; C.ty = 1.0 + io.y;
     { const fuori = id === 'piazza'; if (!fuori) setBici(false); const bb = $('#btn-bici'); if (bb) bb.style.display = fuori ? '' : 'none'; }
     assegnaLuci(); ultimaPorta = undefined;
     B.Bolle.pulisci(io);
-    G.stato.chiaveChat = id === 'ospite' ? 'casa:' + String(stanza.ospite || '').toLowerCase() : id;   // ogni luogo ha la sua chat
+    G.stato.chiaveChat = id === 'ospite' ? 'casa:' + String(stanza.ospite || '').toLowerCase() : (stanza.luogo || id);   // ogni luogo ha la sua chat
     if (B.Arredo) B.Arredo.stanzaCambiata(id);
     G.emetti('stanza', { id, def: { nome: stanza.nome, pubblica: stanza.pubblica } });
   }
@@ -386,7 +397,7 @@
     ndc.set(((cx - x0) / w) * 2 - 1, -((cy - y0) / h) * 2 + 1);
     ray.setFromCamera(ndc, cam);
     const cand = [];
-    npc.forEach(n => { if (stanza.id === 'piazza' && n.av.root.visible) cand.push({ obj: n.av.proxy, tipo: 'npc', id: n.id }); });
+    npc.forEach(n => { if (stanza.gruppo === gP && n.av.root.visible) cand.push({ obj: n.av.proxy, tipo: 'npc', id: n.id }); });
     cand.push({ obj: io.av.proxy, tipo: 'io' });
     if (B.amiciToccabili) B.amiciToccabili().forEach(c => cand.push(c));
     stanza.toccabili.forEach(t => cand.push(t));
@@ -456,24 +467,25 @@
     const dt = Math.min(0.05, clock.getDelta()); t += dt;
     G.tick(dt);
     if (!giocoAttivo) return;
-    B.Audio.scena((B.Kart && B.Kart.attivo) || (B.Paintball && B.Paintball.attivo) || (B.Raid && B.Raid.attivo) || (B.Nascondino && B.Nascondino.attivo) || (B.Fronte && B.Fronte.attivo) ? 'kart' : stanza.id === 'piazza' ? 'piazza' : 'altro');
+    B.Audio.scena((B.Kart && B.Kart.attivo) || (B.Paintball && B.Paintball.attivo) || (B.Raid && B.Raid.attivo) || (B.Nascondino && B.Nascondino.attivo) || (B.Fronte && B.Fronte.attivo) ? 'kart' : stanza.gruppo === gP ? 'piazza' : 'altro');
     if (B.Raid && B.Raid.attivo) { B.Raid.frame(dt, t, renderer); return; }
     if (B.Paintball && B.Paintball.attivo) { B.Paintball.frame(dt, t, renderer); return; }
     if (B.Nascondino && B.Nascondino.attivo) { B.Nascondino.frame(dt, t, renderer); return; }
     if (B.Fronte && B.Fronte.attivo) { B.Fronte.frame(dt, t, renderer); return; }
     if (B.Kart && B.Kart.attivo) { B.Kart.frame(dt, t, renderer); return; }
     const UIm = window.UI, copre = UIm && UIm.paginaPiena();
-    const vel = muoviIo(dt, !copre); io.av.aggiorna(dt, vel, t); aggBolla(io, dt);
-    if (stanza.id === 'piazza') { npc.forEach(o => aggNpc(o, dt, t)); piazza.anim.forEach(f => f(t, dt)); piazza.dissolvi(io.x, io.z, Math.sin(C.az), Math.cos(C.az), dt); }
+    const tel = !!(B.Telescopio && B.Telescopio.attivo);   // telescopio aperto: niente movimento, si guarda con la sua camera
+    const vel = muoviIo(dt, !copre && !tel); io.av.aggiorna(dt, vel, t); aggBolla(io, dt);
+    if (stanza.gruppo === gP) { npc.forEach(o => aggNpc(o, dt, t)); piazza.anim.forEach(f => f(t, dt)); piazza.dissolvi(io.x, io.z, tel ? 0 : Math.sin(C.az), tel ? 0 : Math.cos(C.az), dt); }
     else { stanza.m.anim.forEach(f => f(t, dt)); stanza.m.aggiornaMuri(C.az, dt, io.x, io.z); }
     if (B.Arredo) B.Arredo.frame(dt, t);
     aggCamera(dt);
     // porta vicina: avvisa l'interfaccia solo quando cambia
-    const p = copre ? null : portaVicina();
+    const p = copre || tel ? null : portaVicina();
     if (p !== ultimaPorta) { ultimaPorta = p; G.emetti('porta', p); }
     // le stanze nascoste non ricalcolano le posizioni dei loro pezzi (prima lo facevano a ogni fotogramma)
     for (const g of gruppiStanze) g.matrixWorldAutoUpdate = g.visible;
-    if (!copre) renderer.render(scene, cam);
+    if (!copre) renderer.render(scene, tel ? B.Telescopio.aggiorna(dt, renderer) : cam);
     // se il telefono e' lento, passa da solo alla grafica leggera
     tf += dt; cnt++; if (tf > 1) {
       stato.fps = cnt / tf; const f = $('#fps'); if (f && f.dataset.mostra) f.textContent = Math.round(stato.fps) + ' fps';
