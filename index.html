@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="61d2a1370aed">
+  <meta name="versione" content="a81e75a262ed">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -7497,7 +7497,7 @@ window.CONFIG = {
     }
     [[-25, 2.5, 0.55], [-25, 20, 0.55], [25, 9, 0.55], [25, 24, 0.55], [-11, 27.6, 0.55], [11, 27.6, 0.55], [-19.5, -3, 0.55]].forEach(c => ciliegio(c[0], c[1] + DZ, c[2]));
     // zone nuove della piazza ampliata: filari di ciliegi ai bordi
-    [-50, -40, 40, 50].forEach((x, i) => [16, 32, 48, 66].forEach((z, j) => { if (!(x === 40 && z === 32)) ciliegio(x, z, 0.55, (i + j) % 3 === 1 ? 'ciliegio' : 'verde'); }));   // (40,32) e' nel laghetto
+    [-50, -40, 40, 50].forEach((x, i) => [16, 32, 48, 66].forEach((z, j) => { if (!(x === 40 && z === 32) && !(x === -50 && z === 32)) ciliegio(x, z, 0.55, (i + j) % 3 === 1 ? 'ciliegio' : 'verde'); }));   // (40,32) e' nel laghetto
     [-30, -15, 15, 30].forEach((x, i) => ciliegio(x, 67, 0.55, i % 2 ? 'ciliegio' : 'verde'));
 
     /* ---------- lampioni (con alone luminoso) ---------- */
@@ -8167,6 +8167,54 @@ window.CONFIG = {
 </script>
 <script>
 /* =====================================================================
+   THE BORG - I NEGOZI DELLA TORRE DELLA COMETA
+   Un negozio per piano (1 = primo piano, 2 = secondo, 3 = terzo).
+   null = "spazio libero": il piano resta vuoto, con il cartello e il gesso
+   sul pavimento dove andranno bancone, scaffali e tavoli.
+
+   Per aprire un negozio basta scrivere qui un oggetto con:
+     nome       nome del negozio (bacheca fuori dalla torre, bacheca dell'ingresso,
+                scala, titolo della stanza, pulsante al bancone)
+     insegna    testo dell'insegna sopra il bancone (facoltativo: se no, il nome in maiuscolo)
+     colore     colore di fondo dell'insegna e delle tovaglie (es. '#2f2342')
+     accento    colore del bordo dell'insegna, del piano del bancone e degli scaffali
+     testo      colore delle lettere dell'insegna (facoltativo)
+     azione     testo del pulsante al bancone (facoltativo, es. 'Guarda la merce')
+     apri()     cosa succede al bancone: di solito apre il pannello del negozio
+     arredo(kit)  facoltativo: mette la merce. kit contiene:
+                  kit.scaffali  12 posti (4 scaffali x 3 ripiani): { x, y, z, rot, larg }
+                  kit.tavoli    2 tavoli da vetrina: { x, y, z, larg, prof }
+                  kit.bancone   { x, y, z, larg }
+                  kit.gruppo    dove aggiungere le mesh (coordinate della stanza)
+                  kit.T, kit.M, kit.mesh, kit.B   three.js e gli aiuti del borgo
+                  kit.anim      lista di funzioni (t, dt) chiamate a ogni fotogramma
+                  kit.ostacoli  collisioni ({ t: 'c', x, z, r } oppure { t: 'b', x0, x1, z0, z1 })
+   Bancone, scaffali e tavoli li costruisce torre.js: stanno sempre negli stessi
+   posti, cosi' ogni negozio ha la stessa struttura.
+
+   Esempio:
+     1: {
+       nome: 'Bottega delle Stelle', insegna: 'BOTTEGA DELLE STELLE',
+       colore: '#2f2342', accento: '#f2c76e', azione: 'Guarda la merce',
+       apri: () => window.Gioco.emetti('toast', 'Benvenuto alla Bottega delle Stelle!'),
+       arredo: kit => kit.scaffali.forEach(s => {
+         const m = kit.mesh(new kit.T.BoxGeometry(0.3, 0.4, 0.3), kit.M('#7fe3ff'), { x: s.x, y: s.y + 0.2, z: s.z, l: 0.01 });
+         kit.gruppo.add(m);
+       })
+     },
+   ===================================================================== */
+(function () {
+  'use strict';
+  const B = window.B3;
+  B.TORRE_NEGOZI = {
+    1: null,
+    2: null,
+    3: null
+  };
+})();
+</script>
+<script>
+/* =====================================================================
    THE BORG - LA TORRE DELLA COMETA (al posto della Torre dell'Orologio)
    Fuori: torre di pietra di quattro piani, con l'orologio sotto la terrazza,
    merli, bandiera e il telescopio in cima.
@@ -8177,6 +8225,10 @@ window.CONFIG = {
    alla torre, si vede il borgo e gli amici in piazza vedono chi c'e' lassu'.
    Il telescopio (B3.Telescopio) apre una visuale da trascinare, con lo zoom,
    per guardare il borgo di sotto e il cosmo; dice cosa si sta guardando.
+   I NEGOZI: i piani 1..3 sono pronti per ospitare un negozio ciascuno. Si
+   dichiarano in src/borgo/torre-negozi.js (B3.TORRE_NEGOZI): con un negozio
+   il piano ha insegna, bancone con cassa, scaffali e tavoli da vetrina, e il
+   bancone apre il negozio; senza, e' uno "spazio libero".
    Usato da piazza.js (B3.costruisciTorreEsterna) e programma-principale.js
    (B3.costruisciPianoTorre, B3.TettoTorre).
    ===================================================================== */
@@ -8185,7 +8237,7 @@ window.CONFIG = {
   const B = window.B3, T = B.T, M = B.M, mesh = B.mesh, PI = Math.PI;
 
   // dove sta e quanto e' grande (in piazza)
-  const TORRE = { x: -49.9, z: 26, w: 7, piano: 3.8, piani: 4 };
+  const TORRE = { x: -47.6, z: 26, w: 11, piano: 3.8, piani: 4 };
   TORRE.hCorpo = TORRE.piano * TORRE.piani;          // 15,2 m di muro
   TORRE.lt = TORRE.w + 0.9;                           // lato della terrazza (sporge sui beccatelli)
   TORRE.h = TORRE.hCorpo + 1.25;                      // altezza del pavimento della terrazza
@@ -8193,6 +8245,14 @@ window.CONFIG = {
   const NOMI = ['Ingresso', 'Primo piano', 'Secondo piano', 'Terzo piano'];
   const NOME = 'Torre della Cometa';
   B.TORRE = TORRE;
+  // i negozi dei piani (src/borgo/torre-negozi.js): null = spazio libero
+  const negozio = n => (n > 0 && B.TORRE_NEGOZI && B.TORRE_NEGOZI[n]) || null;
+  const rigaPiano = n => n + '° piano · ' + (negozio(n) ? negozio(n).nome : 'spazio libero');
+  const elencoPiani = () => [1, 2, 3].map(rigaPiano).join('\n') + '\nTetto · il telescopio';
+  // le sale dentro la torre (uguali a ogni piano) e le scale
+  const X = 8.5, Z0 = -7.5, Z1 = 7.5;
+  const AREA = { x0: -X + 0.7, x1: X - 0.7, z0: Z0 + 0.8, z1: Z1 - 0.6 };
+  const SALI = { x: X - 2.3, z: Z0 + 2.3 }, SCENDI = { x: -X + 2.3, z: Z0 + 2.3 };   // scala a chiocciola (su) e scala che scende
 
   const pietra = '#d9c7b0', pietraScura = '#8f7f86', pietraChiara = '#e8dccb', legno = '#5c3822', coppi = '#b0583f';
   const tela = (w, h, fn) => { const [cv, x] = B.tela(w, h); fn(x, w, h); return B.tex(cv); };
@@ -8230,8 +8290,8 @@ window.CONFIG = {
     for (let i = 1; i < TORRE.piani; i++) box(W + 0.24, 0.24, W + 0.24, pietraChiara, 0, i * P, 0, 0.015);
     // finestre ad arco su ogni lato, ai piani di sopra (accese la sera)
     const vetro = B.Mluce('#ffc860', 0.9);
-    function finestraArco(lato, piano, larga) {
-      const f = new T.Group(); f.rotation.y = lato * PI / 2; g.add(f);
+    function finestraArco(lato, piano, larga, fx) {
+      const f = new T.Group(); f.rotation.y = lato * PI / 2; f.position.set(Math.cos(lato * PI / 2) * fx, 0, -Math.sin(lato * PI / 2) * fx); g.add(f);
       const y = piano * P + 1.7, w = larga ? 1.3 : 0.9, h = 1.4, z = W / 2 + 0.02;
       f.add(mesh(new T.BoxGeometry(w + 0.32, h + 0.2, 0.12), M(pietraChiara), { y, z, lb: 0.012 }));
       f.add(mesh(new T.CylinderGeometry((w + 0.32) / 2, (w + 0.32) / 2, 0.12, 16, 1, false, -PI / 2, PI), M(pietraChiara), { y: y + h / 2 + 0.1, z, l: 0.012 }).rotateX(PI / 2));
@@ -8240,9 +8300,9 @@ window.CONFIG = {
       f.add(mesh(new T.BoxGeometry(0.06, h, 0.04), M(legno), { y, z: z + 0.1, cast: false }));
       f.add(mesh(new T.BoxGeometry(w + 0.5, 0.12, 0.3), M(pietraChiara), { y: y - h / 2 - 0.12, z: z + 0.1, lb: 0.01 }));
     }
-    for (let p = 1; p < TORRE.piani; p++) [0, 1, 2, 3].forEach(l => finestraArco(l, p, p === TORRE.piani - 1));
-    [0, 2, 3].forEach(l => finestraArco(l, 0, false));
-    // portone sul lato est (verso la piazza), con insegna e lanterne
+    for (let p = 1; p < TORRE.piani; p++) [0, 1, 2, 3].forEach(l => [-2.6, 2.6].forEach(fx => finestraArco(l, p, p === TORRE.piani - 1, fx)));
+    [0, 2, 3].forEach(l => [-2.6, 2.6].forEach(fx => finestraArco(l, 0, false, fx)));
+    // portone sul lato est (verso la piazza), con la targa e la bacheca dei negozi ai lati
     {
       const f = new T.Group(); f.rotation.y = PI / 2; g.add(f);
       const z = W / 2 + 0.02;
@@ -8256,15 +8316,20 @@ window.CONFIG = {
       f.add(mesh(new T.BoxGeometry(2.8, 0.3, 1.2), M(pietraScura), { y: 0.75, z: z + 0.5, lb: 0.012 }));
       f.add(mesh(new T.BoxGeometry(3.2, 0.3, 1.6), M(pietraScura), { y: 0.45, z: z + 0.7, lb: 0.012 }));
       f.add(mesh(new T.BoxGeometry(3.6, 0.3, 2.0), M(pietraScura), { y: 0.15, z: z + 0.9, lb: 0.012 }));
-      const ins = new T.Mesh(new T.PlaneGeometry(3.0, 0.75), new T.MeshBasicMaterial({ map: scritta('TORRE DELLA COMETA', 3.0, 0.75, { fs: 52 }) })); ins.position.set(0, 4.55, z + 0.06); f.add(ins);
       [-1, 1].forEach(s => B.PM.lanterna(f, s * 1.55, 2.6, z));
+      // targa con il nome (a sinistra del portone, lontana dalle finestre) e bacheca dei negozi (a destra)
+      f.add(mesh(new T.BoxGeometry(2.9, 1.0, 0.12), M('#6b4126'), { x: -3.3, y: 2.9, z: z + 0.06, lb: 0.012 }));
+      const targa = new T.Mesh(new T.PlaneGeometry(2.7, 0.82), new T.MeshBasicMaterial({ map: scritta('TORRE DELLA\nCOMETA', 2.7, 0.82, { fs: 64 }) })); targa.position.set(-3.3, 2.9, z + 0.13); f.add(targa);
+      f.add(mesh(new T.BoxGeometry(2.5, 1.9, 0.12), M('#6b4126'), { x: 3.3, y: 2.6, z: z + 0.06, lb: 0.012 }));
+      const bac = new T.Mesh(new T.PlaneGeometry(2.3, 1.7), new T.MeshBasicMaterial({ map: scritta('NEGOZI\n' + elencoPiani(), 2.3, 1.7, { fs: 40, fondo: '#3a2a1e', bordo: '#c8923a' }) })); bac.position.set(3.3, 2.6, z + 0.13); f.add(bac);
+      f.add(mesh(new T.ConeGeometry(1.5, 0.4, 4, 1), M(coppi), { x: 3.3, y: 3.75, z: z + 0.25, l: 0.01 }).rotateY(PI / 4));
     }
     // fascia in cima con i beccatelli e l'orologio
     const yb = HC, hb = 1.25;
     box(LT, hb, LT, pietraChiara, 0, yb + hb / 2, 0, 0.03);
     [0, 1, 2, 3].forEach(l => {
       const f = new T.Group(); f.rotation.y = l * PI / 2; g.add(f);
-      for (let k = 0; k < 7; k++) f.add(mesh(new T.BoxGeometry(0.4, 0.6, 0.45), M('#c9b59e'), { x: -W / 2 + 0.5 + k * (W - 1) / 6, y: yb - 0.3, z: W / 2 + 0.22, lb: 0.012 }));
+      for (let k = 0; k < 11; k++) f.add(mesh(new T.BoxGeometry(0.4, 0.6, 0.45), M('#c9b59e'), { x: -W / 2 + 0.5 + k * (W - 1) / 10, y: yb - 0.3, z: W / 2 + 0.22, lb: 0.012 }));
       // orologio: quadrante e lancette (le muove piazza.js con l'ora vera)
       const yq = yb - 1.2;
       f.add(mesh(new T.CylinderGeometry(0.78, 0.78, 0.1, 28), M('#c8923a'), { y: yq, z: W / 2 + 0.03, l: 0.012 }).rotateX(PI / 2));
@@ -8274,12 +8339,12 @@ window.CONFIG = {
     });
     // terrazza: pavimento, parapetto e merli
     const H = TORRE.h;
-    const tPav = B.texSelciato(); tPav.repeat.set(2, 2);
+    const tPav = B.texSelciato(); tPav.repeat.set(3, 3);
     const pav = new T.Mesh(new T.PlaneGeometry(LT - 0.1, LT - 0.1), new T.MeshToonMaterial({ map: tPav, gradientMap: gm, color: new T.Color('#d8c8b8') })); pav.rotation.x = -PI / 2; pav.position.y = H + 0.005; pav.receiveShadow = true; g.add(pav);
     [0, 1, 2, 3].forEach(l => {
       const f = new T.Group(); f.rotation.y = l * PI / 2; g.add(f);
       f.add(mesh(new T.BoxGeometry(LT, 0.75, 0.4), M(pietra), { y: H + 0.375, z: LT / 2 - 0.2, lb: 0.02 }));
-      for (let k = 0; k < 5; k++) f.add(mesh(new T.BoxGeometry(0.75, 0.6, 0.45), M('#cdbfb8'), { x: -LT / 2 + 0.55 + k * (LT - 1.1) / 4, y: H + 0.75 + 0.3, z: LT / 2 - 0.2, lb: 0.015 }));
+      for (let k = 0; k < 8; k++) f.add(mesh(new T.BoxGeometry(0.75, 0.6, 0.45), M('#cdbfb8'), { x: -LT / 2 + 0.55 + k * (LT - 1.1) / 7, y: H + 0.75 + 0.3, z: LT / 2 - 0.2, lb: 0.015 }));
     });
     // botola con la scala (angolo sud-ovest), ringhiera su due lati
     const bx = -TORRE.mezzo + 1.1, bz = TORRE.mezzo - 1.1;
@@ -8316,7 +8381,7 @@ window.CONFIG = {
 
     const lb = W + 0.9;
     ostacoli.push({ t: 'b', x0: TORRE.x - lb / 2, x1: TORRE.x + lb / 2, z0: TORRE.z - lb / 2, z1: TORRE.z + lb / 2 });
-    porte.push({ id: 'porta-torre', nome: NOME, testo: 'Entra nella Torre', x: TORRE.x + lb / 2 + 1.0, z: TORRE.z, r: 1.3, verso: 'torre0', arrivo: { x: 0, z: 3.6, yaw: PI } });
+    porte.push({ id: 'porta-torre', nome: NOME, testo: 'Entra nella Torre', x: TORRE.x + lb / 2 + 1.0, z: TORRE.z, r: 1.3, verso: 'torre0', arrivo: { x: 0, z: Z1 - 2.0, yaw: PI } });
     edifici.push({ g, x: TORRE.x, z: TORRE.z, w: lb, d: lb, nome: NOME });
     return g;
   };
@@ -8334,7 +8399,7 @@ window.CONFIG = {
       { t: 'b', x0: xT(-TORRE.mezzo + 1.1 - 0.85), x1: xT(-TORRE.mezzo + 1.1 + 0.85), z0: zT(TORRE.mezzo - 1.1 - 0.85), z1: zT(TORRE.mezzo - 1.1 - 0.72) }   // ringhiera della botola (si scende da est)
     ],
     porte: [
-      { id: 'botola', nome: 'Scendi nella Torre', testo: 'Scendi', x: xT(-TORRE.mezzo + 1.1), z: zT(TORRE.mezzo - 1.1), r: 0.95, verso: 'torre3', arrivo: { x: 0.8, z: -0.6, yaw: PI * 0.75 } },
+      { id: 'botola', nome: 'Scendi nella Torre', testo: 'Scendi', x: xT(-TORRE.mezzo + 1.1), z: zT(TORRE.mezzo - 1.1), r: 0.95, verso: 'torre3', arrivo: { x: SALI.x - 3.0, z: SALI.z + 3.0, yaw: PI * 0.75 } },
       { id: 'telescopio', nome: 'Telescopio', testo: 'Guarda nel telescopio', x: xT(0.9), z: zT(-0.6), r: 1.35, fn: () => B.Telescopio.apri() }
     ]
   };
@@ -8342,9 +8407,6 @@ window.CONFIG = {
   /* =================================================================
      DENTRO: un piano della torre (n = 0 ingresso, 1..3 piani vuoti)
      ================================================================= */
-  const X = 5.6, Z0 = -5.6, Z1 = 5.6;
-  const AREA = { x0: -X + 0.7, x1: X - 0.7, z0: Z0 + 0.8, z1: Z1 - 0.6 };
-  const SALI = { x: 3.4, z: -3.4 }, SCENDI = { x: -3.4, z: -3.4 };   // scala a chiocciola (su) e scala che scende
   B.costruisciPianoTorre = function (scena, n) {
     const sedili = [], ostacoli = [], anim = [], porte = [], toccabili = [], lampade = [], vetri = [], muri = [];
     const gm = M('#fff').gradientMap;
@@ -8354,10 +8416,11 @@ window.CONFIG = {
     const cil = (g, r1, r2, h, col, x, y, z, seg, l) => { const m = mesh(new T.CylinderGeometry(r1, r2, h, seg || 12), M(col), { x, y, z, l: l === undefined ? 0.018 : l }); g.add(m); return m; };
     const muroCol = ['#cdbba6', '#c9b7a4', '#c4b3a2', '#bfae9f'][n];
 
+    const neg = negozio(n);
     /* ---------- base sospesa e pavimento ---------- */
     scena.add(mesh(new T.BoxGeometry(2 * X + 0.6, 1.0, Z1 - Z0 + 0.6), M('#7a6c78'), { y: -0.51, z: (Z0 + Z1) / 2, lb: 0.05 }));
-    for (let i = 0; i < 7; i++) { const c = mesh(new T.ConeGeometry(0.9 + (i % 3) * 0.4, 1.8 + (i % 4) * 0.5, 7), M('#5f5463'), { x: -4.5 + i * 1.5, y: -1.9 - (i % 2) * 0.4, z: -3 + (i * 37 % 7), cast: false }); c.rotation.x = PI; scena.add(c); }
-    const cri = new T.Mesh(new T.OctahedronGeometry(0.5, 0), new T.MeshBasicMaterial({ color: '#7fe3ff' })); cri.scale.y = 2; cri.position.set(2, -3, 2); cri.rotation.x = PI; scena.add(cri);
+    for (let i = 0; i < 10; i++) { const c = mesh(new T.ConeGeometry(1.0 + (i % 3) * 0.5, 2.0 + (i % 4) * 0.6, 7), M('#5f5463'), { x: -X + 1.5 + i * (2 * X - 3) / 9, y: -2.0 - (i % 2) * 0.4, z: Z0 + 2 + (i * 37 % 11), cast: false }); c.rotation.x = PI; scena.add(c); }
+    const cri = new T.Mesh(new T.OctahedronGeometry(0.6, 0), new T.MeshBasicMaterial({ color: '#7fe3ff' })); cri.scale.y = 2; cri.position.set(3, -3.4, 2); cri.rotation.x = PI; scena.add(cri);
     const tPar = B.texParquet(); tPar.repeat.set(2 * X / 4, (Z1 - Z0) / 4);
     const pav = new T.Mesh(new T.PlaneGeometry(2 * X, Z1 - Z0), new T.MeshToonMaterial({ map: tPar, gradientMap: gm, color: new T.Color(n === 0 ? '#c9b8a8' : '#d8c0a0') })); pav.rotation.x = -PI / 2; pav.position.set(0, 0.002, (Z0 + Z1) / 2); pav.receiveShadow = true; scena.add(pav);
 
@@ -8376,18 +8439,24 @@ window.CONFIG = {
       const corpo = mesh(new T.BoxGeometry(len, 4, 0.5), M(muroCol), { y: 2, z: -0.25, lb: 0.03 }); corpo.castShadow = false; g.add(corpo);
       scatola(g, len, 0.35, 0.1, '#8f7f86', 0, 0.17, 0.05, 0.012);
       scatola(g, len, 0.22, 0.4, '#6b4326', 0, 3.85, 0.15, 0.012);          // trave in alto
-      for (let k = -2; k <= 2; k++) scatola(g, 0.3, 3.5, 0.14, '#7a5a3c', k * len / 5, 1.95, 0.08, 0.01);   // travi verticali
+      for (let k = -3; k <= 3; k++) scatola(g, 0.3, 3.5, 0.14, '#7a5a3c', k * len / 7, 1.95, 0.08, 0.01);   // travi verticali
       contenuto(g);
       muri.push({ g, out, mats: [], lines: [], q: 1, ap: 1 });
       return g;
     }
     parete(2 * X + 0.7, 0, Z0, 0, [0, -1], g => {
-      finestra(g, 0, 2.2, 1.2, 1.4);
-      // stendardo con il nome del piano
-      const ins = new T.Mesh(new T.PlaneGeometry(2.4, 0.6), new T.MeshBasicMaterial({ map: scritta(n ? n + '° PIANO' : 'TORRE DELLA COMETA', 2.4, 0.6, { fs: n ? 60 : 44 }) })); ins.position.set(0, 3.45, 0.14); g.add(ins);
+      finestra(g, -4.2, 2.2, 1.2, 1.4); finestra(g, 4.2, 2.2, 1.2, 1.4);
+      // al centro: l'insegna del negozio, oppure il nome del piano
+      if (neg) {
+        scatola(g, 5.6, 1.5, 0.16, '#6b4326', 0, 3.0, 0.08, 0.015);
+        const ins = new T.Mesh(new T.PlaneGeometry(5.3, 1.25), new T.MeshBasicMaterial({ map: scritta(neg.insegna || neg.nome.toUpperCase(), 5.3, 1.25, { fs: 64, fondo: neg.colore || '#2f2342', bordo: neg.accento || '#f2c76e', colore: neg.testo || '#fbf3dc' }) })); ins.position.set(0, 3.0, 0.18); g.add(ins);
+      } else {
+        const ins = new T.Mesh(new T.PlaneGeometry(2.6, 0.65), new T.MeshBasicMaterial({ map: scritta(n ? n + '° PIANO' : 'TORRE DELLA COMETA', 2.6, 0.65, { fs: n ? 60 : 44 }) })); ins.position.set(0, 3.3, 0.14); g.add(ins);
+      }
     });
-    parete(Z1 - Z0 + 0.4, -X, (Z0 + Z1) / 2, PI / 2, [-1, 0], g => { finestra(g, -1.2, 2.2, 1.0, 1.3); finestra(g, 2.2, 2.2, 1.0, 1.3); });
-    parete(Z1 - Z0 + 0.4, X, (Z0 + Z1) / 2, -PI / 2, [1, 0], g => { finestra(g, 1.2, 2.2, 1.0, 1.3); finestra(g, -2.2, 2.2, 1.0, 1.3); });
+    // finestre dei lati: verso nord (dietro le scale), lontane dagli scaffali
+    parete(Z1 - Z0 + 0.4, -X, (Z0 + Z1) / 2, PI / 2, [-1, 0], g => { finestra(g, 3.4, 2.2, 1.0, 1.3); finestra(g, -5.2, 2.2, 1.0, 1.3); });
+    parete(Z1 - Z0 + 0.4, X, (Z0 + Z1) / 2, -PI / 2, [1, 0], g => { finestra(g, -3.4, 2.2, 1.0, 1.3); finestra(g, 5.2, 2.2, 1.0, 1.3); });
     // pilastri d'angolo davanti (lato sud aperto verso la camera)
     [-1, 1].forEach(s => { scatola(scena, 0.6, 4, 0.6, muroCol, s * (X + 0.05), 2, Z1 - 0.1, 0.03); });
 
@@ -8399,13 +8468,13 @@ window.CONFIG = {
         const a = -k * 0.55 + PI * 0.75, st = scatola(g, 1.15, 0.12, 0.5, k % 2 ? '#a07650' : '#946a46', Math.cos(a) * 0.62, 0.2 + k * 0.34, Math.sin(a) * 0.62, 0.008);
         st.rotation.y = -a;
       }
-      // ringhiera esterna
       for (let k = 0; k < 11; k += 2) { const a = -k * 0.55 + PI * 0.75; cil(g, 0.025, 0.025, 0.9, '#2c2431', Math.cos(a) * 1.18, 0.65 + k * 0.34, Math.sin(a) * 1.18, 5, 0); }
       ostCer(SALI.x, SALI.z, 1.25);
       const ultima = n === TORRE.piani - 1;
       const cart = new T.Mesh(new T.PlaneGeometry(1.5, 0.45), new T.MeshBasicMaterial({ map: scritta(ultima ? 'TETTO ↑' : 'SALI ↑', 1.5, 0.45, { fs: 70, fondo: '#2f2342' }) }));
       cart.position.set(-1.0, 2.3, 1.2); cart.rotation.y = -PI / 4; g.add(cart);
-      porte.push({ id: 'sali', nome: ultima ? 'Sali sul tetto' : 'Sali al ' + NOMI[n + 1].toLowerCase(), testo: ultima ? 'Sali sul tetto' : 'Sali al ' + NOMI[n + 1].toLowerCase(), x: SALI.x - 1.35, z: SALI.z + 1.35, r: 1.0,
+      const dove = ultima ? 'sul tetto' : 'al ' + NOMI[n + 1].toLowerCase() + (negozio(n + 1) ? ' · ' + negozio(n + 1).nome : '');
+      porte.push({ id: 'sali', nome: 'Sali ' + dove, testo: 'Sali ' + dove, x: SALI.x - 1.35, z: SALI.z + 1.35, r: 1.0,
         verso: ultima ? 'tetto' : 'torre' + (n + 1), arrivo: ultima ? B.TettoTorre.spawn : { x: SCENDI.x + 1.9, z: SCENDI.z + 1.7, yaw: PI * 0.75 } });
     }
     /* ---------- scala che scende (nord-ovest), con ringhiera ---------- */
@@ -8420,44 +8489,87 @@ window.CONFIG = {
         verso: 'torre' + (n - 1), arrivo: { x: SALI.x - 2.5, z: SALI.z + 2.5, yaw: PI * 0.75 } });
     }
 
-    /* ---------- arredo: ingresso o spazio libero per un negozio ---------- */
-    if (n === 0) {
-      // bacheca con i piani della torre
-      const tb = scritta('TORRE DELLA COMETA\n1° piano · presto un negozio\n2° piano · presto un negozio\n3° piano · presto un negozio\nTetto · il telescopio', 2.6, 1.9, { fs: 34, fondo: '#3a2a1e', bordo: '#c8923a' });
-      const bac = new T.Group(); bac.position.set(-X + 0.35, 0, 1.2); bac.rotation.y = PI / 2; scena.add(bac);
-      scatola(bac, 2.8, 2.1, 0.1, '#6b4326', 0, 2.0, 0.0, 0.015);
-      const p = new T.Mesh(new T.PlaneGeometry(2.6, 1.9), new T.MeshBasicMaterial({ map: tb })); p.position.set(0, 2.0, 0.06); bac.add(p);
+    /* ---------- il negozio: bancone con cassa, scaffali e tavoli da vetrina ----------
+       Dove sta tutto e' fisso (BANCONE, SCAFFALI, TAVOLI): il negozio dichiarato in
+       torre-negozi.js ci mette la sua merce con arredo(kit). */
+    const BANCONE = { x: 0, z: Z0 + 3.4, w: 6.0 };
+    const SCAFFALI = [[-X + 0.55, -0.2], [-X + 0.55, 3.0], [X - 0.55, -0.2], [X - 0.55, 3.0]];
+    const TAVOLI = [[-2.8, 3.2], [2.8, 3.2]];
+    if (neg) {
+      const acc = neg.accento || '#f2c76e', col = neg.colore || '#2f2342';
+      const kit = { gruppo: scena, anim, ostacoli, scaffali: [], tavoli: [], bancone: null, T, M, mesh, B, negozio: neg, piano: n };
+      // bancone a L con piano colorato, cassa e campanello
+      { const g = new T.Group(); g.position.set(BANCONE.x, 0, BANCONE.z); scena.add(g);
+        scatola(g, BANCONE.w, 1.0, 0.9, '#8a5a35', 0, 0.5, 0, 0.02); scatola(g, BANCONE.w + 0.2, 0.1, 1.05, acc, 0, 1.05, 0, 0.015);
+        scatola(g, 0.9, 1.0, 1.8, '#8a5a35', -BANCONE.w / 2 + 0.45, 0.5, -0.9, 0.02); scatola(g, 1.05, 0.1, 2.0, acc, -BANCONE.w / 2 + 0.45, 1.05, -0.9, 0.015);
+        for (let k = -2; k <= 2; k++) scatola(g, 0.08, 0.7, 0.04, '#6b4326', k * 1.1, 0.5, 0.47, 0);
+        scatola(g, 0.7, 0.4, 0.5, '#3a3a48', 1.8, 1.3, -0.05, 0.01); scatola(g, 0.6, 0.2, 0.2, '#c8923a', 1.8, 1.55, -0.25, 0.008);   // cassa
+        cil(g, 0.1, 0.16, 0.12, '#c8923a', -1.2, 1.17, 0.15, 12, 0.008);                                                             // campanello
+        ostBox(BANCONE.x, BANCONE.z, BANCONE.w + 0.2, 1.1); ostBox(BANCONE.x - BANCONE.w / 2 + 0.45, BANCONE.z - 0.9, 1.05, 2.0);
+        kit.bancone = { x: BANCONE.x, y: 1.1, z: BANCONE.z, larg: BANCONE.w, g }; }
+      // scaffali lungo le pareti: 3 ripiani ciascuno; kit.scaffali = un posto per ripiano
+      SCAFFALI.forEach(q => {
+        const lato = q[0] < 0 ? 1 : -1, g = new T.Group(); g.position.set(q[0], 0, q[1]); g.rotation.y = lato * PI / 2; scena.add(g);
+        scatola(g, 2.6, 2.8, 0.55, '#6b4326', 0, 1.4, -0.1, 0.02);
+        [0.35, 1.15, 1.95].forEach(y => { scatola(g, 2.5, 0.06, 0.55, '#a96f44', 0, y, 0.02, 0.008); kit.scaffali.push({ x: q[0] + lato * 0.15, y: y + 0.03, z: q[1], rot: lato * PI / 2, larg: 2.4, g }); });
+        scatola(g, 2.7, 0.12, 0.65, acc, 0, 2.86, -0.05, 0.01);
+        ostBox(q[0], q[1], 0.8, 2.7);
+      });
+      // tavoli da vetrina con la tovaglia nei colori del negozio
+      TAVOLI.forEach(q => {
+        const g = new T.Group(); g.position.set(q[0], 0, q[1]); scena.add(g);
+        scatola(g, 2.0, 0.08, 1.2, '#a96f44', 0, 0.85, 0, 0.012); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(c => scatola(g, 0.08, 0.82, 0.08, '#6b4326', c[0] * 0.9, 0.41, c[1] * 0.5, 0.006));
+        scatola(g, 2.1, 0.02, 1.3, col, 0, 0.9, 0, 0); scatola(g, 2.1, 0.3, 0.02, col, 0, 0.76, 0.66, 0);
+        kit.tavoli.push({ x: q[0], y: 0.92, z: q[1], larg: 2.0, prof: 1.2, g });
+        ostBox(q[0], q[1], 2.1, 1.3);
+      });
+      const tap = new T.Mesh(new T.PlaneGeometry(5, 3), new T.MeshToonMaterial({ map: B.texTappeto(), gradientMap: gm, color: new T.Color(acc), transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); tap.rotation.x = -PI / 2; tap.position.set(0, 0.012, BANCONE.z + 2.0); scena.add(tap);
+      // al bancone: apre il negozio (lo fornisce torre-negozi.js)
+      porte.push({ id: 'bancone', nome: neg.nome, testo: neg.azione || 'Guarda la merce', x: BANCONE.x, z: BANCONE.z + 1.6, r: 1.6,
+        fn: () => { if (typeof neg.apri === 'function') neg.apri(); else if (window.Gioco) window.Gioco.emetti('toast', neg.nome + ': apre presto!'); } });
+      if (typeof neg.arredo === 'function') try { neg.arredo(kit); } catch (e) { console.warn('torre: arredo del negozio', e); }
+      // ringhiera sul lato sud aperto
+      scatola(scena, 2 * X, 0.08, 0.08, '#5c3822', 0, 1.0, Z1 - 0.15, 0.008);
+      for (let k = -7; k <= 7; k++) scatola(scena, 0.07, 1.0, 0.07, '#5c3822', k * X / 7.5, 0.5, Z1 - 0.15, 0.006);
+    } else if (n === 0) {
+      // bacheca con i piani e i negozi della torre
+      const tb = scritta('TORRE DELLA COMETA\n' + elencoPiani(), 3.0, 2.2, { fs: 34, fondo: '#3a2a1e', bordo: '#c8923a' });
+      const bac = new T.Group(); bac.position.set(-X + 0.35, 0, 1.6); bac.rotation.y = PI / 2; scena.add(bac);
+      scatola(bac, 3.2, 2.4, 0.1, '#6b4326', 0, 2.0, 0.0, 0.015);
+      const p = new T.Mesh(new T.PlaneGeometry(3.0, 2.2), new T.MeshBasicMaterial({ map: tb })); p.position.set(0, 2.0, 0.06); bac.add(p);
       // panche
-      [[-2.2, 2.6], [2.2, 2.6]].forEach(q => { scatola(scena, 1.8, 0.12, 0.5, '#a96f44', q[0], 0.5, q[1], 0.012); [-0.7, 0.7].forEach(dx => scatola(scena, 0.12, 0.45, 0.4, '#6b4326', q[0] + dx, 0.22, q[1], 0.01)); ostBox(q[0], q[1], 1.9, 0.6);
+      [[-2.6, 3.4], [2.6, 3.4]].forEach(q => { scatola(scena, 1.8, 0.12, 0.5, '#a96f44', q[0], 0.5, q[1], 0.012); [-0.7, 0.7].forEach(dx => scatola(scena, 0.12, 0.45, 0.4, '#6b4326', q[0] + dx, 0.22, q[1], 0.01)); ostBox(q[0], q[1], 1.9, 0.6);
         const st = { x: q[0], z: q[1] + 0.05, y: 0.08, yt: 0, yaw: PI }; st.azione = { sedile: st, nome: 'Siediti', testo: 'Siediti' }; sedili.push(st); });
-      const tap = new T.Mesh(new T.PlaneGeometry(3.2, 4.6), new T.MeshToonMaterial({ map: B.texTappeto(), gradientMap: gm, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); tap.rotation.x = -PI / 2; tap.position.set(0, 0.012, 2.2); scena.add(tap);
+      const tap = new T.Mesh(new T.PlaneGeometry(3.4, 6.4), new T.MeshToonMaterial({ map: B.texTappeto(), gradientMap: gm, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); tap.rotation.x = -PI / 2; tap.position.set(0, 0.012, 2.6); scena.add(tap);
+      // vasi con piante ai lati della bacheca
+      [[-X + 1.0, -1.2], [-X + 1.0, 4.4], [X - 1.0, 4.4]].forEach(q => { cil(scena, 0.38, 0.3, 0.7, '#b0583f', q[0], 0.35, q[1], 12, 0.015); const c = B.PM.cespuglio(n + q[1] | 0); c.position.set(q[0], 0.6, q[1]); c.scale.setScalar(1.3); scena.add(c); ostCer(q[0], q[1], 0.45); });
       // portone d'uscita (lato sud)
       const g = new T.Group(); g.position.set(0, 0, Z1 + 0.1); scena.add(g);
       [-1, 1].forEach(s => scatola(g, 0.3, 3.2, 0.3, pietraChiara, s * 1.1, 1.6, 0, 0.015)); scatola(g, 2.5, 0.3, 0.3, pietraChiara, 0, 3.2, 0, 0.015);
       const mt = new T.Mesh(new T.PlaneGeometry(1.8, 1.0), new T.MeshToonMaterial({ map: B.texTappeto(), gradientMap: gm })); mt.rotation.x = -PI / 2; mt.position.set(0, 0.014, -0.6); g.add(mt);
       porte.push({ id: 'porta-uscita', nome: 'Esci in piazza', x: 0, z: Z1 - 1.1, r: 1.3, verso: 'piazza', arrivo: { x: TORRE.x + (TORRE.w + 0.9) / 2 + 2.6, z: TORRE.z, yaw: PI / 2 } });
     } else {
-      // cavalletto: qui aprira' un negozio
-      const g = new T.Group(); g.position.set(0, 0, 1.0); scena.add(g);
+      // spazio libero: il cavalletto e, col gesso, dove andranno bancone, scaffali e tavoli
+      const g = new T.Group(); g.position.set(0, 0, 0.8); scena.add(g);
       [-0.45, 0.45].forEach(s => { const gm2 = scatola(g, 0.07, 1.9, 0.07, '#6b4326', s, 0.95, 0.12, 0.008); gm2.rotation.x = -0.12; });
       const gb = scatola(g, 0.07, 1.8, 0.07, '#6b4326', 0, 0.9, -0.3, 0.008); gb.rotation.x = 0.3;
       const cv = new T.Mesh(new T.PlaneGeometry(1.4, 1.0), new T.MeshBasicMaterial({ map: scritta('Spazio libero\nqui aprirà\nun negozio', 1.4, 1.0, { fs: 58, fondo: '#fbf3dc', colore: '#3a2a1e', bordo: '#a96f44' }) }));
       cv.position.set(0, 1.4, 0.2); cv.rotation.x = -0.12; g.add(cv);
-      ostCer(0, 1.0, 0.55);
-      // segno di gesso sul pavimento: dove andra' il bancone
-      const lin = (x0, z0, x1, z1) => { const l = mesh(new T.BoxGeometry(Math.abs(x1 - x0) + 0.06, 0.01, Math.abs(z1 - z0) + 0.06), new T.MeshBasicMaterial({ color: 0xf2ecdf, transparent: true, opacity: 0.55 }), { x: (x0 + x1) / 2, y: 0.014, z: (z0 + z1) / 2, cast: false, recv: false }); scena.add(l); };
-      lin(-2.6, -2.2, 2.0, -2.2); lin(-2.6, -1.2, 2.0, -1.2); lin(-2.6, -2.2, -2.6, -1.2); lin(2.0, -2.2, 2.0, -1.2);
-      // casse e botti negli angoli, lasciate dai muratori
-      [[X - 1.1, 2.6], [X - 1.1, 3.6], [X - 2.1, 3.4]].forEach((q, i) => { scatola(scena, 0.8, 0.8, 0.8, i % 2 ? '#a07650' : '#946a46', q[0], 0.4 + (i === 1 ? 0 : 0), q[1], 0.015); ostBox(q[0], q[1], 0.9, 0.9); });
-      [[-X + 1.0, 3.2], [-X + 1.0, 2.2]].forEach(q => { cil(scena, 0.42, 0.42, 1.0, '#8a5a35', q[0], 0.5, q[1], 12, 0.015); cil(scena, 0.44, 0.44, 0.08, '#2c2431', q[0], 0.25, q[1], 12, 0); cil(scena, 0.44, 0.44, 0.08, '#2c2431', q[0], 0.75, q[1], 12, 0); ostCer(q[0], q[1], 0.5); });
+      ostCer(0, 0.8, 0.55);
+      const gesso = new T.MeshBasicMaterial({ color: 0xf2ecdf, transparent: true, opacity: 0.55 });
+      const rett = (cx, cz, w, d) => { const l = (x0, z0, x1, z1) => scena.add(mesh(new T.BoxGeometry(Math.abs(x1 - x0) + 0.06, 0.01, Math.abs(z1 - z0) + 0.06), gesso, { x: (x0 + x1) / 2, y: 0.014, z: (z0 + z1) / 2, cast: false, recv: false })); l(cx - w / 2, cz - d / 2, cx + w / 2, cz - d / 2); l(cx - w / 2, cz + d / 2, cx + w / 2, cz + d / 2); l(cx - w / 2, cz - d / 2, cx - w / 2, cz + d / 2); l(cx + w / 2, cz - d / 2, cx + w / 2, cz + d / 2); };
+      rett(BANCONE.x, BANCONE.z, BANCONE.w, 0.9); SCAFFALI.forEach(q => rett(q[0], q[1], 0.6, 2.6)); TAVOLI.forEach(q => rett(q[0], q[1], 2.0, 1.2));
+      // casse e botti lasciate dai muratori
+      [[X - 1.6, 5.4], [X - 2.6, 5.6], [X - 1.6, 6.3]].forEach((q, i) => { scatola(scena, 0.8, 0.8, 0.8, i % 2 ? '#a07650' : '#946a46', q[0], 0.4, q[1], 0.015); ostBox(q[0], q[1], 0.9, 0.9); });
+      [[-X + 1.3, 5.6], [-X + 2.4, 6.0]].forEach(q => { cil(scena, 0.42, 0.42, 1.0, '#8a5a35', q[0], 0.5, q[1], 12, 0.015); cil(scena, 0.44, 0.44, 0.08, '#2c2431', q[0], 0.25, q[1], 12, 0); cil(scena, 0.44, 0.44, 0.08, '#2c2431', q[0], 0.75, q[1], 12, 0); ostCer(q[0], q[1], 0.5); });
       // ringhiera sul lato sud aperto
       scatola(scena, 2 * X, 0.08, 0.08, '#5c3822', 0, 1.0, Z1 - 0.15, 0.008);
-      for (let k = -5; k <= 5; k++) scatola(scena, 0.07, 1.0, 0.07, '#5c3822', k * X / 5.5, 0.5, Z1 - 0.15, 0.006);
+      for (let k = -7; k <= 7; k++) scatola(scena, 0.07, 1.0, 0.07, '#5c3822', k * X / 7.5, 0.5, Z1 - 0.15, 0.006);
     }
 
     /* ---------- luci a muro ---------- */
     const lampa = B.Mluce('#ffd9a0', 0.9);
-    [[-X + 0.4, -1.5], [X - 0.4, -1.5], [-X + 0.4, 2.8], [X - 0.4, 2.8]].forEach(p => {
+    [[-X + 0.4, -5.8], [X - 0.4, -5.8], [-X + 0.4, 1.4], [X - 0.4, 1.4], [-2.2, Z0 + 0.4], [2.2, Z0 + 0.4]].forEach(p => {
       const l = new T.Group(); l.position.set(p[0], 0, p[1]); scena.add(l);
       cil(l, 0.08, 0.12, 0.3, '#2c2431', 0, 2.6, 0, 8, 0.008);
       const fi = new T.Mesh(new T.SphereGeometry(0.13, 8, 6), lampa); fi.position.y = 2.85; l.add(fi);
@@ -8490,7 +8602,7 @@ window.CONFIG = {
     const COLORI = { giorno: ['#bfe3f2', 0.6], tramonto: ['#ffb878', 0.55], notte: ['#2c3a78', 0.5] };
     function atm(nome) { const c = COLORI[nome] || COLORI.giorno; vetri.forEach(v => { v.color.set(c[0]); v.emissive.set(nome === 'notte' ? '#3a4a9a' : c[0]); v.emissiveIntensity = c[1]; }); }
     const area = (x, z) => x > AREA.x0 && x < AREA.x1 && z > AREA.z0 && z < AREA.z1;
-    return { sedili, anim, ostacoli, porte, toccabili, lampade, area, aggiornaMuri, atm, limiti: AREA, nome: NOME + ' · ' + (n ? NOMI[n] : 'Ingresso'), spawn: n === 0 ? { x: 0, z: 3.6, yaw: PI } : { x: SCENDI.x + 1.9, z: SCENDI.z + 1.7, yaw: PI * 0.75 } };
+    return { sedili, anim, ostacoli, porte, toccabili, lampade, area, aggiornaMuri, atm, limiti: AREA, nome: NOME + ' · ' + (n ? NOMI[n] + (neg ? ' · ' + neg.nome : '') : 'Ingresso'), negozio: neg, zoom: 0.62, rect: { x0: -X, x1: X, z0: Z0, z1: Z1 }, spawn: n === 0 ? { x: 0, z: Z1 - 2.0, yaw: PI } : { x: SCENDI.x + 1.9, z: SCENDI.z + 1.7, yaw: PI * 0.75 } };
   };
 
   /* =================================================================
@@ -8589,7 +8701,8 @@ window.CONFIG = {
     cam.aspect = w / h; cam.fov = Tel.fov; cam.updateProjectionMatrix();
     const fx = -Math.sin(Tel.yaw), fz = -Math.cos(Tel.yaw);
     // l'occhio sta oltre il parapetto, nella direzione in cui si guarda: cosi' si vede anche giu'
-    cam.position.set(TORRE.x + 0.9 + fx * 4.6, TORRE.h + 2.0, TORRE.z - 0.6 + fz * 4.6);
+    const oltre = TORRE.lt / 2 + 0.8;
+    cam.position.set(TORRE.x + 0.9 + fx * oltre, TORRE.h + 2.0, TORRE.z - 0.6 + fz * oltre);
     cam.rotation.order = 'YXZ'; cam.rotation.set(Tel.pitch, Tel.yaw, 0);
     cam.updateMatrixWorld();
     if (Tel.testa) { Tel.testa.rotation.y = Tel.yaw; Tel.testa.rotation.x = Tel.pitch; }
@@ -29700,7 +29813,7 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
   };
   piani.forEach((m, n) => {
     stanze['torre' + n] = { id: 'torre' + n, nome: m.nome, pubblica: true, gruppo: gTorre[n], m, ostacoli: m.ostacoli, porte: m.porte, sedili: m.sedili, toccabili: m.toccabili,
-      area: m.area, alt: () => 0, zoom: 0.8, spawn: m.spawn, rect: { x0: -5.6, x1: 5.6, z0: -5.6, z1: 5.6 }, edifici: [], sfondo: '#2a2040' };
+      area: m.area, alt: () => 0, zoom: m.zoom || 0.8, spawn: m.spawn, rect: m.rect, edifici: [], sfondo: '#2a2040' };
   });
   // il tetto della torre e' un pezzo di piazza (stesso gruppo, stessa chat, gli amici ti vedono lassu')
   if (B.TettoTorre) { const tt = B.TettoTorre; stanze.tetto = { id: 'tetto', luogo: 'piazza', nome: tt.nome, pubblica: true, gruppo: gP, m: piazza, ostacoli: tt.ostacoli, porte: tt.porte, sedili: [], toccabili: [],
