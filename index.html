@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="c02bd6d31a87">
+  <meta name="versione" content="61d2a1370aed">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -513,6 +513,7 @@ body.orizz #inizio .nota { grid-column: 1; grid-row: 4; align-self: start; }
 body.orizz #inizio-anteprima { width: 120px; height: 140px; }
 
 #btn-bici.attivo { background: #d8453b; border-color: #fff; }
+#btn-corri.attivo { background: #2f8f5b; border-color: #fff; }
 #btn-cam.attivo { background: #3b7fd6; border-color: #fff; }
 
 /* ---------- STARLIGHT, la moneta del borgo: bastoncino che brilla come la luce del giorno ---------- */
@@ -551,6 +552,7 @@ body.orizz #inizio-anteprima { width: 120px; height: 140px; }
       <button class="btn-mini" id="btn-musica" aria-label="Spegni la musica">&#x1F3B5;</button>
       <button class="btn-mini" id="btn-audio" aria-label="Spegni gli effetti sonori">&#x1F50A;</button>
       <button class="btn-mini" id="btn-bici" aria-label="Bicicletta: tira fuori o rimetti">&#x1F6B2;</button>
+      <button class="btn-mini" id="btn-corri" aria-label="Corri: attiva o disattiva (anche tenendo premuto Maiuscolo)">&#x1F3C3;</button>
       <button class="btn-mini" id="btn-cam" aria-label="Camera dietro all'avatar: attiva o disattiva">&#x1F3A5;</button>
       <button class="btn-mini" id="btn-arreda" aria-label="Arreda la casa" style="display:none">&#x1F6CB;&#xFE0F;</button>
       <button class="btn-mini" id="btn-emote" aria-label="Emote">&#x1F60A;</button>
@@ -30073,7 +30075,9 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
     io.av.sedT = 0; io.av.sdrT = 0; io.av.root.rotation.order = 'YXZ'; io.av.root.rotation.x = -PI / 2 * io.av.sdr;
     const sa = Math.sin(C.az), ca = Math.cos(C.az);
     const wx = ca * jx + (-sa) * (-jy), wz = -sa * jx + (-ca) * (-jy);
-    const n = Math.hypot(wx, wz) || 1, vmax = CFG.velocita * (io.bici ? 1.9 : 1) * (forza > 0.02 ? (0.45 + 0.55 * forza) : 0);
+    // corsa: tasto 🏃 (o Maiuscolo tenuto premuto), in piazza e nelle stanze; la bici va ancora piu' veloce
+    const corre = io.corre || tasti['shift'];
+    const n = Math.hypot(wx, wz) || 1, vmax = CFG.velocita * (io.bici ? 2.5 : corre ? 1.7 : 1) * (forza > 0.02 ? (0.45 + 0.55 * forza) : 0);
     const acc = 1 - Math.exp(-dt * (forza > 0.02 ? 11 : 15));
     io.vx += (wx / n * vmax - io.vx) * acc; io.vz += (wz / n * vmax - io.vz) * acc;
     const vel = Math.hypot(io.vx, io.vz);
@@ -30148,6 +30152,7 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
 
   { const bc = $('#btn-cam'); if (bc) bc.addEventListener('click', () => setSegui(!C.segui)); }
   { const bb = $('#btn-bici'); if (bb) bb.addEventListener('click', () => setBici(!io.bici)); }
+  { const bc = $('#btn-corri'); if (bc) bc.addEventListener('click', () => { io.corre = !io.corre; bc.classList.toggle('attivo', io.corre); G.emetti('toast', io.corre ? 'Corsa attiva: ti muovi più veloce' : 'Si torna a camminare'); }); }
   B.app = {
     io, gC, vistaAlto, assegnaLuci, ricostruisciCasa, casaOspite, setBici, creaBici, npc, C, cam, scene, renderer, stanze, G, joy, entraStanza, usaPorta, portaVicina, misura, atmosfera, impostaZoom,
     inclina, emote, mostraBolla, ruota: d => { C.azT += d * PI / 2; setSegui(false); },
