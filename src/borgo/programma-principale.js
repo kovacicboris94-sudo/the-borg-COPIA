@@ -59,7 +59,7 @@
   };
   piani.forEach((m, n) => {
     stanze['torre' + n] = { id: 'torre' + n, nome: m.nome, pubblica: true, gruppo: gTorre[n], m, ostacoli: m.ostacoli, porte: m.porte, sedili: m.sedili, toccabili: m.toccabili,
-      area: m.area, alt: () => 0, zoom: 0.8, spawn: m.spawn, rect: { x0: -5.6, x1: 5.6, z0: -5.6, z1: 5.6 }, edifici: [], sfondo: '#2a2040' };
+      area: m.area, alt: () => 0, zoom: m.zoom || 0.8, spawn: m.spawn, rect: m.rect, edifici: [], sfondo: '#2a2040' };
   });
   // il tetto della torre e' un pezzo di piazza (stesso gruppo, stessa chat, gli amici ti vedono lassu')
   if (B.TettoTorre) { const tt = B.TettoTorre; stanze.tetto = { id: 'tetto', luogo: 'piazza', nome: tt.nome, pubblica: true, gruppo: gP, m: piazza, ostacoli: tt.ostacoli, porte: tt.porte, sedili: [], toccabili: [],

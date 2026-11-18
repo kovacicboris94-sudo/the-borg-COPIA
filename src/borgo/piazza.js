@@ -218,7 +218,7 @@
     }
     [[-25, 2.5, 0.55], [-25, 20, 0.55], [25, 9, 0.55], [25, 24, 0.55], [-11, 27.6, 0.55], [11, 27.6, 0.55], [-19.5, -3, 0.55]].forEach(c => ciliegio(c[0], c[1] + DZ, c[2]));
     // zone nuove della piazza ampliata: filari di ciliegi ai bordi
-    [-50, -40, 40, 50].forEach((x, i) => [16, 32, 48, 66].forEach((z, j) => { if (!(x === 40 && z === 32)) ciliegio(x, z, 0.55, (i + j) % 3 === 1 ? 'ciliegio' : 'verde'); }));   // (40,32) e' nel laghetto
+    [-50, -40, 40, 50].forEach((x, i) => [16, 32, 48, 66].forEach((z, j) => { if (!(x === 40 && z === 32) && !(x === -50 && z === 32)) ciliegio(x, z, 0.55, (i + j) % 3 === 1 ? 'ciliegio' : 'verde'); }));   // (40,32) e' nel laghetto
     [-30, -15, 15, 30].forEach((x, i) => ciliegio(x, 67, 0.55, i % 2 ? 'ciliegio' : 'verde'));
 
     /* ---------- lampioni (con alone luminoso) ---------- */
