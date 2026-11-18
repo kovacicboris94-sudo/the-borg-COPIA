@@ -37,9 +37,8 @@
   [scene].concat(gruppiStanze).forEach(g => { g.updateMatrix(); g.matrixAutoUpdate = false; g.matrixWorldNeedsUpdate = true; });
   const stanze = {
     piazza: { id: 'piazza', nome: 'Piazza del Borgo', pubblica: true, gruppo: gP, m: piazza, ostacoli: piazza.ostacoli, porte: piazza.porte, sedili: piazza.sedili, toccabili: piazza.toccabili,
-      // si cammina fino alle siepi della campagna: dalla piazza si esce solo dalla Porta del Borgo (le mura sono ostacoli)
-      area: B.Campagna ? B.Campagna.area : (x, z) => x > PZ.x0 + 1 && x < PZ.x1 - 1 && z > PZ.z0 + 1 && z < PZ.z1 - 1, alt: piazza.altezza, zoom: 1, spawn: { x: 0, z: 38.6, yaw: PI },
-      rect: { x0: PZ.x0, x1: PZ.x1, z0: PZ.z0, z1: PZ.z1 }, edifici: piazza.edifici, sfondo: '#7fb35a' },
+      area: (x, z) => x > PZ.x0 + 1 && x < PZ.x1 - 1 && z > PZ.z0 + 1 && z < PZ.z1 - 1, alt: piazza.altezza, zoom: 1, spawn: { x: 0, z: 38.6, yaw: PI },
+      rect: { x0: PZ.x0, x1: PZ.x1, z0: PZ.z0, z1: PZ.z1 }, edifici: piazza.edifici, sfondo: '#1c1440' },
     casa: { id: 'casa', nome: 'La tua casa', pubblica: false, gruppo: gC, m: casa, ostacoli: casa.ostacoli, porte: casa.porte, sedili: casa.sedili, toccabili: casa.toccabili,
       area: casa.area, alt: (x, z) => (B.Arredo ? B.Arredo.alt(x, z, true) : 0), zoom: 0.8 * Math.pow(10 / casa.w, 0.8), spawn: casa.spawn, rect: { x0: -casa.w / 2, x1: casa.w / 2, z0: casa.zN, z1: 6.1 }, edifici: [], sfondo: '#3a2c4d' },
     negozio: { id: 'negozio', nome: '', pubblica: true, gruppo: gN, m: negozio, ostacoli: negozio.ostacoli, porte: negozio.porte, sedili: negozio.sedili, toccabili: negozio.toccabili,

@@ -32,11 +32,10 @@
     const gm = M('#fff').gradientMap;
     const PZ = CFG.plaza;
 
-    /* ---------- suolo: il selciato della piazza (fuori dalle mura c'e' la campagna, js/campagna.js) ---------- */
+    /* ---------- suolo: il selciato della piazza (sotto l'isola e attorno c'e' il cosmo, js/mura-cosmo.js) ---------- */
     const W = PZ.w, D = PZ.d, CZ = PZ.cz;
     // pietre irregolari con rilievo e macchie di colore (B3.PM, piazza-modelli.js)
     const suolo = B.PM.suolo(W, D, [W / 4.5, D / 4.5]); suolo.position.z = CZ; scene.add(suolo);
-    scene.add(mesh(new T.BoxGeometry(W + 0.4, 1.4, D + 0.4), M('#8a7a82'), { y: -0.71, z: CZ, lb: 0.05 }));
     // disco a mosaico attorno alla fontana
     const mo = B.PM.discoAnelli(6.3); mo.position.set(0, 0.02, 3.2 + DZ); scene.add(mo);   // anelli di pietra e stella della cometa
 
@@ -231,8 +230,8 @@
     if (B.CasaScacchi) B.CasaScacchi.decoraPiazza(scene, { ostCer });
     const gt = torre(-51.4, 26); gt.rotation.y = PI / 2; edifici.push({ g: gt, x: -51.4, z: 26, w: 3.2, d: 3.2, nome: 'Torre' });
     porte.push({ id: 'porta-torre', nome: 'Torre dell\'Orologio', x: -51.4 + 1.5 + 0.9, z: 26, r: 1.2, verso: null });
-    // le mura con le torri e la Porta del Borgo, e fuori la campagna (js/campagna.js)
-    if (B.costruisciMuraCampagna) B.costruisciMuraCampagna({ scene, ostacoli, anim, fadeVoci, edifici });
+    // le mura con le torri e la Porta del Borgo, e attorno il cosmo (js/mura-cosmo.js)
+    if (B.costruisciMuraCosmo) B.costruisciMuraCosmo({ scene, ostacoli, anim, fadeVoci, edifici });
 
     /* ---------- fontana con statua ---------- */
     (function fontana(x, z) {
