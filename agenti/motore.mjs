@@ -270,7 +270,16 @@ function avanza(stato, ag, dt, adesso, regole) {
     const a = ag.coda.shift();
     if (esegui(stato, ag, a, adesso, regole) === 'cammina') break;
   }
-  if (!ag.coda.length && !ag.lavoro && ag.modo === 'automatico') routine(ag, adesso);
+  if (!ag.coda.length && !ag.lavoro) { if (ag.modo === 'automatico') routine(ag, adesso); else passeggia(ag, adesso); }
+}
+
+// Tra un pensiero e l'altro, finite le azioni, si fanno due passi qui intorno: e' gratis (lo decide il codice, non il modello).
+function passeggia(ag, adesso) {
+  if (!ag.ancora) ag.ancora = { x: ag.x, z: ag.z };
+  if (ag.prossimaGita && adesso < ag.prossimaGita) return;
+  const notte = momento(adesso) === 'notte', a = adesso / 9e4 + ag.id.charCodeAt(0), r = 1 + (Math.sin(a * 3.7) + 1) * 1.25;
+  ag.tx = r2(lim(ag.ancora.x + Math.sin(a) * r, AREA.x0, AREA.x1)); ag.tz = r2(lim(ag.ancora.z + Math.cos(a) * r, AREA.z0, AREA.z1));
+  ag.prossimaGita = adesso + (notte ? 12 : 3 + (Math.sin(a * 1.3) + 1) * 1.5) * 60000;
 }
 
 const nomeDi = (stato, id) => (stato.agenti[id] ? stato.agenti[id].nome : id && id.indexOf('g:') === 0 ? id.slice(2) : 'qualcuno');
@@ -279,6 +288,7 @@ function esegui(stato, ag, a, adesso, regole) {
   if (a.errore) { esito(ag, 'rifiutata: ' + a.errore); return; }
   if (a.tipo === 'vai') {
     ag.tx = a.x; ag.tz = a.z; if (a.dove) ag.meta = a.dove; else ag.meta = null;
+    ag.ancora = { x: a.x, z: a.z }; ag.prossimaGita = adesso + 2 * 60000;   // arrivato, si passeggia li' intorno
     esito(ag, `vai ${a.dove || `x=${a.x} z=${a.z}`}: in cammino`);
     return 'cammina';
   }
@@ -340,6 +350,20 @@ function svegliaPerVoce(ag, adesso, regole) {
 }
 
 // Senza budget (o senza chiave): si vive in automatico, senza parlare ne' costruire.
+// come guardare il conto in banca: quanti pensieri restano e quando finirebbe il budget al ritmo di questo mese
+function previsione(b, ag, adesso) {
+  const medio = b.pensieri ? b.spesi / b.pensieri : ag.costoUltimo || 0;
+  if (!medio || !b.resto) return '';
+  const restano = Math.floor(b.resto / medio), ogni = b.giorni * 1440 / Math.max(1, restano);
+  let r = ` Al costo medio dei tuoi pensieri (${dollari(medio)}) te ne restano circa ${restano}: ad esempio uno ogni ${ogni < 60 ? Math.max(1, Math.round(ogni)) + ' minuti' : Math.round(ogni / 6) / 10 + ' ore'} fino a fine mese.`;
+  const passati = ag.meseInizio === meseDi(adesso) ? (adesso - ag.tInizio) / 864e5 : 0;
+  if (b.pensieri >= 5 && passati > 0.05) {
+    const alGiorno = b.spesi / passati, giorniBastano = b.resto / alGiorno;
+    r += giorniBastano >= b.giorni ? ` Al ritmo che hai tenuto finora il budget basta fino a fine mese.` : ` Al ritmo che hai tenuto finora il budget finirebbe tra circa ${Math.max(1, Math.round(giorniBastano))} giorni (mancano ${b.giorni} giorni a fine mese).`;
+  }
+  return r;
+}
+
 function routine(ag, adesso) {
   if (ag.prossimaGita && adesso < ag.prossimaGita) return;
   const notte = momento(adesso) === 'notte';
@@ -365,6 +389,7 @@ COSA SAI
 IL TUO PENSIERO COSTA SOLDI VERI
 Hai un budget di ${regole.tettoUsd} dollari al mese. Ogni volta che pensi ne spendi un po' (di solito tra 0,0003 e 0,001 $; pensare a fondo costa di piu'). Quando il budget finisce non puoi piu' pensare fino al mese dopo: vivrai in automatico, girando per il borgo senza parlare ne' costruire.
 Devi far durare il budget fino a fine mese: sei tu a decidere fra quanti minuti ripensare (prossimo_pensiero_minuti, da 1 a 720) e quanto a fondo (sforzo_prossimo: "basso" o "medio"). Se qualcuno ti parla vicino, potresti svegliarti prima.
+Camminare non costa nulla: le azioni che decidi in un pensiero le esegui gratis. E tra un pensiero e l'altro, quando non hai niente da fare, fai da solo due passi qui intorno (entro 3-4 metri), sempre gratis.
 
 AZIONI (le controllano le regole del mondo: se una e' impossibile viene rifiutata e lo scoprirai al prossimo pensiero). Al massimo ${regole.maxAzioni} per pensiero, eseguite in ordine.
 - {"tipo":"vai","luogo":"Fontana"} oppure {"tipo":"vai","x":10,"z":30}: cammini a ${regole.velocita} m/s. Le azioni dopo un "vai" partono quando arrivi.
@@ -383,7 +408,7 @@ export function percezione(stato, ag, adesso, regole = REGOLE) {
   const b = budget(ag, adesso, regole), vicino = luogoVicino(ag);
   const righe = [];
   righe.push(`ORA: ${FMT_ORA.format(new Date(adesso))} (${momento(adesso)}).`);
-  righe.push(`BUDGET: questo mese hai speso ${dollari(b.spesi)} su ${dollari(b.tetto)} in ${b.pensieri} pensieri; restano ${dollari(b.resto)} per ${b.giorni} giorni (circa ${dollari(b.alGiorno)} al giorno).` + (ag.costoUltimo ? ` Il tuo ultimo pensiero e' costato ${dollari(ag.costoUltimo)}.` : ''));
+  righe.push(`BUDGET: questo mese hai speso ${dollari(b.spesi)} su ${dollari(b.tetto)} in ${b.pensieri} pensieri; restano ${dollari(b.resto)} per ${b.giorni} giorni (circa ${dollari(b.alGiorno)} al giorno).` + (ag.costoUltimo ? ` Il tuo ultimo pensiero e' costato ${dollari(ag.costoUltimo)}.` : '') + previsione(b, ag, adesso));
   righe.push(`DOVE SEI: x=${Math.round(ag.x)} z=${Math.round(ag.z)}, ${vicino.d <= 4 ? 'a' : 'vicino a'} ${vicino.nome}.` + (ag.lavoro ? ' Stai ancora lavorando.' : ''));
   const visti = [];
   for (const altro of Object.values(stato.agenti)) {
@@ -464,6 +489,7 @@ async function pensa(stato, ag, adesso, cervello, regole) {
   const costo = costoDi(r.usage), s = spesaMese(ag, adesso);
   s.usd += costo; s.pensieri++; s.ingresso += (r.usage && r.usage.input_tokens) || 0; s.uscita += (r.usage && r.usage.output_tokens) || 0;
   ag.costoUltimo = costo; ag.ultimaVolta = adesso; ag.esiti = [];
+  if (ag.meseInizio !== meseDi(adesso)) { ag.meseInizio = meseDi(adesso); ag.tInizio = adesso; }   // da quando pensa in questo mese (per la previsione)
 
   const v = r.stop_reason === 'refusal' ? null : leggiRisposta(r.testo);
   if (!v) {
