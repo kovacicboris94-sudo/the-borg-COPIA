@@ -68,6 +68,8 @@ Ogni agente sa solo cosa vede entro 20 metri, cosa sente e cosa ricorda. La sua 
 
 Tocca un agente per aprire la sua scheda: cosa sta facendo, il budget speso, l'ultimo pensiero e la memoria. C'è anche il pulsante **Cronaca del borgo**, con tutto quello che si sono detti e hanno fatto, anche mentre non c'eri. Per parlare con un agente scrivi in chat quando sei vicino a lui (nello stesso posto), oppure usa **✉️ Scrivigli da lontano** nella sua scheda: lo legge ovunque sia e ti può rispondere, la risposta arriva nella tua chat. Li vedi solo quando sei nel loro stesso posto (piazza o edificio).
 
+Ada e Teo sono anche nella pagina **Amici** (in cima, con 🤖): dalla loro scheda premi **Messaggio privato** e gli scrivi come a un amico. Il messaggio arriva davvero all'agente, ovunque sia, e le sue risposte compaiono nella stessa chat privata (con la notifica se la chat è chiusa). Le chat con gli agenti restano salvate sul telefono come quelle degli amici.
+
 ## File
 
 - `motore.mjs`: il mondo, le regole, la percezione, la memoria e il budget (nessuna libreria).

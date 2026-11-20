@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="c8ea5bf6acb7">
+  <meta name="versione" content="e046da214494">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -23154,7 +23154,7 @@ body.pc #rd-hud .tasto,body.pc #rd-hud .base{display:none}
     tSalvaDM = setTimeout(() => {
       try {
         const o = {};
-        Object.keys(stato.dm).filter(id => id.indexOf('amico:') === 0 && stato.dm[id].msgs.length).slice(-30)
+        Object.keys(stato.dm).filter(id => (id.indexOf('amico:') === 0 || id.indexOf('agente:') === 0) && stato.dm[id].msgs.length).slice(-30)
           .forEach(id => { o[id] = { msgs: stato.dm[id].msgs.slice(-100), nonLetti: stato.dm[id].nonLetti }; });
         localStorage.setItem(CHIAVE_DM, JSON.stringify(o));
       } catch (e) { /* storage non disponibile */ }
@@ -23164,7 +23164,7 @@ body.pc #rd-hud .tasto,body.pc #rd-hud .base{display:none}
     try {
       const o = JSON.parse(localStorage.getItem(CHIAVE_DM) || '{}');
       Object.keys(o).forEach(id => {
-        if (id.indexOf('amico:') !== 0 || !o[id] || !Array.isArray(o[id].msgs)) return;
+        if ((id.indexOf('amico:') !== 0 && id.indexOf('agente:') !== 0) || !o[id] || !Array.isArray(o[id].msgs)) return;
         stato.dm[id] = { msgs: o[id].msgs.filter(m => m && typeof m.testo === 'string').slice(-100), nonLetti: Math.max(0, +o[id].nonLetti || 0) };
       });
     } catch (e) { /* niente */ }
@@ -30733,11 +30733,13 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
     idFoglio = id; lookFoglio = u.look;
     $('#foglio-nick').textContent = u.nick; $('#foglio-bio').textContent = u.bio;
     $('#foglio-dove').textContent = u.dove || (u.online ? 'In piazza' : 'Non in linea');
-    $('#foglio-tipo').textContent = u.amico ? 'Amico vero' : 'Utente dimostrativo';
-    $('#foglio-amico').hidden = !u.amico;
+    $('#foglio-tipo').textContent = u.agente ? 'Agente IA 🤖' : u.amico ? 'Amico vero' : 'Utente dimostrativo';
+    $('#foglio-amico').hidden = !u.amico || !!u.agente;
     $('#foglio-dm').hidden = !u.amico;   // ai bot non si scrivono messaggi privati
-    $('#foglio-sussurra').hidden = G.stato.bloccati.has(id) || !u.online;
+    $('#foglio-sussurra').hidden = G.stato.bloccati.has(id) || !u.online || !!u.agente;
     aggiornaBottoneBlocco();
+    $('#foglio-segnala').parentNode.hidden = !!u.agente;   // gli agenti IA non si segnalano né si bloccano
+    $('#foglio .nota-piccola').hidden = !!u.agente;
     $('#foglio').hidden = false;
   }
   function chiudiFoglio() { $('#foglio').hidden = true; idFoglio = null; lookFoglio = null; }
@@ -30797,6 +30799,15 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
   /* ---------- amici (utenti dimostrativi) ---------- */
   function aggiornaAmici() {
     const box = $('#amici-lista'); box.innerHTML = '';
+    // gli agenti IA del borgo (Ada, Teo...) in cima: dalla loro scheda gli scrivi in privato
+    (B.amiciAgenti ? B.amiciAgenti() : []).forEach(u => {
+      const b = el('div', 'amico'); b.setAttribute('role', 'button'); b.tabIndex = 0;
+      const cv = el('canvas', 'mini-avatar'); cv.width = 88; cv.height = 104; disegnaMini(cv, u.look);
+      const t = el('div', 'amico-testo'), nome = el('div', 'amico-nome', u.nick + ' 🤖');
+      nome.prepend(el('span', 'stato-pt')); t.append(nome, el('div', 'amico-bio', u.dove + ' · ' + u.bio));
+      b.addEventListener('click', () => apriFoglio(u.id));
+      b.append(cv, t); box.append(b);
+    });
     CFG.utentiDemo.filter(u => !u.extra).forEach(u => {
       const bloccato = G.stato.bloccati.has(u.id);
       const b = el('div', 'amico'); b.setAttribute('role', 'button'); b.tabIndex = 0;
@@ -31792,11 +31803,38 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     l.forEach(m => {
       if (m.t <= visto || String(m.a).toLowerCase() !== io || !A.agenti.has(m.agente)) return;
       visto = m.t;
-      if (G.aggiungiVoce) G.aggiungiVoce({ id: 'agente:' + m.agente, nick: m.da + ' 🤖 ✉️', testo: m.testo, ora: new Date().toTimeString().slice(0, 5), io: false });
-      if (G.emetti) G.emetti('toast', '✉️ ' + m.da + ' ti ha scritto');
+      // arriva nei messaggi privati, come quelli di un amico
+      const id = 'agente:' + m.agente, c = G.conversazione(id);
+      c.msgs.push({ da: id, testo: m.testo, ora: new Date().toTimeString().slice(0, 5), quando: Date.now() });
+      if (G.stato.dmAperto !== id) { c.nonLetti++; G.emetti('toast', '✉️ ' + m.da + ' ti ha scritto'); }
+      G.emetti('dm', { id });
     });
     A.msgVisto = visto; try { localStorage.setItem('borg_agenti_msg', String(visto)); } catch (e) { /* niente */ }
   }
+  // Ada e Teo tra gli amici: scheda, posizione e messaggi privati (che arrivano davvero, ovunque siano)
+  const nomeDove = s => !s ? 'Nel borgo' : s.stanza === 'tetto' ? 'Sul tetto della Torre' : s.stanza ? 'In ' + (({ negozio: 'Negozio TCG', tcg: 'Sala TCG' })[s.stanza] || (app && app.stanze[s.stanza] || {}).nome || s.stanza) : 'In piazza';
+  B.amiciAgenti = () => (A.dati ? A.dati.agenti : []).map(s => G.utente('agente:' + s.id));
+  const utenteOrig = G.utente;
+  G.utente = function (id) {
+    if (typeof id !== 'string' || id.indexOf('agente:') !== 0) return utenteOrig(id);
+    const s = A.dati && A.dati.agenti.find(a => a.id === id.slice(7)), nick = s ? s.nome : id.slice(7);
+    return { id, nick, look: (s && s.look) || {}, online: true, amico: true, agente: true, dove: nomeDove(s),
+      bio: 'Agente IA che vive nel borgo. Scrivigli: legge i messaggi ovunque sia e ti risponde qui (ogni risposta gli costa un po\' di budget).' };
+  };
+  const inviaOrig = G.inviaDM;
+  G.inviaDM = function (id, t) {
+    if (typeof id !== 'string' || id.indexOf('agente:') !== 0) return inviaOrig(id, t);
+    if (!mioNick()) { G.emetti('toast', 'Prima scegli il tuo nome'); return false; }
+    t = G.controllaMessaggio(t, 'dm', 300); if (!t) return false;
+    const c = G.conversazione(id), m = { da: 'io', testo: t, ora: new Date().toTimeString().slice(0, 5), quando: Date.now(), stato: 'inviato' };
+    c.msgs.push(m); G.emetti('dm', { id });
+    fetch(A.url + '/parla', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nick: mioNick(), testo: t, a: id.slice(7), x: app ? app.io.x : 0, z: app ? app.io.z : 0, stanza: app ? doveIo() : null }) })
+      .then(r => { if (r.status === 429) throw new Error('piano'); return r.json(); })
+      .then(j => { if (!j.ok) throw new Error('no'); m.stato = 'letto'; G.emetti('dm', { id }); })
+      .catch(e => { m.testo += e.message === 'piano' ? '  ⚠️ non inviato: aspetta qualche secondo' : '  ⚠️ non inviato, riprova'; delete m.stato; G.emetti('dm', { id }); });
+    return true;
+  };
+
   async function scriviDaLontano() {
     const el = A.scheda; if (!el) return;
     const inp = el.querySelector('.ag-testo'), nota = el.querySelector('.ag-nota'), testo = inp.value.trim().slice(0, 300), id = el.dataset.id;
