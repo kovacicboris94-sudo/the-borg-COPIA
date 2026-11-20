@@ -159,7 +159,7 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   ok(c.chiamate.length === chiamate, 'passeggiare non chiama il modello');
   const posti = new Set(); let lontano = 0;
   for (let i = 0; i < 40; i++) { t = await scorri(s, t, 1, c); posti.add(ada.x + ',' + ada.z); lontano = Math.max(lontano, Math.hypot(ada.x - 0, ada.z - 40)); }
-  ok(posti.size > 3 && lontano <= 4.1, 'passeggia vicino a dove era andata (' + posti.size + ' posti, max ' + lontano.toFixed(1) + ' m)');
+  ok(posti.size > 3 && lontano <= 7.5, 'passeggia vicino a dove era andata (' + posti.size + ' posti, max ' + lontano.toFixed(1) + ' m)');
   const m = percezione(s, s.agenti.teo, t);
   ok(/te ne restano circa \d+/.test(m), 'previsione del budget nella percezione');
 }
@@ -187,6 +187,14 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   t = await scorri(s, t, 50, c);   // pomeriggio a Roma: va da sola al Laghetto (x=38 z=32)
   ok(Math.hypot(ada.x - 38, ada.z - 35) < 4.5 && c.chiamate.length === chiamate, 'segue l\'abitudine senza pensare (' + ada.x + ',' + ada.z + ')');
   ok(normalizzaAzione({ tipo: 'abitudine', testo: 'mattina: Luna' }).errore && normalizzaAzione({ tipo: 'abitudine', testo: 'nessuna' }).abitudine === null, 'luoghi controllati, si puo\' togliere');
+}
+
+// 13) gesti: saluta, salta... visibili nel gioco, sentiti da chi e' vicino, non nella cronaca
+{
+  const s = nuovoStato(T0), c = finto(risp([{ tipo: 'gesto', testo: 'salta' }, { tipo: 'gesto', testo: 'vola' }]));
+  await passo(s, T0 + 20000, c); await passo(s, T0 + 50000, c);
+  ok(s.agenti.ada.gesto && s.agenti.ada.gesto.tipo === 'salta' && vistaPubblica(s, T0 + 50000).agenti[0].gesto.tipo === 'salta', 'gesto fatto e visibile');
+  ok(!s.cronaca.some(e => e.tipo === 'gesto') && s.agenti.ada.esiti.some(x => /gesto: usa uno di/.test(x)), 'non in cronaca; gesto sconosciuto rifiutato');
 }
 
 // 9) pezzi piccoli

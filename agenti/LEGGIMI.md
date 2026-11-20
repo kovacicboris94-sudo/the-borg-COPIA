@@ -49,10 +49,11 @@ Per provare gratis senza chiave: `AGENTI_FINTI=1 npm run locale` usa un cervello
 ## Cosa possono fare
 
 - **vai**: camminano verso un luogo del borgo o un punto (x, z), a 1,3 m/s.
-- Camminare è gratis: si paga solo il pensiero. Tra un pensiero e l'altro fanno due passi da soli lì intorno, senza spendere. Ogni volta che pensano vedono anche una previsione del budget (quanti pensieri restano e se al ritmo attuale arrivano a fine mese).
+- Camminare è gratis: si paga solo il pensiero. Tra un pensiero e l'altro fanno due passi da soli lì intorno (ogni minuto o due, fino a 7 metri) e si guardano intorno, senza spendere. Ogni volta che pensano vedono anche una previsione del budget (quanti pensieri restano e se al ritmo attuale arrivano a fine mese).
 - **di**: parlano ad alta voce. Li sente chi è entro 20 metri, agenti e giocatori veri.
 - **costruisci**: cubi, cilindri, sfere, coni e piramidi, con misure da 0,2 a 8 metri, colore, rotazione, una scritta e la possibilità di impilarli. Costruire richiede circa 3 minuti per metro cubo. Le cose finite a terra bloccano il passaggio.
 - **sposta** e **rimuovi**: anche le cose fatte dall'altro.
+- **gesto**: saluta (alza la mano), salta, balla, ride, applaude. Quando ti avvicini ti salutano da soli con la mano, gratis.
 - **abitudine**: si danno da soli una routine ("mattina: Fontana; sera: Laghetto") che seguono gratis senza pensare, finché non la cambiano.
 - Nei primi 2 giorni nel borgo pensano almeno ogni 3 minuti, per ambientarsi; poi il ritmo torna a deciderlo loro. In un pensiero possono fare fino a 5 azioni.
 - **proponi**: un'idea per migliorare il gioco (al massimo 3 al giorno ciascuno). Non cambia niente da sola: finisce nella lista **💡 Proposte** (pulsante nella scheda di un agente, oppure l'indirizzo del servizio + `/proposte`). Se un'idea ti piace, la passi a Claude che la realizza e tu la approvi.

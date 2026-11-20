@@ -89,6 +89,11 @@
         }
       }
     }
+    // un gesto deciso pensando (saluta, salta, balla...): il corpo lo fa
+    if (s.gesto && s.gesto.t > (e.gestoVisto || 0)) {
+      e.gestoVisto = s.gesto.t;
+      if (ora() - s.gesto.t < 40000 && inPiazza()) fai(e, s.gesto.tipo);
+    }
     const lk = s.lavoro ? s.lavoro.tipo + s.lavoro.id : null;
     if (lk && lk !== e.lavoroVisto && inPiazza()) app.mostraBolla(e, s.lavoro.tipo === 'costruisci' ? '🔨' : '🧰', 3);
     e.lavoroVisto = lk;
@@ -104,6 +109,9 @@
     }
     return { x, z };
   }
+  const EMOTE = { saluta: ['saluta', 3], salta: ['evviva', 2.4], balla: ['balla', 5], ridi: ['ridi', 3], applaudi: ['applaudi', 3.5] };
+  const vel0 = e => Math.hypot(e.vx || 0, e.vz || 0);
+  function fai(e, g) { const m = EMOTE[g]; if (m && e.av.faiEmote) { e.av.faiEmote(m[0], m[1]); e.gestoFino = ora() + m[1] * 1000; } }
   const SPAZIO = 0.8;   // distanza minima tra due persone
   // strada a piedi su una griglia di mezzo metro (A*), poi si tolgono le tappe inutili
   function percorso(x0, z0, x1, z1) {
@@ -179,7 +187,15 @@
         app.muovi(e, ux * k, uz * k);
       });
       const vel = Math.hypot(e.vx, e.vz);
-      if (vel > 0.2) e.yaw = Math.atan2(e.vx, e.vz);
+      // quando arrivi vicino ti salutano con la mano (gratis, lo fa il gioco), al massimo una volta ogni 2 minuti
+      if (inPiazza() && app.io) {
+        const vicino = Math.hypot(app.io.x - e.x, app.io.z - e.z) < 4;
+        if (vicino && !e.ioVicino && ora() - (e.salutato || 0) > 120000 && vel0(e) < 0.3) { e.salutato = ora(); e.yawT = Math.atan2(app.io.x - e.x, app.io.z - e.z); fai(e, 'saluta'); }
+        e.ioVicino = vicino;
+      }
+      // fermi non vuol dire statue: ogni tanto si guardano intorno
+      if (vel <= 0.2 && !s.lavoro && !(ora() < (e.gestoFino || 0))) { e.guarda = (e.guarda || 0) - dt; if (e.guarda <= 0) { e.guarda = 2.5 + Math.random() * 4; e.yawT = e.yaw + (Math.random() - 0.5) * 2.2; } if (e.yawT != null) e.yaw += (e.yawT - e.yaw) * Math.min(1, dt * 3); }
+      if (vel > 0.2) { e.yaw = Math.atan2(e.vx, e.vz); e.yawT = null; }
       else if (s.lavoro) { const o = A.oggetti.get(s.lavoro.id); if (o) e.yaw = Math.atan2(o.d.x - e.x, o.d.z - e.z); }
       // il pavimento non e' tutto alla stessa altezza (palco, gradini): si sta sopra, come il giocatore
       const st = app.stanze.piazza, ty = st.alt ? st.alt(e.x, e.z) : 0; e.y = e.y == null ? ty : e.y + (ty - e.y) * Math.min(1, dt * 14);
