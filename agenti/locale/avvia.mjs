@@ -15,7 +15,7 @@ import http from 'node:http';
 import { readFileSync, writeFileSync, existsSync, renameSync, statSync } from 'node:fs';
 import { join, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nuovoStato, passo, vistaPubblica, giocatoreParla, cronaca } from '../motore.mjs';
+import { nuovoStato, passo, vistaPubblica, giocatoreParla, cronaca, proposte } from '../motore.mjs';
 import { cervelloClaude, cervelloFinto } from '../cervello.mjs';
 
 const qui = p => fileURLToPath(new URL(p, import.meta.url));
@@ -58,6 +58,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
   if (url.pathname === '/stato') return manda(vistaPubblica(stato, Date.now()));
   if (url.pathname === '/cronaca') return manda({ ora: Date.now(), voci: cronaca(stato, +url.searchParams.get('da') || 0) });
+  if (url.pathname === '/proposte') return manda({ ora: Date.now(), proposte: proposte(stato) });
   if (url.pathname === '/parla' && req.method === 'POST') {
     const chi = req.socket.remoteAddress || 'x', ora = Date.now();
     if (ora - (voci.get(chi) || 0) < 8000) return manda({ ok: false, motivo: 'piano' }, 429);

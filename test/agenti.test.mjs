@@ -1,7 +1,7 @@
 // Prove del motore degli agenti (agenti/motore.mjs), senza chiave e senza spendere niente.
 //   node test/agenti.test.mjs
 import assert from 'node:assert/strict';
-import { nuovoStato, passo, budget, percezione, giocatoreParla, vistaPubblica, normalizzaAzione, leggiRisposta, costoDi, meseDi, REGOLE, SCHEMA } from '../agenti/motore.mjs';
+import { nuovoStato, passo, budget, percezione, giocatoreParla, vistaPubblica, normalizzaAzione, leggiRisposta, costoDi, meseDi, REGOLE, SCHEMA, proposte } from '../agenti/motore.mjs';
 
 const T0 = Date.UTC(2026, 10, 20, 12, 0, 0);   // 20 novembre 2026, 13:00 a Roma
 let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -160,6 +160,16 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   ok(posti.size > 3 && lontano <= 4.1, 'passeggia vicino a dove era andata (' + posti.size + ' posti, max ' + lontano.toFixed(1) + ' m)');
   const m = percezione(s, s.agenti.teo, t);
   ok(/te ne restano circa \d+/.test(m), 'previsione del budget nella percezione');
+}
+
+// 11) proposte per chi crea il gioco: finiscono in una lista, al massimo 3 al giorno per agente
+{
+  const s = nuovoStato(T0), c = finto(risp([{ tipo: 'proponi', testo: 'Un mercato coperto' }, { tipo: 'proponi', testo: 'Una biblioteca' }], { prossimo_pensiero_minuti: 1 }));
+  await scorri(s, T0, 6, c);
+  const l = proposte(s), di = l.filter(p => p.chi === 'Ada');
+  ok(di.length === 3, 'al massimo 3 proposte al giorno (' + di.length + ')');
+  ok(l[0].testo && s.cronaca.some(e => e.tipo === 'proposta'), 'nella lista e nella cronaca');
+  ok(normalizzaAzione({ tipo: 'proponi', testo: '' }).errore, 'proposta vuota rifiutata');
 }
 
 // 9) pezzi piccoli

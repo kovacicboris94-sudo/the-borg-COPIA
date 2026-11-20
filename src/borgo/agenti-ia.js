@@ -248,9 +248,20 @@
     box.innerHTML = '<div style="margin-top:8px;max-height:38vh;overflow:auto;background:#1f1729;border-radius:10px;padding:6px 10px">' + A.voci.slice().reverse().map(v => {
       const g = giorno(v.t), h = new Date(v.t).toTimeString().slice(0, 5), testa = g !== ultimo ? `<div style="margin:8px 0 2px;font-size:11px;opacity:.6;text-transform:uppercase">${esc(g)}</div>` : ''; ultimo = g;
       const chi = `<b>${esc(v.chi)}</b>${v.vero ? '' : ' 🤖'}`;
-      const cosa = v.tipo === 'parla' ? `: “${esc(v.testo)}”` : v.tipo === 'costruisce' ? ` inizia a costruire <i>${esc(v.testo)}</i>` : v.tipo === 'finito' ? ` ha finito <i>${esc(v.testo)}</i>` : v.tipo === 'rimosso' ? ` ha smontato <i>${esc(v.testo)}</i>` : ` ha spostato <i>${esc(v.testo)}</i>`;
+      const cosa = v.tipo === 'parla' ? `: “${esc(v.testo)}”` : v.tipo === 'costruisce' ? ` inizia a costruire <i>${esc(v.testo)}</i>` : v.tipo === 'finito' ? ` ha finito <i>${esc(v.testo)}</i>` : v.tipo === 'rimosso' ? ` ha smontato <i>${esc(v.testo)}</i>` : v.tipo === 'proposta' ? ` propone per il gioco 💡 “${esc(v.testo)}”` : ` ha spostato <i>${esc(v.testo)}</i>`;
       return testa + `<div style="margin:3px 0"><span style="opacity:.6;font-size:12px">${h} · ${esc(v.luogo)}</span><br>${chi}${cosa}</div>`;
     }).join('') + '</div>';
+  }
+  // le idee degli agenti per chi crea il gioco: le legge Boris e decide lui
+  async function mostraProposte() {
+    const box = A.scheda && A.scheda.querySelector('.ag-voci'); if (!box) return;
+    A.voci = null; box.innerHTML = '<div style="margin-top:8px;opacity:.7">Carico le proposte...</div>';
+    let l;
+    try { const r = await fetch(A.url + '/proposte', { cache: 'no-store' }); l = (await r.json()).proposte || []; }
+    catch (e) { box.innerHTML = '<div style="margin-top:8px">Proposte non raggiungibili, riprova tra poco.</div>'; return; }
+    if (!l.length) { box.innerHTML = '<div style="margin-top:8px;opacity:.8">Nessuna proposta, per ora.</div>'; return; }
+    box.innerHTML = '<div style="margin-top:8px;max-height:38vh;overflow:auto;background:#1f1729;border-radius:10px;padding:6px 10px">' + l.map(p =>
+      `<div style="margin:6px 0"><span style="opacity:.6;font-size:12px">${esc(new Date(p.t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</span><br><b>${esc(p.chi)} 🤖</b>: ${esc(p.testo)}</div>`).join('') + '</div>';
   }
   function apriScheda(id) {
     chiudiScheda();
@@ -258,8 +269,10 @@
     el.style.cssText = 'position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(92vw,420px);max-height:60vh;overflow:auto;z-index:60;background:#2a1f36;color:#ffe9c4;border:2px solid #f2c76e;border-radius:16px;padding:14px 16px;font-family:sans-serif;font-size:14px;line-height:1.35;box-shadow:0 8px 30px rgba(0,0,0,.45)';
     el.innerHTML = '<button aria-label="Chiudi" style="position:absolute;right:8px;top:6px;background:none;border:0;color:#ffe9c4;font-size:22px;cursor:pointer">×</button><div class="ag-info"></div>' +
       '<button class="ag-cronaca" style="margin-top:10px;width:100%;padding:9px;border-radius:10px;border:0;background:#f2c76e;color:#2a1a2e;font-weight:700;font-size:14px;cursor:pointer">📜 Cronaca del borgo: cosa si sono detti e fatti</button>' +
+      '<button class="ag-proposte" style="margin-top:8px;width:100%;padding:9px;border-radius:10px;border:2px solid #f2c76e;background:none;color:#ffe9c4;font-weight:700;font-size:14px;cursor:pointer">💡 Proposte per migliorare il gioco</button>' +
       '<div class="ag-voci"></div><div style="margin-top:10px;font-size:12px;opacity:.75">Per parlargli scrivi in chat quando sei vicino a lui: ti sente entro ' + VISTA + ' metri. Ogni risposta gli costa un po\' di budget.</div>';
     el.querySelector('.ag-cronaca').addEventListener('click', mostraCronaca);
+    el.querySelector('.ag-proposte').addEventListener('click', mostraProposte);
     el.querySelector('button').addEventListener('click', chiudiScheda);
     ['pointerdown', 'touchstart'].forEach(ev => el.addEventListener(ev, e => e.stopPropagation(), { passive: true }));
     (document.getElementById('app') || document.body).appendChild(el);
