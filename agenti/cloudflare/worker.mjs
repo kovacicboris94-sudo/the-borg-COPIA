@@ -7,7 +7,7 @@
 //    il gioco non la vede mai: riceve solo /stato e manda /parla.
 // =====================================================================
 import { DurableObject } from 'cloudflare:workers';
-import { nuovoStato, passo, vistaPubblica, giocatoreParla, cronaca } from '../motore.mjs';
+import { nuovoStato, passo, vistaPubblica, giocatoreParla, cronaca, proposte } from '../motore.mjs';
 import { cervelloClaude, cervelloFinto } from '../cervello.mjs';
 
 const PASSO_MS = 30 * 1000;
@@ -41,6 +41,7 @@ export class Borgo extends DurableObject {
     const url = new URL(req.url), s = await this.carica();
     if (url.pathname === '/stato') return json(vistaPubblica(s, Date.now()));
     if (url.pathname === '/cronaca') return json({ ora: Date.now(), voci: cronaca(s, +url.searchParams.get('da') || 0) });
+    if (url.pathname === '/proposte') return json({ ora: Date.now(), proposte: proposte(s) });
     if (url.pathname === '/parla' && req.method === 'POST') {
       // al massimo un messaggio ogni 8 secondi per chi scrive (cosi' nessuno svuota il budget degli agenti)
       const chi = req.headers.get('CF-Connecting-IP') || 'x', ora = Date.now();

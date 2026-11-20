@@ -38,7 +38,9 @@ export const REGOLE = {
   diarioMax: 24,              // oltre questo l'agente riscrive la memoria e il diario si accorcia
   memoriaMax: 1500,           // caratteri
   eventiMax: 150,
-  cronacaMax: 600            // frasi e lavori salvati per chi torna nel borgo
+  cronacaMax: 600,           // frasi e lavori salvati per chi torna nel borgo
+  proposteAlGiorno: 3,        // idee per migliorare il gioco, per agente
+  proposteMax: 200
 };
 
 // La piazza del borgo (stesse misure del gioco, src/borgo/base.js e piazza.js).
@@ -201,6 +203,7 @@ export function normalizzaAzione(a) {
     return { tipo, id: String(a.id), x: r2(x), z: r2(z), y: a.y == null ? null : r2(lim(num(a.y, 0), 0, 12)) };
   }
   if (tipo === 'rimuovi') return a.id ? { tipo, id: String(a.id) } : { errore: 'rimuovi: serve l\'id' };
+  if (tipo === 'proponi') { const t = testo(a.testo, 400); return t ? { tipo, testo: t } : { errore: 'proponi: testo vuoto' }; }
   return { errore: 'azione sconosciuta: ' + testo(tipo, 20) };
 }
 
@@ -300,6 +303,16 @@ function esegui(stato, ag, a, adesso, regole) {
     for (const altro of Object.values(stato.agenti)) if (altro !== ag && dist(altro, ag) <= regole.vista) svegliaPerVoce(altro, adesso, regole);
     return;
   }
+  if (a.tipo === 'proponi') {
+    // una proposta per chi crea il gioco: finisce in una lista che legge Boris, non cambia niente da sola
+    const p = stato.proposte || (stato.proposte = []);
+    const oggi = p.filter(q => q.chi === ag.id && adesso - q.t < 864e5).length;
+    if (oggi >= regole.proposteAlGiorno) return esito(ag, `proponi: rifiutata, al massimo ${regole.proposteAlGiorno} proposte al giorno`);
+    p.push({ t: adesso, chi: ag.id, testo: a.testo }); if (p.length > regole.proposteMax) p.splice(0, p.length - regole.proposteMax);
+    evento(stato, { chi: ag.id, tipo: 'proposta', testo: a.testo, x: ag.x, z: ag.z });
+    annota(ag, adesso, `Ho proposto a chi crea il gioco: "${testo(a.testo, 160)}"`);
+    return esito(ag, 'proponi: consegnata a chi crea il gioco');
+  }
   if (a.tipo === 'costruisci') {
     const o = { id: 'o' + stato.prossimoId, autore: ag.id, nome: a.nome, forma: a.forma, l: a.l, h: a.h, p: a.p, y: a.y, rot: a.rot, colore: a.colore, scritta: a.scritta,
       x: a.x != null ? a.x : r2(ag.x + Math.sin(ag.id.length + stato.prossimoId) * 2), z: a.z != null ? a.z : r2(ag.z + Math.cos(ag.id.length + stato.prossimoId) * 2), creato: adesso, pronto: false };
@@ -397,6 +410,7 @@ AZIONI (le controllano le regole del mondo: se una e' impossibile viene rifiutat
 - {"tipo":"costruisci","nome":"...","forma":"cubo|cilindro|sfera|cono|piramide","larghezza":2,"altezza":1,"profondita":2,"colore":"#a0703f","x":..,"z":..,"y":0,"rotazione":0,"testo":"scritta facoltativa"}: misure in metri (da 0,2 a 8). x e z entro ${regole.portata} m da te (se mancano, accanto a te). y e' l'altezza da terra: per impilare usa y = altezza della cima di un oggetto finito sotto. Costruire richiede tempo (circa ${regole.minutiPerMetroCubo} minuti per metro cubo, da 2 a 180) e intanto resti li'. Puoi comporre piu' pezzi per fare case, panchine, statue, insegne...
 - {"tipo":"sposta","id":"o12","x":..,"z":..,"y":..}: oggetti finiti entro ${regole.portata} m, al massimo 6 metri cubi.
 - {"tipo":"rimuovi","id":"o12"}: smonti un oggetto finito entro ${regole.portata} m (richiede tempo).
+- {"tipo":"proponi","testo":"..."}: il borgo e' un gioco fatto da persone. Tu non puoi cambiarne il codice, gli edifici originali o i minigiochi, ma puoi proporre a chi lo crea un miglioramento o un'idea (al massimo ${regole.proposteAlGiorno} al giorno). La legge una persona e decide lei; non saprai subito se l'ha accettata.
 
 RISPOSTA: solo un oggetto JSON, niente altro testo:
 {"pensiero":"cosa pensi ora, breve","azioni":[...],"ricorda":"cosa annotare nel diario, breve (o vuoto)","prossimo_pensiero_minuti":30,"sforzo_prossimo":"basso","memoria_nuova":""}
@@ -445,7 +459,7 @@ export const SCHEMA = {
     azioni: { type: 'array', items: {
       type: 'object', additionalProperties: false,
       required: ['tipo', 'luogo', 'x', 'z', 'y', 'testo', 'id', 'nome', 'forma', 'larghezza', 'altezza', 'profondita', 'colore', 'rotazione'],
-      properties: { tipo: { type: 'string', enum: ['vai', 'di', 'costruisci', 'sposta', 'rimuovi'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
+      properties: { tipo: { type: 'string', enum: ['vai', 'di', 'costruisci', 'sposta', 'rimuovi', 'proponi'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
         testo: STR_O_NULL, id: STR_O_NULL, nome: STR_O_NULL, forma: STR_O_NULL, larghezza: NUM_O_NULL, altezza: NUM_O_NULL, profondita: NUM_O_NULL, colore: STR_O_NULL, rotazione: NUM_O_NULL } } }
   }
 };
@@ -550,6 +564,9 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
 }
 
 // La cronaca per il gioco: chi ha detto o fatto cosa, e quando (dalla piu' vecchia alla piu' nuova).
+export function proposte(stato) {
+  return (stato.proposte || []).slice().reverse().map(p => ({ t: p.t, chi: nomeDi(stato, p.chi), testo: p.testo }));
+}
 export function cronaca(stato, da = 0, max = 300) {
   return (stato.cronaca || []).filter(e => e.t > da).slice(-max).map(e => ({ t: e.t, chi: nomeDi(stato, e.chi), vero: e.chi.indexOf('g:') === 0, tipo: e.tipo, testo: e.testo, luogo: luogoVicino(e).nome }));
 }
