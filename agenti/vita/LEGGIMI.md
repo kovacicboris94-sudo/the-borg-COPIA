@@ -75,6 +75,10 @@ Le prove sono in `test/vita.test.mjs` (74 controlli): `node test/vita.test.mjs`.
 
 È il comportamento giusto per un mondo vero: la piazza da sola non può sfamare due persone per sempre. Serve qualcosa che venga da fuori (lavoro, commercio, territorio) o inventare modi di sprecare meno (forno chiuso, fuoco condiviso, conservare il cibo). Questo è il punto da decidere insieme.
 
+## La morte è vera
+
+Deciso da Boris il 20 novembre 2026 (`REGOLE_VITA.morte = true`): chi muore resta morto. Si muore per cause vere: sete (circa 3 giorni senz'acqua), fame (settimane), ipotermia, colpo di calore, sonno negato per giorni. Le malattie del cibo e dell'acqua fanno danno soprattutto attraverso la disidratazione, come nella realtà. Con `morte: false` invece si sviene e si viene portati al chiuso.
+
 ## Semplificazioni dichiarate
 
 - Il corpo è un modello a "serbatoi" (stomaco, glicogeno, grasso, acqua), non una fisiologia completa.

@@ -11,7 +11,8 @@ import { MATERIALI } from './materiali.mjs';
 import { POSTI } from './mondo.mjs';
 import { tempoAdesso } from './natura.mjs';
 
-const ha = (c, cosa, kg = 0.01) => c.zaino.filter(q => q.cosa === cosa && !q.rotta).reduce((s, q) => s + (q.kg || 1), 0) >= kg;
+// il cibo che puzza non si conta: una persona lo annusa e lo butta
+const ha = (c, cosa, kg = 0.01) => c.zaino.filter(q => q.cosa === cosa && !q.rotta && (q.guasto || 0) < 0.9).reduce((s, q) => s + (q.kg || 1), 0) >= kg;
 const haAsciutto = (c, cosa, kg) => c.zaino.filter(q => q.cosa === cosa && (q.umid ?? 0) <= (cosa === 'erba_secca' ? 0.15 : 0.3)).reduce((s, q) => s + q.kg, 0) >= kg;
 const inDispensa = (mondo, cosa, kg = 0.01) => mondo.cose.filter(q => q.dove === 'dispensa' && q.cosa === cosa).reduce((s, q) => s + q.kg, 0) >= kg;
 const oraRoma = ms => +new Date(ms).toLocaleString('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false }) % 24;

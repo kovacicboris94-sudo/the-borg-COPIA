@@ -49,7 +49,7 @@ export const CORPI_ABITANTI = {
 };
 
 export const REGOLE_VITA = {
-  morte: false,            // da decidere con Boris: se false, a salute zero si sviene e ci si riprende
+  morte: true,             // deciso da Boris il 20/11/2026: la morte e' vera (con false si sviene e si viene soccorsi)
   portataMani: 6,          // metri: per prendere, raccogliere, usare un fuoco
   caricoMax: 25,           // kg che una persona porta con se'
   passoMaxS: 60

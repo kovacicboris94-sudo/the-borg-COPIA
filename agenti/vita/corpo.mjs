@@ -157,7 +157,8 @@ export function viviCorpo(c, dt, amb, adesso, regole = {}) {
   if (c.temperatura < 35) danno += (35 - c.temperatura) * 8 * ore;               // ipotermia
   if (c.temperatura > 40) danno += (c.temperatura - 40) * 10 * ore;              // colpo di calore
   if (c.oreSveglio > 48) danno += 0.6 * ore;
-  for (const m of c.malattie) danno += (m.gravita || 1) * 0.6 * ore;
+  // le malattie del borgo raramente uccidono da sole un adulto sano: fanno danno soprattutto con la disidratazione (diarrea, gia' contata sopra)
+  for (const m of c.malattie) danno += (m.gravita || 1) * 0.25 * ore;
   if (danno > 0) c.salute -= danno;
   else if (disidratazione < 0.03 && c.glicogeno > 300 && c.sonno < 1.2 && Math.abs(c.temperatura - 37) < 0.8) c.salute = Math.min(100, c.salute + 2 * ore);
 
