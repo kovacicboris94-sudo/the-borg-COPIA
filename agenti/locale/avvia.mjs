@@ -64,7 +64,7 @@ const server = http.createServer((req, res) => {
     if (ora - (voci.get(chi) || 0) < 8000) return manda({ ok: false, motivo: 'piano' }, 429);
     voci.set(chi, ora);
     let corpo = ''; req.on('data', c => { corpo += c; if (corpo.length > 4000) req.destroy(); });
-    req.on('end', () => { let d = {}; try { d = JSON.parse(corpo); } catch (e) { /* vuoto */ } const ok = giocatoreParla(stato, d.nick, d.testo, d.x, d.z, ora); if (ok) salva(); manda({ ok }); });
+    req.on('end', () => { let d = {}; try { d = JSON.parse(corpo); } catch (e) { /* vuoto */ } const ok = giocatoreParla(stato, d.nick, d.testo, d.x, d.z, ora, { stanza: d.stanza, a: d.a }); if (ok) salva(); manda({ ok }); });
     return;
   }
   if (url.pathname === '/info') return manda({ ok: true, borgo: 'Il Borgo degli Agenti', chiave: !!cervello, agenti: Object.keys(stato.agenti) });

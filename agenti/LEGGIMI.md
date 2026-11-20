@@ -51,6 +51,8 @@ Per provare gratis senza chiave: `AGENTI_FINTI=1 npm run locale` usa un cervello
 - **vai**: camminano verso un luogo del borgo o un punto (x, z), a 1,3 m/s.
 - Camminare è gratis: si paga solo il pensiero. Tra un pensiero e l'altro fanno due passi da soli lì intorno (ogni minuto o due, fino a 7 metri), si guardano intorno e ogni tanto partono a esplorare un altro posto del borgo (prima quelli mai visti), senza spendere. Ogni volta che pensano vedono anche una previsione del budget (quanti pensieri restano e se al ritmo attuale arrivano a fine mese).
 - **di**: parlano ad alta voce. Li sente chi è entro 20 metri, agenti e giocatori veri.
+- **entra** ed **esci**: entrano negli edifici pubblici (Negozio TCG, Sala Giochi, Biblioteca, Casa degli Scacchi, Laugh Tale Collectibles e, da lì, la Sala TCG). Camminano da soli fino alla porta; dentro vedono e sentono solo chi è nella stessa stanza, non costruiscono e non spostano nulla. Se ci entrano per scelta ci restano finché vogliono (dopo un'ora escono da soli); esplorando da soli danno un'occhiata di qualche minuto. Le case private no.
+- **scrivi**: un messaggio da lontano a un altro agente o a una persona vera che gli ha parlato o scritto, ovunque sia.
 - **costruisci**: cubi, cilindri, sfere, coni e piramidi, con misure da 0,2 a 8 metri, colore, rotazione, una scritta e la possibilità di impilarli. Costruire richiede circa 3 minuti per metro cubo. Le cose finite a terra bloccano il passaggio.
 - **sposta** e **rimuovi**: anche le cose fatte dall'altro.
 - **gesto**: saluta (alza la mano), salta, balla, ride, applaude. Quando ti avvicini ti salutano da soli con la mano, gratis.
@@ -64,7 +66,7 @@ Ogni agente sa solo cosa vede entro 20 metri, cosa sente e cosa ricorda. La sua 
 
 ## Nel gioco
 
-Tocca un agente per aprire la sua scheda: cosa sta facendo, il budget speso, l'ultimo pensiero e la memoria. C'è anche il pulsante **Cronaca del borgo**, con tutto quello che si sono detti e hanno fatto, anche mentre non c'eri. Per parlare con un agente scrivi in chat quando sei vicino a lui.
+Tocca un agente per aprire la sua scheda: cosa sta facendo, il budget speso, l'ultimo pensiero e la memoria. C'è anche il pulsante **Cronaca del borgo**, con tutto quello che si sono detti e hanno fatto, anche mentre non c'eri. Per parlare con un agente scrivi in chat quando sei vicino a lui (nello stesso posto), oppure usa **✉️ Scrivigli da lontano** nella sua scheda: lo legge ovunque sia e ti può rispondere, la risposta arriva nella tua chat. Li vedi solo quando sei nel loro stesso posto (piazza o edificio).
 
 ## File
 

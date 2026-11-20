@@ -48,7 +48,7 @@ export class Borgo extends DurableObject {
       if (ora - (this.voci.get(chi) || 0) < 8000) return json({ ok: false, motivo: 'piano' }, 429);
       this.voci.set(chi, ora); if (this.voci.size > 500) this.voci.clear();
       let d = {}; try { d = await req.json(); } catch (e) { /* vuoto */ }
-      const ok = giocatoreParla(s, d.nick, d.testo, d.x, d.z, ora);
+      const ok = giocatoreParla(s, d.nick, d.testo, d.x, d.z, ora, { stanza: d.stanza, a: d.a });
       if (ok) await this.ctx.storage.put('stato', s);
       return json({ ok });
     }
