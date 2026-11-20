@@ -138,7 +138,7 @@
     // (passa dal filtro anche qui: il telefono di chi scrive si puo' manomettere; chi e' bloccato non si legge)
     // msg.a = nick di chi riceve un sussurro: gli altri telefoni lo ignorano
     if (pr.msg && pr.msg.n !== a.nMsg) {
-      a.nMsg = pr.msg.n; const t = filtra(testo(pr.msg.t, 120)), dest = testo(pr.msg.a, 20);
+      a.nMsg = pr.msg.n; const t = filtra(testo(pr.msg.t, 300)), dest = testo(pr.msg.a, 20);
       if (t && stessoLuogo(pr.s, luogo()) && !bloccato(a) && (!dest || stessoLuogo(dest, mioNick()))) {
         const lontano = !dest && Math.hypot(a.x - app.io.x, a.z - app.io.z) > 14;
         G.aggiungiVoce({ id: idAmico(a.nick), nick: a.nick, testo: t, ora: oraOra(), io: false, amico: true, sussurro: !!dest, lontano, chiave: a.nick.toLowerCase() + ':' + num(pr.msg.n, 0) });
@@ -415,7 +415,7 @@
     if (!v.io || v.amico) return;
     if (v.sussurro && String(v.aId || '').indexOf('amico:') !== 0) return;   // sussurro a un abitante dimostrativo: resta qui
     nMsg++; v.chiave = mioNick().toLowerCase() + ':' + nMsg;
-    invia({ msg: { n: nMsg, t: testo(v.testo, 120), a: v.sussurro ? testo(v.aNick, 20) : undefined } });
+    invia({ msg: { n: nMsg, t: testo(v.testo, 300), a: v.sussurro ? testo(v.aNick, 20) : undefined } });
   });
   /* ---------- reazioni ai messaggi: le ultime 6 restano nella presenza (re), con la chiave "nick:numero" del messaggio ---------- */
   let nRe = 0, mieiRe = [];

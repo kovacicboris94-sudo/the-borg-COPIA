@@ -105,6 +105,38 @@
     return { x, z };
   }
   const SPAZIO = 0.8;   // distanza minima tra due persone
+  // strada a piedi su una griglia di mezzo metro (A*), poi si tolgono le tappe inutili
+  function percorso(x0, z0, x1, z1) {
+    const st = app.stanze.piazza, r = B.CFG.raggio + 0.05, R = 0.5, M = 12;
+    const ax = Math.min(x0, x1) - M, az = Math.min(z0, z1) - M, W = Math.ceil((Math.abs(x1 - x0) + 2 * M) / R) + 1, H = Math.ceil((Math.abs(z1 - z0) + 2 * M) / R) + 1;
+    if (W * H > 90000) return [{ x: x1, z: z1 }];
+    const lib = new Int8Array(W * H).fill(-1), ok = i => { if (lib[i] < 0) lib[i] = app.libero(st, ax + (i % W) * R, az + Math.floor(i / W) * R, r) ? 1 : 0; return lib[i] === 1; };
+    const cella = (x, z) => Math.max(0, Math.min(H - 1, Math.round((z - az) / R))) * W + Math.max(0, Math.min(W - 1, Math.round((x - ax) / R)));
+    const s0 = cella(x0, z0), s1 = cella(x1, z1), g = new Float32Array(W * H).fill(1e9), da = new Int32Array(W * H).fill(-1), chiuso = new Uint8Array(W * H);
+    const h = i => Math.hypot((i % W) - (s1 % W), Math.floor(i / W) - Math.floor(s1 / W));
+    const aperti = [s0]; g[s0] = 0; let giri = 0, trovato = false;
+    while (aperti.length && giri++ < 20000) {
+      let bi = 0; for (let j = 1; j < aperti.length; j++) if (g[aperti[j]] + h(aperti[j]) < g[aperti[bi]] + h(aperti[bi])) bi = j;
+      const c = aperti[bi]; aperti[bi] = aperti[aperti.length - 1]; aperti.pop();
+      if (c === s1) { trovato = true; break; }
+      if (chiuso[c]) continue; chiuso[c] = 1;
+      const cx = c % W, cz = Math.floor(c / W);
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dz) continue; const nx = cx + dx, nz = cz + dz; if (nx < 0 || nz < 0 || nx >= W || nz >= H) continue;
+        const n = nz * W + nx; if (chiuso[n] || (n !== s1 && !ok(n))) continue;
+        if (dx && dz && (!ok(cz * W + nx) || !ok(nz * W + cx))) continue;   // niente angoli tagliati
+        const ng = g[c] + (dx && dz ? 1.414 : 1); if (ng < g[n]) { g[n] = ng; da[n] = c; aperti.push(n); }
+      }
+    }
+    if (!trovato) return [{ x: x1, z: z1 }];
+    const pt = []; for (let c = s1; c !== s0 && c >= 0; c = da[c]) pt.push({ x: ax + (c % W) * R, z: az + Math.floor(c / W) * R });
+    pt.reverse(); pt[pt.length - 1] = { x: x1, z: z1 };
+    // si tengono solo le tappe necessarie: se si vede la tappa dopo in linea retta, quella di mezzo non serve
+    const vede = (a, b) => { const L = Math.hypot(b.x - a.x, b.z - a.z), n = Math.ceil(L / 0.25); for (let i = 1; i < n; i++) if (!app.libero(st, a.x + (b.x - a.x) * i / n, a.z + (b.z - a.z) * i / n, r)) return false; return true; };
+    const out = []; let da0 = { x: x0, z: z0 }, i = 0;
+    while (i < pt.length) { let j = pt.length - 1; while (j > i && !vede(da0, pt[j])) j--; out.push(pt[j]); da0 = pt[j]; i = j + 1; }
+    return out;
+  }
   function corpi(e) {
     const l = [];
     (app.npc || []).forEach(n => { if (n.av && n.av.root.visible) l.push(n); });
@@ -120,15 +152,25 @@
       const camm = Math.hypot(s.tx - s.x, s.tz - s.z) > 0.2, mx = camm ? s.tx : s.x, mz = camm ? s.tz : s.z, km = mx + ',' + mz;
       if (e.km !== km) { e.km = km; e.meta = libera(mx, mz); }
       const gx = e.meta.x, gz = e.meta.z;
-      if (Math.hypot(s.x - e.x, s.z - e.z) > 12 || e.fermo > 3) { const q = libera(s.x, s.z); e.x = q.x; e.z = q.z; e.fermo = 0; }
       const dx = gx - e.x, dz = gz - e.z, d = Math.hypot(dx, dz);
+      // il servizio avanza a scatti (ogni 30 s): non si riporta MAI indietro chi cammina.
+      // Solo se si e' rimasti indietro di moltissimo si salta in avanti dove il servizio dice che e'.
+      if (d - Math.hypot(gx - s.x, gz - s.z) > 45) { const q = libera(s.x, s.z); e.x = q.x; e.z = q.z; }   // (es. tornando nel gioco dopo tanto: il servizio e' piu' avanti)
       // le altre persone (abitanti, giocatore, l'altro agente): se il posto e' occupato ci si ferma accanto
       const altri = corpi(e), occupato = altri.some(o => Math.hypot(o.x - gx, o.z - gz) < SPAZIO);
       if (d > (occupato ? SPAZIO + 0.2 : 0.3)) {
+        // la strada: si calcola una volta per meta (aggirando fontana, aiuole, panchine) e si seguono le tappe
+        if (!e.via || e.viaPer !== e.km) { e.via = percorso(e.x, e.z, gx, gz); e.viaPer = e.km; }
+        while (e.via.length > 1 && Math.hypot(e.via[0].x - e.x, e.via[0].z - e.z) < 0.45) e.via.shift();
+        const w = e.via[0] || { x: gx, z: gz }, wx = w.x - e.x, wz = w.z - e.z, wd = Math.hypot(wx, wz) || 1;
         const k = 1 - Math.exp(-dt * 5);
-        e.vx += (dx / d * VEL - e.vx) * k; e.vz += (dz / d * VEL - e.vz) * k;
-        if (!app.muovi(e, e.vx * dt, e.vz * dt)) e.fermo += dt; else e.fermo = 0;
-      } else { e.vx *= 0.8; e.vz *= 0.8; e.fermo = 0; }
+        e.vx += (wx / wd * VEL - e.vx) * k; e.vz += (wz / wd * VEL - e.vz) * k;
+        const px = e.x, pz = e.z;
+        app.muovi(e, e.vx * dt, e.vz * dt);
+        if (Math.hypot(e.x - px, e.z - pz) < VEL * dt * 0.2) e.fermo += dt; else e.fermo = 0;
+        if (e.fermo > 0.8) { e.fermo = 0; e.via = null; e.blocchi = (e.blocchi || 0) + 1; }   // qualcosa in mezzo: si ricalcola la strada
+        if (e.blocchi > 6) { const q = libera(e.x + dx / d * 2, e.z + dz / d * 2); e.x = q.x; e.z = q.z; e.blocchi = 0; }
+      } else { e.vx *= 0.8; e.vz *= 0.8; e.fermo = 0; e.blocchi = 0; }
       // nessuno si compenetra: chi e' troppo vicino viene scansato piano
       altri.forEach(o => {
         const ox = e.x - o.x, oz = e.z - o.z, od = Math.hypot(ox, oz);
@@ -139,7 +181,9 @@
       const vel = Math.hypot(e.vx, e.vz);
       if (vel > 0.2) e.yaw = Math.atan2(e.vx, e.vz);
       else if (s.lavoro) { const o = A.oggetti.get(s.lavoro.id); if (o) e.yaw = Math.atan2(o.d.x - e.x, o.d.z - e.z); }
-      e.av.root.position.set(e.x, 0, e.z); e.av.root.rotation.y = e.yaw;
+      // il pavimento non e' tutto alla stessa altezza (palco, gradini): si sta sopra, come il giocatore
+      const st = app.stanze.piazza, ty = st.alt ? st.alt(e.x, e.z) : 0; e.y = e.y == null ? ty : e.y + (ty - e.y) * Math.min(1, dt * 14);
+      e.av.root.position.set(e.x, e.y, e.z); e.av.root.rotation.y = e.yaw;
       e.av.aggiorna(dt, vel, t); B.Bolle.aggiorna(e, dt);
     });
     // i cantieri crescono

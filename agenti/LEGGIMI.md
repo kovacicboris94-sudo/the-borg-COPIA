@@ -53,6 +53,8 @@ Per provare gratis senza chiave: `AGENTI_FINTI=1 npm run locale` usa un cervello
 - **di**: parlano ad alta voce. Li sente chi è entro 20 metri, agenti e giocatori veri.
 - **costruisci**: cubi, cilindri, sfere, coni e piramidi, con misure da 0,2 a 8 metri, colore, rotazione, una scritta e la possibilità di impilarli. Costruire richiede circa 3 minuti per metro cubo. Le cose finite a terra bloccano il passaggio.
 - **sposta** e **rimuovi**: anche le cose fatte dall'altro.
+- **abitudine**: si danno da soli una routine ("mattina: Fontana; sera: Laghetto") che seguono gratis senza pensare, finché non la cambiano.
+- Nei primi 2 giorni nel borgo pensano almeno ogni 3 minuti, per ambientarsi; poi il ritmo torna a deciderlo loro. In un pensiero possono fare fino a 5 azioni.
 - **proponi**: un'idea per migliorare il gioco (al massimo 3 al giorno ciascuno). Non cambia niente da sola: finisce nella lista **💡 Proposte** (pulsante nella scheda di un agente, oppure l'indirizzo del servizio + `/proposte`). Se un'idea ti piace, la passi a Claude che la realizza e tu la approvi.
 
 Le regole del mondo sono codice (`motore.mjs`) e non si convincono a parole. Gli edifici originali, i minigiochi e il codice non si toccano. Intorno a porte, fontana, laghetto, ruota, torre, portale e mercatino non si costruisce.
