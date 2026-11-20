@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="6a7c0c30b770">
+  <meta name="versione" content="471057ec756d">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -6280,7 +6280,7 @@ window.CONFIG = {
     corpo.traverse(o => { if (o.isMesh && o.castShadow !== false) o.castShadow = true; });
 
     /* area invisibile per toccare l'avatar */
-    const proxy = new T.Mesh(new T.CylinderGeometry(0.5, 0.5, 2.3, 8), new T.MeshBasicMaterial()); proxy.position.y = 1.15; proxy.visible = false; root.add(proxy);
+    const proxy = new T.Mesh(new T.CylinderGeometry(0.5, 0.5, 2.3, 8), new T.MeshBasicMaterial()); proxy.position.y = 1.15; proxy.visible = false; proxy.userData.avatar = true; root.add(proxy);
 
     const av = { corporatura: p.corpo, parti: { busto, bL, bR, gL, gR }, root, corpo, testa, proxy, fase: 0, e: 0, sed: 0, sedT: 0, sdr: 0, sdrT: 0, emote: null, bic: 0, bicT: 0, fb: 0, p, look: Object.assign({}, look) };
     av.aggiorna = function (dt, vel, tempo) {
@@ -30157,7 +30157,13 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
     if (B.agentiToccabili && stanza.gruppo === gP) B.agentiToccabili().forEach(c => cand.push(c));
     stanza.toccabili.forEach(t => cand.push(t));
     let best = null, bd = 1e9;
-    cand.forEach(c => { c.obj.updateWorldMatrix(true, false); const h = ray.intersectObject(c.obj, false); if (h.length && h[0].distance < bd) { bd = h[0].distance; best = c; } });
+    const presi = [];
+    cand.forEach(c => { c.obj.updateWorldMatrix(true, false); const h = ray.intersectObject(c.obj, false); if (h.length) presi.push(c); if (h.length && h[0].distance < bd) { bd = h[0].distance; best = c; } });
+    // due persone vicine: i loro cilindri si sovrappongono, quindi vince quella il cui centro e' piu' vicino al dito
+    if (best && best.obj.userData.avatar) {
+      const pos = new T.Vector3(); let md = 1e9;
+      presi.forEach(c => { if (!c.obj.userData.avatar) return; c.obj.getWorldPosition(pos); const d = ray.ray.distanceSqToPoint(pos); if (d < md) { md = d; best = c; } });
+    }
     if (B.Arredo && B.Arredo.tocca(ray)) return;
     if (!best) return;
     if (best.tipo === 'npc') G.emetti('profilo', { id: best.id });

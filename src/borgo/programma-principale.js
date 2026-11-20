@@ -403,7 +403,13 @@
     if (B.agentiToccabili && stanza.gruppo === gP) B.agentiToccabili().forEach(c => cand.push(c));
     stanza.toccabili.forEach(t => cand.push(t));
     let best = null, bd = 1e9;
-    cand.forEach(c => { c.obj.updateWorldMatrix(true, false); const h = ray.intersectObject(c.obj, false); if (h.length && h[0].distance < bd) { bd = h[0].distance; best = c; } });
+    const presi = [];
+    cand.forEach(c => { c.obj.updateWorldMatrix(true, false); const h = ray.intersectObject(c.obj, false); if (h.length) presi.push(c); if (h.length && h[0].distance < bd) { bd = h[0].distance; best = c; } });
+    // due persone vicine: i loro cilindri si sovrappongono, quindi vince quella il cui centro e' piu' vicino al dito
+    if (best && best.obj.userData.avatar) {
+      const pos = new T.Vector3(); let md = 1e9;
+      presi.forEach(c => { if (!c.obj.userData.avatar) return; c.obj.getWorldPosition(pos); const d = ray.ray.distanceSqToPoint(pos); if (d < md) { md = d; best = c; } });
+    }
     if (B.Arredo && B.Arredo.tocca(ray)) return;
     if (!best) return;
     if (best.tipo === 'npc') G.emetti('profilo', { id: best.id });

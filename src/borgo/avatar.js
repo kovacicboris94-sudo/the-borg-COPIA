@@ -477,7 +477,7 @@
     corpo.traverse(o => { if (o.isMesh && o.castShadow !== false) o.castShadow = true; });
 
     /* area invisibile per toccare l'avatar */
-    const proxy = new T.Mesh(new T.CylinderGeometry(0.5, 0.5, 2.3, 8), new T.MeshBasicMaterial()); proxy.position.y = 1.15; proxy.visible = false; root.add(proxy);
+    const proxy = new T.Mesh(new T.CylinderGeometry(0.5, 0.5, 2.3, 8), new T.MeshBasicMaterial()); proxy.position.y = 1.15; proxy.visible = false; proxy.userData.avatar = true; root.add(proxy);
 
     const av = { corporatura: p.corpo, parti: { busto, bL, bR, gL, gR }, root, corpo, testa, proxy, fase: 0, e: 0, sed: 0, sedT: 0, sdr: 0, sdrT: 0, emote: null, bic: 0, bicT: 0, fb: 0, p, look: Object.assign({}, look) };
     av.aggiorna = function (dt, vel, tempo) {
