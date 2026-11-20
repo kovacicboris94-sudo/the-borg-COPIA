@@ -445,8 +445,8 @@ async function pensa(stato, ag, adesso, cervello, regole) {
     const motivo = !cervello ? 'senza-chiave' : stimaIngresso > regole.maxTokensIngresso ? 'troppo-lungo' : 'budget-finito';
     if (ag.modo !== 'automatico') annota(ag, adesso, motivo === 'budget-finito' ? 'Il budget del mese e\' finito: vivo in automatico fino al mese prossimo.' : 'Non riesco a pensare: vivo in automatico.');
     ag.modo = 'automatico'; ag.motivo = motivo;
-    // si riprova a inizio mese (o fra un'ora se manca la chiave)
-    ag.prossimoPensiero = motivo === 'budget-finito' ? inizioMeseProssimo(adesso) : adesso + 60 * 60000;
+    // si riprova a inizio mese (o fra 5 minuti se manca la chiave: appena la metti, ripartono)
+    ag.prossimoPensiero = motivo === 'budget-finito' ? inizioMeseProssimo(adesso) : adesso + 5 * 60000;
     return { agente: ag.id, pensato: false, motivo };
   }
   if (ag.modo === 'automatico') { ag.modo = 'attivo'; ag.motivo = null; ag.coda = []; }

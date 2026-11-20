@@ -21,7 +21,11 @@ export class Borgo extends DurableObject {
     this.cervello = env.AGENTI_FINTI === '1' ? cervelloFinto(7) : cervelloClaude(env.ANTHROPIC_API_KEY);
   }
   async carica() {
-    if (!this.stato) this.stato = (await this.ctx.storage.get('stato')) || nuovoStato(Date.now());
+    if (!this.stato) {
+      this.stato = (await this.ctx.storage.get('stato')) || nuovoStato(Date.now());
+      // la chiave e' appena arrivata: chi era fermo "senza chiave" riprova subito
+      if (this.cervello) for (const ag of Object.values(this.stato.agenti)) if (ag.motivo === 'senza-chiave') ag.prossimoPensiero = Date.now();
+    }
     if ((await this.ctx.storage.getAlarm()) == null) await this.ctx.storage.setAlarm(Date.now() + PASSO_MS);
     return this.stato;
   }
