@@ -104,6 +104,14 @@
     }
     return { x, z };
   }
+  const SPAZIO = 0.8;   // distanza minima tra due persone
+  function corpi(e) {
+    const l = [];
+    (app.npc || []).forEach(n => { if (n.av && n.av.root.visible) l.push(n); });
+    if (app.io && inPiazza()) l.push(app.io);
+    A.agenti.forEach(o => { if (o !== e) l.push(o); });
+    return l;
+  }
   function frame(dt, t) {
     if (!app) return;
     A.agenti.forEach(e => {
@@ -114,11 +122,20 @@
       const gx = e.meta.x, gz = e.meta.z;
       if (Math.hypot(s.x - e.x, s.z - e.z) > 12 || e.fermo > 3) { const q = libera(s.x, s.z); e.x = q.x; e.z = q.z; e.fermo = 0; }
       const dx = gx - e.x, dz = gz - e.z, d = Math.hypot(dx, dz);
-      if (d > 0.3) {
+      // le altre persone (abitanti, giocatore, l'altro agente): se il posto e' occupato ci si ferma accanto
+      const altri = corpi(e), occupato = altri.some(o => Math.hypot(o.x - gx, o.z - gz) < SPAZIO);
+      if (d > (occupato ? SPAZIO + 0.2 : 0.3)) {
         const k = 1 - Math.exp(-dt * 5);
         e.vx += (dx / d * VEL - e.vx) * k; e.vz += (dz / d * VEL - e.vz) * k;
         if (!app.muovi(e, e.vx * dt, e.vz * dt)) e.fermo += dt; else e.fermo = 0;
       } else { e.vx *= 0.8; e.vz *= 0.8; e.fermo = 0; }
+      // nessuno si compenetra: chi e' troppo vicino viene scansato piano
+      altri.forEach(o => {
+        const ox = e.x - o.x, oz = e.z - o.z, od = Math.hypot(ox, oz);
+        if (od >= SPAZIO) return;
+        const k = Math.min(1, dt * 4) * (SPAZIO - od), ux = od > 1e-3 ? ox / od : Math.sin(e.id.length + t), uz = od > 1e-3 ? oz / od : Math.cos(e.id.length + t);
+        app.muovi(e, ux * k, uz * k);
+      });
       const vel = Math.hypot(e.vx, e.vz);
       if (vel > 0.2) e.yaw = Math.atan2(e.vx, e.vz);
       else if (s.lavoro) { const o = A.oggetti.get(s.lavoro.id); if (o) e.yaw = Math.atan2(o.d.x - e.x, o.d.z - e.z); }
