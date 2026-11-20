@@ -80,7 +80,11 @@ export const STANZE = [
   { id: 'biblioteca', nome: 'Biblioteca', porta: { x: -27.7, z: -3.5 }, rect: { x0: -7.5, x1: 7.5, z0: -6.5, z1: 7.5 }, arrivo: { x: 0, z: 6 }, uscita: { x: 0, z: 6.3 } },
   { id: 'scacchi', nome: 'Casa degli Scacchi', porta: { x: 3, z: -3.5 }, rect: { x0: -10, x1: 10, z0: -8, z1: 9 }, arrivo: { x: 0, z: 7 }, uscita: { x: 0, z: 7.8 } },
   { id: 'collectibles', nome: 'Laugh Tale Collectibles', porta: { x: -40, z: -3.5 }, rect: { x0: -10.5, x1: 10.5, z0: -5, z1: 15 }, arrivo: { x: 0, z: 13.5 }, uscita: { x: 0, z: 13.8 } },
-  { id: 'tcg', nome: 'Sala TCG', da: 'collectibles', porta: { x: -8.3, z: 9 }, rect: { x0: -21, x1: 21, z0: -13, z1: 15 }, arrivo: { x: -18.8, z: 9 }, uscita: { x: -19.8, z: 9 } }
+  { id: 'tcg', nome: 'Sala TCG', da: 'collectibles', porta: { x: -8.3, z: 9 }, rect: { x0: -21, x1: 21, z0: -13, z1: 15 }, arrivo: { x: -18.8, z: 9 }, uscita: { x: -19.8, z: 9 } },
+  // la Torre della Cometa: ingresso dalla piazza (portone a est), poi si sale piano per piano con le scale
+  { id: 'torre0', nome: 'Torre della Cometa', porta: { x: -39, z: 26 }, rect: { x0: -8.5, x1: 8.5, z0: -7.5, z1: 7.5 }, arrivo: { x: 0, z: 5.5 }, uscita: { x: 0, z: 6.3 } },
+  ...['Primo', 'Secondo', 'Terzo'].map((n, i) => ({ id: 'torre' + (i + 1), nome: 'Torre della Cometa · ' + n + ' piano', da: 'torre' + i, porta: { x: 4.85, z: -3.85 },
+    rect: { x0: -8.5, x1: 8.5, z0: -7.5, z1: 7.5 }, arrivo: { x: -4.3, z: -3.5 }, uscita: { x: -5.9, z: -4.9 }, ritorno: { x: 3.7, z: -2.7 } }))
 ];
 export const stanzaDi = id => STANZE.find(q => q.id === id) || null;
 function cercaStanza(nome) {
@@ -436,7 +440,7 @@ function esegui(stato, ag, a, adesso, regole) {
     const st = stanzaDi(ag.stanza);
     if (!st) { ag.stanza = null; return a.auto ? undefined : esito(ag, 'esci: sei gia\' fuori, in piazza'); }
     if (Math.hypot(ag.x - st.uscita.x, ag.z - st.uscita.z) > 1) { ag.tx = st.uscita.x; ag.tz = st.uscita.z; ag.ancora = null; ag.coda.unshift(a); return 'cammina'; }
-    const fuori = st.da ? stanzaDi(st.da) : null, p = fuori ? { x: st.porta.x + 1, z: st.porta.z } : { x: st.porta.x, z: st.porta.z + 0.5 };
+    const fuori = st.da ? stanzaDi(st.da) : null, p = st.ritorno || (fuori ? { x: st.porta.x + 1, z: st.porta.z } : { x: st.porta.x, z: st.porta.z + 0.5 });
     ag.stanza = fuori ? fuori.id : null; ag.x = ag.tx = p.x; ag.z = ag.tz = p.z;
     ag.ancora = { x: p.x, z: fuori ? p.z : p.z + 3 }; ag.prossimaGita = adesso + 20000; ag.dentroFino = fuori ? adesso + 4 * 60000 : 0;
     if (!fuori) ag.prossimaEsplorazione = Math.max(ag.prossimaEsplorazione || 0, adesso + 3 * 60000);

@@ -262,6 +262,14 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   ok(teo.stanza === 'biblioteca', 'Teo esplorando entra in Biblioteca ' + JSON.stringify([teo.x, teo.z, teo.tx, teo.tz, teo.coda, teo.stanza, teo.diario.slice(-2)]));
   t = await scorri(s, t, 6, c);
   ok(teo.stanza == null, 'dopo qualche minuto esce da solo');
+  // la Torre della Cometa: si entra dal portone e si sale fino al terzo piano, poi un "vai" fa scendere e uscire
+  ada.coda = [normalizzaAzione({ tipo: 'entra', luogo: 'Torre della Cometa · Terzo piano' })]; ada.tx = ada.x; ada.tz = ada.z;
+  t = await scorri(s, t, 6, c);
+  ok(ada.stanza === 'torre3', 'Ada sale in cima alla Torre ' + JSON.stringify([ada.stanza, ada.x, ada.z, ada.esiti]));
+  ada.coda = [normalizzaAzione({ tipo: 'vai', luogo: 'Laghetto' })];
+  t = await scorri(s, t, 6, c);
+  ok(ada.stanza == null && ada.x > 0, 'scende, esce e va al Laghetto ' + JSON.stringify([ada.stanza, ada.x, ada.z]));
+  ok(normalizzaAzione({ tipo: 'entra', luogo: 'Torre della Cometa' }).stanza === 'torre0', 'Torre della Cometa = ingresso');
   ok(normalizzaAzione({ tipo: 'entra', luogo: 'casa di Boris' }).errore && normalizzaAzione({ tipo: 'entra', luogo: 'sala giochi' }).stanza === 'sala', 'si entra solo negli edifici pubblici');
 }
 
