@@ -5,6 +5,8 @@ name = "borgo-agenti"
 main = "worker.mjs"
 compatibility_date = "2026-11-01"
 compatibility_flags = ["nodejs_compat"]
+# le variabili messe a mano nel pannello (es. AGENTI_PAUSA) restano anche dopo una nuova pubblicazione
+keep_vars = true
 
 [[durable_objects.bindings]]
 name = "BORGO"
