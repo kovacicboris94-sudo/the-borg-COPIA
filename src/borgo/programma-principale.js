@@ -400,6 +400,7 @@
     npc.forEach(n => { if (stanza.gruppo === gP && n.av.root.visible) cand.push({ obj: n.av.proxy, tipo: 'npc', id: n.id }); });
     cand.push({ obj: io.av.proxy, tipo: 'io' });
     if (B.amiciToccabili) B.amiciToccabili().forEach(c => cand.push(c));
+    if (B.agentiToccabili && stanza.gruppo === gP) B.agentiToccabili().forEach(c => cand.push(c));
     stanza.toccabili.forEach(t => cand.push(t));
     let best = null, bd = 1e9;
     cand.forEach(c => { c.obj.updateWorldMatrix(true, false); const h = ray.intersectObject(c.obj, false); if (h.length && h[0].distance < bd) { bd = h[0].distance; best = c; } });
@@ -478,7 +479,7 @@
     const UIm = window.UI, copre = UIm && UIm.paginaPiena();
     const tel = !!(B.Telescopio && B.Telescopio.attivo);   // telescopio aperto: niente movimento, si guarda con la sua camera
     const vel = muoviIo(dt, !copre && !tel); io.av.aggiorna(dt, vel, t); aggBolla(io, dt);
-    if (stanza.gruppo === gP) { npc.forEach(o => aggNpc(o, dt, t)); piazza.anim.forEach(f => f(t, dt)); piazza.dissolvi(io.x, io.z, tel ? 0 : Math.sin(C.az), tel ? 0 : Math.cos(C.az), dt); }
+    if (stanza.gruppo === gP) { npc.forEach(o => aggNpc(o, dt, t)); if (B.AgentiIA) B.AgentiIA.frame(dt, t); piazza.anim.forEach(f => f(t, dt)); piazza.dissolvi(io.x, io.z, tel ? 0 : Math.sin(C.az), tel ? 0 : Math.cos(C.az), dt); }
     else { stanza.m.anim.forEach(f => f(t, dt)); stanza.m.aggiornaMuri(C.az, dt, io.x, io.z); }
     if (B.Arredo) B.Arredo.frame(dt, t);
     aggCamera(dt);
@@ -513,7 +514,7 @@
   { const bb = $('#btn-bici'); if (bb) bb.addEventListener('click', () => setBici(!io.bici)); }
   { const bc = $('#btn-corri'); if (bc) bc.addEventListener('click', () => { io.corre = !io.corre; bc.classList.toggle('attivo', io.corre); G.emetti('toast', io.corre ? 'Corsa attiva: ti muovi più veloce' : 'Si torna a camminare'); }); }
   B.app = {
-    io, gC, vistaAlto, assegnaLuci, ricostruisciCasa, casaOspite, setBici, creaBici, npc, C, cam, scene, renderer, stanze, G, joy, entraStanza, usaPorta, portaVicina, misura, atmosfera, impostaZoom,
+    io, gC, gP, piazza, libero, muovi, vistaAlto, assegnaLuci, ricostruisciCasa, casaOspite, setBici, creaBici, npc, C, cam, scene, renderer, stanze, G, joy, entraStanza, usaPorta, portaVicina, misura, atmosfera, impostaZoom,
     inclina, emote, mostraBolla, ruota: d => { C.azT += d * PI / 2; setSegui(false); },
     stanza: () => stanza, gioco: () => giocoAttivo,
     rivesti: () => { if (G.stato.giocatore && io.av) costruisciIo(G.stato.giocatore.look); }

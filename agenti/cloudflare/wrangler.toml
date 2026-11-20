@@ -1,0 +1,18 @@
+# Configurazione del servizio Cloudflare degli agenti (piano Free).
+# La chiave di Anthropic NON va scritta qui: si mette come segreto con
+#   npx wrangler secret put ANTHROPIC_API_KEY
+name = "borgo-agenti"
+main = "worker.mjs"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "BORGO"
+class_name = "Borgo"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Borgo"]
+
+[triggers]
+crons = ["*/5 * * * *"]
