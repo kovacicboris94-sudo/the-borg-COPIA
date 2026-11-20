@@ -1,7 +1,7 @@
 // Prove del motore degli agenti (agenti/motore.mjs), senza chiave e senza spendere niente.
 //   node test/agenti.test.mjs
 import assert from 'node:assert/strict';
-import { nuovoStato, passo, budget, percezione, giocatoreParla, vistaPubblica, normalizzaAzione, leggiRisposta, costoDi, meseDi, REGOLE, SCHEMA, proposte } from '../agenti/motore.mjs';
+import { nuovoStato, passo, budget, percezione, giocatoreParla, vistaPubblica, normalizzaAzione, leggiRisposta, costoDi, meseDi, REGOLE, SCHEMA, proposte, giocatoreArriva } from '../agenti/motore.mjs';
 
 const T0 = Date.UTC(2026, 10, 20, 12, 0, 0);   // 20 novembre 2026, 13:00 a Roma
 let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -120,7 +120,7 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   const c = finto(risp([], { memoria_nuova: 'Sono Ada. Ho fatto tante cose nel borgo e voglio costruire un orto vicino al belvedere.' }));
   await passo(s, T0 + 20000, c);
   ok(/scrivi "memoria_nuova"/.test(c.chiamate[0].messaggio), 'chiesto il riassunto');
-  ok(ada.memoria.startsWith('Sono Ada') && ada.diario.length <= 6, 'memoria riscritta, diario corto');
+  ok(ada.memoria.startsWith('Sono Ada') && ada.diario.length <= 6, 'memoria riscritta, diario corto ' + JSON.stringify(ada.diario.slice(-3)) + ada.memoria.slice(0, 40));
 }
 
 // 7) errori del modello: niente costo, si riprova piu' tardi; risposte rotte non bloccano
@@ -155,11 +155,13 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; });   // gia' ambientati
   let t = await scorri(s, T0, 3, c);
   const ada = s.agenti.ada, chiamate = c.chiamate.length;
-  t = await scorri(s, t, 60, c);
+  t = await scorri(s, t, 5, c);
   ok(c.chiamate.length === chiamate, 'passeggiare non chiama il modello');
   const posti = new Set(); let lontano = 0;
   for (let i = 0; i < 40; i++) { t = await scorri(s, t, 1, c); posti.add(ada.x + ',' + ada.z); lontano = Math.max(lontano, Math.hypot(ada.x - 0, ada.z - 40)); }
   ok(posti.size > 3 && lontano <= 7.5, 'passeggia vicino a dove era andata (' + posti.size + ' posti, max ' + lontano.toFixed(1) + ' m)');
+  t = await scorri(s, t, 40, c);
+  ok((ada.visti || []).length >= 1 && ada.diario.some(d => /Facendo un giro sono arrivato/.test(d.s)), 'poi va a esplorare altri posti (' + (ada.visti || []).join(', ') + ')');
   const m = percezione(s, s.agenti.teo, t);
   ok(/te ne restano circa \d+/.test(m), 'previsione del budget nella percezione');
 }
@@ -195,6 +197,38 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   await passo(s, T0 + 20000, c); await passo(s, T0 + 50000, c);
   ok(s.agenti.ada.gesto && s.agenti.ada.gesto.tipo === 'salta' && vistaPubblica(s, T0 + 50000).agenti[0].gesto.tipo === 'salta', 'gesto fatto e visibile');
   ok(!s.cronaca.some(e => e.tipo === 'gesto') && s.agenti.ada.esiti.some(x => /gesto: usa uno di/.test(x)), 'non in cronaca; gesto sconosciuto rifiutato');
+}
+
+// 14) giochi inventati dagli agenti: quiz, tesoro, gara; il codice fa da arbitro
+{
+  const giochiPrima = REGOLE.giochi; REGOLE.giochi = true;
+  const s = nuovoStato(T0); Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; });
+  const ada = s.agenti.ada, teo = s.agenti.teo; teo.prossimoPensiero = T0 + 1e12;
+  const c = finto((req, n) => n === 1 ? risp([{ tipo: 'gioco', forma: 'quiz', testo: 'Di che colore e\' il cielo di notte?', nome: 'Nero' }], { prossimo_pensiero_minuti: 600 }) : risp([], { prossimo_pensiero_minuti: 600 }));
+  await passo(s, T0 + 20000, c);
+  ok(s.giochi.length === 1 && /QUIZ!/.test(ada.detto.testo) && !JSON.stringify(vistaPubblica(s, T0 + 20000)).includes('Nero'), 'quiz lanciato, risposta segreta');
+  giocatoreParla(s, 'Boris', 'forse blu?', ada.x, ada.z, T0 + 30000);
+  ok(!s.giochi[0].finito, 'risposta sbagliata');
+  giocatoreParla(s, 'Boris', 'è NERO!', ada.x, ada.z, T0 + 40000);
+  ok(s.giochi[0].vincitore === 'Boris' && s.punti.Boris === 1 && /Ha vinto Boris/.test(ada.detto.testo), 'vince chi risponde giusto');
+  // tesoro: nascosto vicino, lo trova un giocatore
+  ada.coda = [normalizzaAzione({ tipo: 'gioco', forma: 'tesoro', testo: 'Vicino a me!', x: ada.x + 3, z: ada.z })];
+  await passo(s, T0 + 50000, c);
+  const g = s.giochi[1];
+  ok(g && g.forma === 'tesoro' && s.oggetti.some(o => o.gioco === g.id), 'tesoro nascosto (sfera d\'oro)');
+  ok(!giocatoreArriva(s, 'Rosa', g.x + 6, g.z, T0 + 60000) && giocatoreArriva(s, 'Rosa', g.x + 1, g.z, T0 + 61000), 'trovato solo da vicino');
+  ok(g.vincitore === 'Rosa' && !s.oggetti.some(o => o.gioco === g.id), 'tesoro tolto, Rosa vince');
+  // gara: vince l'altro agente se arriva per primo; e un gioco scade
+  ada.coda = [normalizzaAzione({ tipo: 'gioco', forma: 'gara', testo: 'Al Belvedere!', luogo: 'Belvedere' })];
+  await passo(s, T0 + 70000, c);
+  teo.coda = [normalizzaAzione({ tipo: 'vai', luogo: 'Belvedere' })];
+  await scorri(s, T0 + 70000, 2, c);
+  ok(s.giochi[2] && s.giochi[2].vincitore === 'Teo' && s.punti.Teo === 1, 'gara vinta da Teo ' + JSON.stringify([s.giochi[2], ada.esiti, teo.x, teo.z, teo.esiti]));
+  ada.coda = [normalizzaAzione({ tipo: 'gioco', forma: 'quiz', testo: 'Quanto fa 2+2?', nome: '4' })];
+  let t = T0 + 70000 + 2 * 60000; await passo(s, t + 1000, c); t = await scorri(s, t + 1000, 11, c);
+  ok(s.giochi[3].finito && !s.giochi[3].vincitore && /Tempo scaduto/.test(ada.detto.testo), 'scade dopo 10 minuti');
+  ok(normalizzaAzione({ tipo: 'gioco', forma: 'quiz', testo: 'x' }).errore && normalizzaAzione({ tipo: 'gioco', forma: 'scacchi', testo: 'x' }).errore, 'giochi controllati');
+  REGOLE.giochi = giochiPrima;
 }
 
 // 9) pezzi piccoli
