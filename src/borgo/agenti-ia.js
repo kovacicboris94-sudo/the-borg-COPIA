@@ -211,6 +211,8 @@
       // il pavimento non e' tutto alla stessa altezza (palco, gradini): si sta sopra, come il giocatore
       const st = e.st, ty = st.alt ? st.alt(e.x, e.z) : 0; e.y = e.y == null ? ty : e.y + (ty - e.y) * Math.min(1, dt * 14);
       e.av.root.position.set(e.x, e.y, e.z); e.av.root.rotation.y = e.yaw;
+      // i piani della torre senza negozio condividono lo stesso gruppo: si vede solo chi e' al tuo piano
+      e.av.root.visible = !app.gioco() || qui(s) || e.st.gruppo !== app.stanza().gruppo;
       e.av.aggiorna(dt, vel, t); B.Bolle.aggiorna(e, dt);
     });
     // i cantieri crescono

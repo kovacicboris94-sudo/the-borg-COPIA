@@ -32,8 +32,16 @@
   let casa = B.costruisciCasa(gC, B.Eco ? B.Eco.stato.liv : 0, B.Eco ? B.Eco.stato.stili : null);
   const negozio = B.costruisciNegozio(gN, { vuota: true }), sala = B.costruisciSala(gS), coll = B.costruisciCollectibles(gL, 'negozio'), tcgR = B.costruisciCollectibles(gT, 'tcg'), bib = B.costruisciBiblioteca(gB), scac = B.costruisciCasaScacchi(gK);
   // la Torre della Cometa: un gruppo per piano (il tetto invece fa parte della piazza)
-  const gTorre = [0, 1, 2, 3].map(() => { const g = new T.Group(); g.visible = false; scene.add(g); return g; });
-  const piani = B.costruisciPianoTorre ? gTorre.map((g, n) => B.costruisciPianoTorre(g, n)) : [];
+  // i piani senza negozio sono uguali: un solo gruppo per tutti (cambia solo il numero del piano)
+  const gTorre = [], pianiT = [], piani = [];
+  if (B.costruisciPianoTorre) {
+    const nuovoG = () => { const g = new T.Group(); g.visible = false; scene.add(g); gTorre.push(g); return g; };
+    let condiviso = null;
+    for (let n = 0; n < ((B.TORRE && B.TORRE.piani) || 4); n++) {
+      if (n === 0 || (B.negozioTorre && B.negozioTorre(n))) { const g = nuovoG(), m = B.costruisciPianoTorre(g, n); pianiT[n] = { g, m }; piani.push(m); }
+      else { if (!condiviso) { const g = nuovoG(), m = B.costruisciPianoTorre(g, n, true); condiviso = { g, m }; piani.push(m); } pianiT[n] = condiviso; }
+    }
+  }
   const PZ = CFG.plaza;
   // la scena e le stanze non si muovono mai: cosi' three.js puo' saltare i pezzi fermi e le stanze nascoste
   const gruppiStanze = [gP, gC, gN, gS, gL, gT, gB, gK].concat(gTorre);
@@ -57,8 +65,8 @@
     sala: { id: 'sala', nome: 'Sala Giochi', pubblica: true, gruppo: gS, m: sala, ostacoli: sala.ostacoli, porte: sala.porte, sedili: sala.sedili, toccabili: sala.toccabili,
       area: sala.area, alt: () => 0, zoom: 0.8, spawn: { x: 0, z: 12.6, yaw: PI }, rect: { x0: -27, x1: 27, z0: -13, z1: 15 }, edifici: [], sfondo: '#241a40' }
   };
-  piani.forEach((m, n) => {
-    stanze['torre' + n] = { id: 'torre' + n, nome: m.nome, pubblica: true, gruppo: gTorre[n], m, ostacoli: m.ostacoli, porte: m.porte, sedili: m.sedili, toccabili: m.toccabili,
+  pianiT.forEach(({ g, m }, n) => {
+    stanze['torre' + n] = { id: 'torre' + n, nome: B.nomePianoTorre ? B.nomePianoTorre(n) : m.nome, piano: n, pubblica: true, gruppo: g, m, ostacoli: m.ostacoli, porte: m.porte, sedili: m.sedili, toccabili: m.toccabili,
       area: m.area, alt: () => 0, zoom: m.zoom || 0.8, spawn: m.spawn, rect: m.rect, edifici: [], sfondo: '#2a2040' };
   });
   // il tetto della torre e' un pezzo di piazza (stesso gruppo, stessa chat, gli amici ti vedono lassu')
@@ -278,6 +286,7 @@
   /* ---------- cambio stanza ---------- */
   function entraStanza(id, arrivo) {
     stanza = stanze[id]; io.st = stanza; io.seduto = null; G.stato.stanzaId = id;
+    if (stanza.m && stanza.m.alPiano && stanza.piano != null) stanza.m.alPiano(stanza.piano);   // piani della torre che condividono il gruppo
     gP.visible = stanza.gruppo === gP; gTorre.forEach(g => { g.visible = stanza.gruppo === g; }); gC.visible = id === 'casa'; gN.visible = id === 'negozio'; gS.visible = id === 'sala'; gL.visible = id === 'collectibles'; gT.visible = id === 'tcg'; gB.visible = id === 'biblioteca'; gK.visible = id === 'scacchi'; gO.visible = id === 'ospite';
     const sp = arrivo || stanza.spawn;
     io.x = sp.x; io.z = sp.z; io.vx = io.vz = 0; io.yaw = sp.yaw === undefined ? 0 : sp.yaw; io.y = stanza.alt(io.x, io.z);

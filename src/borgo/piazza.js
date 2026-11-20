@@ -508,7 +508,7 @@
     });
 
     /* ---------- trasparenza di edifici e tetti che coprono la vista ---------- */
-    const fadeItems = edifici.map(e => ({ g: e.g, x: e.x, z: e.z, w: e.w, d: e.d, tipo: 'edificio' })).concat(fadeVoci.map(v => Object.assign({ w: 0, d: 0 }, v)));
+    const fadeItems = edifici.map(e => ({ g: e.g, x: e.x, z: e.z, w: e.w, d: e.d, tipo: 'edificio', alto: e.alto })).concat(fadeVoci.map(v => Object.assign({ w: 0, d: 0 }, v)));
     const finestre0 = new Set(B.finestreMat);
     fadeItems.forEach(it => {
       it.mats = []; it.lines = []; it.q = 1; it.ap = 1;
@@ -535,7 +535,7 @@
         }
         else {
           const rx = it.x - px, rz = it.z - pz, lungo = rx * cdx + rz * cdz, lato = Math.abs(rx * cdz - rz * cdx);
-          if (lungo > 1.0 && lato < Math.max(it.w, it.d) / 2 + 2.2 && Math.hypot(rx, rz) < 20) target = 0.18;
+          if (lungo > 1.0 && lato < Math.max(it.w, it.d) / 2 + 2.2 && Math.hypot(rx, rz) < (it.alto ? 75 : 20)) target = 0.18;   // il grattacielo copre anche da lontano
         }
         it.q += (target - it.q) * Math.min(1, dt * 8);
         const q = Math.abs(it.q - target) < 0.02 ? target : it.q;
