@@ -34,13 +34,15 @@ export const REGOLE = {
   velocita: 1.3,              // metri al secondo, a piedi
   minutiPerMetroCubo: 3,      // tempo di costruzione
   maxOggetti: 150, maxOggettiAgente: 60,
-  maxAzioni: 3,
+  maxAzioni: 5,
   diarioMax: 24,              // oltre questo l'agente riscrive la memoria e il diario si accorcia
   memoriaMax: 1500,           // caratteri
   eventiMax: 150,
   cronacaMax: 600,           // frasi e lavori salvati per chi torna nel borgo
   proposteAlGiorno: 3,        // idee per migliorare il gioco, per agente
-  proposteMax: 200
+  proposteMax: 200,
+  ambientamentoOre: 48,       // i primi 2 giorni nel borgo: si pensa piu' spesso per capire chi si e'
+  ambientamentoMaxMin: 3
 };
 
 // La piazza del borgo (stesse misure del gioco, src/borgo/base.js e piazza.js).
@@ -131,7 +133,7 @@ export function nuovoStato(adesso) {
       x: a.x, z: a.z, tx: a.x, tz: a.z, coda: [], lavoro: null,
       memoria: 'Ho appena aperto gli occhi nel borgo. Non so ancora nulla di questo posto.',
       diario: [], esiti: [], ultimoPensiero: '', prossimoPensiero: adesso + 15000 + i * 45000, ultimaVolta: 0,
-      ultimoAscolto: 0, sforzo: 'basso', spesa: {}, detto: null, modo: 'attivo', errori: 0
+      ultimoAscolto: 0, sforzo: 'basso', spesa: {}, detto: null, modo: 'attivo', errori: 0, nato: adesso, abitudine: null
     };
   });
   return { versione: 1, creato: adesso, ora: adesso, prossimoId: 1, agenti, oggetti: [], eventi: [], cronaca: [] };
@@ -155,7 +157,7 @@ function evento(stato, e) {
   c.push(v); if (c.length > REGOLE.cronacaMax) c.splice(0, c.length - REGOLE.cronacaMax);
 }
 function annota(ag, t, s) {
-  ag.diario.push({ t, s: testo(s, 240) });
+  ag.diario.push({ t, s: testo(s, 600) });
   // tetto di sicurezza: il riassunto vero lo fa l'agente stesso (memoria_nuova)
   if (ag.diario.length > REGOLE.diarioMax * 2) ag.diario.splice(0, ag.diario.length - REGOLE.diarioMax * 2);
 }
@@ -187,7 +189,7 @@ export function normalizzaAzione(a) {
     if (!isFinite(x) || !isFinite(z)) return { errore: 'vai: serve un luogo conosciuto oppure x e z' };
     return { tipo, x: lim(x, AREA.x0, AREA.x1), z: lim(z, AREA.z0, AREA.z1) };
   }
-  if (tipo === 'di') { const t = testo(a.testo, 200); return t ? { tipo, testo: t } : { errore: 'di: testo vuoto' }; }
+  if (tipo === 'di') { const t = testo(a.testo, 500); return t ? { tipo, testo: t } : { errore: 'di: testo vuoto' }; }
   if (tipo === 'costruisci') {
     const forma = String(a.forma || 'cubo').toLowerCase();
     if (!FORME.includes(forma)) return { errore: 'costruisci: forma sconosciuta (usa ' + FORME.join(', ') + ')' };
@@ -203,6 +205,18 @@ export function normalizzaAzione(a) {
     return { tipo, id: String(a.id), x: r2(x), z: r2(z), y: a.y == null ? null : r2(lim(num(a.y, 0), 0, 12)) };
   }
   if (tipo === 'rimuovi') return a.id ? { tipo, id: String(a.id) } : { errore: 'rimuovi: serve l\'id' };
+  if (tipo === 'abitudine') {
+    const t = String(a.testo || '').trim();
+    if (/^(nessuna|niente|cancella|basta)\b/i.test(t)) return { tipo, abitudine: null };
+    const ab = {};
+    for (const pezzo of t.split(/[;,\n]+/)) {
+      const m = pezzo.match(/^\s*(mattina|pomeriggio|sera|notte)\s*[:=-]\s*(.+?)\s*$/i); if (!m) continue;
+      const l = LUOGHI.find(q => q.nome.toLowerCase() === m[2].toLowerCase());
+      if (!l) return { errore: 'abitudine: luogo sconosciuto "' + testo(m[2], 30) + '"' };
+      ab[m[1].toLowerCase()] = l.nome;
+    }
+    return Object.keys(ab).length ? { tipo, abitudine: ab } : { errore: 'abitudine: scrivi per esempio "mattina: Fontana; sera: Laghetto" oppure "nessuna"' };
+  }
   if (tipo === 'proponi') { const t = testo(a.testo, 400); return t ? { tipo, testo: t } : { errore: 'proponi: testo vuoto' }; }
   return { errore: 'azione sconosciuta: ' + testo(tipo, 20) };
 }
@@ -240,6 +254,7 @@ export async function passo(stato, adesso, cervello, opz = {}) {
     return [];
   }
   stato.pausa = false;
+  for (const ag of Object.values(stato.agenti)) if (!ag.nato) ag.nato = adesso;   // agenti nati prima di questa regola: l'ambientamento parte ora
   const dt = Math.max(0, Math.min(10 * 60 * 1000, adesso - (stato.ora || adesso))) / 1000;
   stato.ora = adesso;
   const agenti = Object.values(stato.agenti);
@@ -278,6 +293,9 @@ function avanza(stato, ag, dt, adesso, regole) {
 
 // Tra un pensiero e l'altro, finite le azioni, si fanno due passi qui intorno: e' gratis (lo decide il codice, non il modello).
 function passeggia(ag, adesso) {
+  // l'abitudine: a ogni momento della giornata si va da soli nel posto scelto (gratis, senza pensare)
+  const l = adesso >= (ag.abitudineDopo || 0) ? luogoAbitudine(ag, adesso) : null;
+  if (l && (!ag.ancora || Math.hypot(ag.ancora.x - l.x, ag.ancora.z - l.z) > 4)) { ag.ancora = { x: l.x, z: l.z + 3 }; ag.tx = ag.ancora.x; ag.tz = ag.ancora.z; ag.meta = l.nome; ag.prossimaGita = adesso + 3 * 60000; return; }
   if (!ag.ancora) ag.ancora = { x: ag.x, z: ag.z };
   if (ag.prossimaGita && adesso < ag.prossimaGita) return;
   const notte = momento(adesso) === 'notte', a = adesso / 9e4 + ag.id.charCodeAt(0), r = 1 + (Math.sin(a * 3.7) + 1) * 1.25;
@@ -292,6 +310,7 @@ function esegui(stato, ag, a, adesso, regole) {
   if (a.tipo === 'vai') {
     ag.tx = a.x; ag.tz = a.z; if (a.dove) ag.meta = a.dove; else ag.meta = null;
     ag.ancora = { x: a.x, z: a.z }; ag.prossimaGita = adesso + 2 * 60000;   // arrivato, si passeggia li' intorno
+    ag.abitudineDopo = adesso + 60 * 60000;   // per un'ora l'abitudine non lo porta via da dove ha scelto di andare
     esito(ag, `vai ${a.dove || `x=${a.x} z=${a.z}`}: in cammino`);
     return 'cammina';
   }
@@ -302,6 +321,11 @@ function esegui(stato, ag, a, adesso, regole) {
     // chi e' vicino lo sente: puo' svegliarsi prima
     for (const altro of Object.values(stato.agenti)) if (altro !== ag && dist(altro, ag) <= regole.vista) svegliaPerVoce(altro, adesso, regole);
     return;
+  }
+  if (a.tipo === 'abitudine') {
+    ag.abitudine = a.abitudine; ag.prossimaGita = 0; ag.ancora = null;
+    annota(ag, adesso, a.abitudine ? 'Mi sono dato un\'abitudine: ' + descriviAbitudine(a.abitudine) + '.' : 'Ho smesso di seguire la mia abitudine.');
+    return esito(ag, a.abitudine ? 'abitudine: da ora ' + descriviAbitudine(a.abitudine) : 'abitudine: cancellata');
   }
   if (a.tipo === 'proponi') {
     // una proposta per chi crea il gioco: finisce in una lista che legge Boris, non cambia niente da sola
@@ -377,7 +401,12 @@ function previsione(b, ag, adesso) {
   return r;
 }
 
+const descriviAbitudine = ab => ['mattina', 'pomeriggio', 'sera', 'notte'].filter(m => ab[m]).map(m => m + ' ' + ab[m]).join(', ');
+function luogoAbitudine(ag, adesso) { const n = ag.abitudine && ag.abitudine[momento(adesso)]; return n ? LUOGHI.find(q => q.nome === n) : null; }
+function inAmbientamento(ag, adesso, regole) { return adesso - (ag.nato || adesso) < regole.ambientamentoOre * 3600000; }
+
 function routine(ag, adesso) {
+  if (luogoAbitudine(ag, adesso)) return passeggia(ag, adesso);
   if (ag.prossimaGita && adesso < ag.prossimaGita) return;
   const notte = momento(adesso) === 'notte';
   const l = notte ? LUOGHI[0] : LUOGHI[Math.floor((adesso / 60000 + ag.id.charCodeAt(0)) % LUOGHI.length)];
@@ -410,6 +439,7 @@ AZIONI (le controllano le regole del mondo: se una e' impossibile viene rifiutat
 - {"tipo":"costruisci","nome":"...","forma":"cubo|cilindro|sfera|cono|piramide","larghezza":2,"altezza":1,"profondita":2,"colore":"#a0703f","x":..,"z":..,"y":0,"rotazione":0,"testo":"scritta facoltativa"}: misure in metri (da 0,2 a 8). x e z entro ${regole.portata} m da te (se mancano, accanto a te). y e' l'altezza da terra: per impilare usa y = altezza della cima di un oggetto finito sotto. Costruire richiede tempo (circa ${regole.minutiPerMetroCubo} minuti per metro cubo, da 2 a 180) e intanto resti li'. Puoi comporre piu' pezzi per fare case, panchine, statue, insegne...
 - {"tipo":"sposta","id":"o12","x":..,"z":..,"y":..}: oggetti finiti entro ${regole.portata} m, al massimo 6 metri cubi.
 - {"tipo":"rimuovi","id":"o12"}: smonti un oggetto finito entro ${regole.portata} m (richiede tempo).
+- {"tipo":"abitudine","testo":"mattina: Fontana; pomeriggio: Mercatino; sera: Laghetto; notte: Fontana"}: ti dai una routine con i luoghi che conosci. Da quel momento ci vai da solo a ogni momento della giornata, senza pensarci e gratis, finche' non la cambi (o scrivi "nessuna" per toglierla). Le azioni che decidi pensando vengono sempre prima dell'abitudine.
 - {"tipo":"proponi","testo":"..."}: il borgo e' un gioco fatto da persone. Tu non puoi cambiarne il codice, gli edifici originali o i minigiochi, ma puoi proporre a chi lo crea un miglioramento o un'idea (al massimo ${regole.proposteAlGiorno} al giorno). La legge una persona e decide lei; non saprai subito se l'ha accettata.
 
 RISPOSTA: solo un oggetto JSON, niente altro testo:
@@ -423,6 +453,8 @@ export function percezione(stato, ag, adesso, regole = REGOLE) {
   const righe = [];
   righe.push(`ORA: ${FMT_ORA.format(new Date(adesso))} (${momento(adesso)}).`);
   righe.push(`BUDGET: questo mese hai speso ${dollari(b.spesi)} su ${dollari(b.tetto)} in ${b.pensieri} pensieri; restano ${dollari(b.resto)} per ${b.giorni} giorni (circa ${dollari(b.alGiorno)} al giorno).` + (ag.costoUltimo ? ` Il tuo ultimo pensiero e' costato ${dollari(ag.costoUltimo)}.` : '') + previsione(b, ag, adesso));
+  if (ag.abitudine) righe.push(`LA TUA ABITUDINE: ${descriviAbitudine(ag.abitudine)} (la segui da solo, gratis; puoi cambiarla quando vuoi).`);
+  if (inAmbientamento(ag, adesso, regole)) righe.push(`SEI NEL BORGO DA POCO: per i primi ${Math.round(regole.ambientamentoOre / 24)} giorni ripenserai al massimo ogni ${regole.ambientamentoMaxMin} minuti, per conoscere il posto e capire chi sei. Poi deciderai di nuovo tu il ritmo.`);
   righe.push(`DOVE SEI: x=${Math.round(ag.x)} z=${Math.round(ag.z)}, ${vicino.d <= 4 ? 'a' : 'vicino a'} ${vicino.nome}.` + (ag.lavoro ? ' Stai ancora lavorando.' : ''));
   const visti = [];
   for (const altro of Object.values(stato.agenti)) {
@@ -459,7 +491,7 @@ export const SCHEMA = {
     azioni: { type: 'array', items: {
       type: 'object', additionalProperties: false,
       required: ['tipo', 'luogo', 'x', 'z', 'y', 'testo', 'id', 'nome', 'forma', 'larghezza', 'altezza', 'profondita', 'colore', 'rotazione'],
-      properties: { tipo: { type: 'string', enum: ['vai', 'di', 'costruisci', 'sposta', 'rimuovi', 'proponi'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
+      properties: { tipo: { type: 'string', enum: ['vai', 'di', 'costruisci', 'sposta', 'rimuovi', 'proponi', 'abitudine'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
         testo: STR_O_NULL, id: STR_O_NULL, nome: STR_O_NULL, forma: STR_O_NULL, larghezza: NUM_O_NULL, altezza: NUM_O_NULL, profondita: NUM_O_NULL, colore: STR_O_NULL, rotazione: NUM_O_NULL } } }
   }
 };
@@ -518,7 +550,8 @@ async function pensa(stato, ag, adesso, cervello, regole) {
     ag.diario = ag.diario.slice(-6);
   }
   ag.sforzo = v.sforzo_prossimo === 'medio' ? 'medio' : 'basso';
-  const minuti = lim(Math.round(num(v.prossimo_pensiero_minuti, 30)), 1, 720);
+  let minuti = lim(Math.round(num(v.prossimo_pensiero_minuti, 30)), 1, 720);
+  if (inAmbientamento(ag, adesso, regole)) minuti = Math.min(minuti, regole.ambientamentoMaxMin);
   ag.prossimoPensiero = Math.max(adesso + regole.pausaMinimaMs, adesso + minuti * 60000);
   const azioni = Array.isArray(v.azioni) ? v.azioni.slice(0, regole.maxAzioni) : [];
   // nuove decisioni: la coda vecchia si butta (il lavoro gia' iniziato invece continua)
@@ -539,7 +572,7 @@ function inizioMeseProssimo(ms) {
 /*  da fuori: giocatori che parlano, vista pubblica per il gioco        */
 /* ------------------------------------------------------------------ */
 export function giocatoreParla(stato, nick, frase, x, z, adesso) {
-  const n = testo(nick, 20).replace(/[^\p{L}\p{N}_ .-]/gu, ''), t = testo(frase, 200), px = num(x, NaN), pz = num(z, NaN);
+  const n = testo(nick, 20).replace(/[^\p{L}\p{N}_ .-]/gu, ''), t = testo(frase, 300), px = num(x, NaN), pz = num(z, NaN);
   if (!n || !t || !isFinite(px) || !isFinite(pz)) return false;
   const e = { chi: 'g:' + n, tipo: 'parla', testo: t, x: r2(px), z: r2(pz) };
   const prima = stato.ora; stato.ora = adesso; evento(stato, e); stato.ora = prima;

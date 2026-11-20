@@ -93,14 +93,14 @@
     const u = utenteDi(id); if (!u) return false;
     if (stato.bloccati.has(id)) { emetti('toast', 'Hai bloccato questo utente'); return false; }
     if (stato.stanzaId !== 'piazza' || !inPiazza().some(b => b.id === id)) { emetti('toast', u.nick + ' non è qui: non puoi sussurrargli'); return false; }
-    testo = controllaMessaggio(testo, 'chat', 120);
+    testo = controllaMessaggio(testo, 'chat', 300);
     if (!testo) return false;
     aggiungiChat('io', stato.giocatore.nick, testo, true, { sussurro: true, aId: id, aNick: u.nick });
     if (Math.random() < 0.6) setTimeout(() => { if (!stato.bloccati.has(id) && stato.stanzaId === 'piazza') aggiungiChat(id, u.nick, pick(SUSSURRI).replace('{nick}', stato.giocatore.nick), false, { sussurro: true }); }, rnd(1800, 3500));
     return true;
   }
   function inviaChat(testo) {
-    testo = controllaMessaggio(testo, 'chat', 120);
+    testo = controllaMessaggio(testo, 'chat', 300);
     if (!testo) return false;
     const mia = aggiungiChat('io', stato.giocatore.nick, testo, true);
     // abitanti dimostrativi: chi viene citato con @ risponde quasi sempre; ogni tanto qualcuno mette una reazione

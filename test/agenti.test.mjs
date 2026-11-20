@@ -71,6 +71,7 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
       { tipo: 'costruisci', nome: 'lontano', forma: 'cubo', x: 40, z: 60 }], { prossimo_pensiero_minuti: 30 });
     return risp([]);
   });
+  Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; });   // gia' ambientati
   s.agenti.teo.prossimoPensiero = T0 + 1e12;
   ada.prossimoPensiero = T0;
   await passo(s, T0 + 1000, c);
@@ -151,6 +152,7 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
 // 10) tra un pensiero e l'altro si passeggia gratis lì intorno, e si vede la previsione del budget
 {
   const s = nuovoStato(T0), c = finto(risp([{ tipo: 'vai', x: 0, z: 40 }], { prossimo_pensiero_minuti: 600 }));
+  Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; });   // gia' ambientati
   let t = await scorri(s, T0, 3, c);
   const ada = s.agenti.ada, chiamate = c.chiamate.length;
   t = await scorri(s, t, 60, c);
@@ -170,6 +172,21 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   ok(di.length === 3, 'al massimo 3 proposte al giorno (' + di.length + ')');
   ok(l[0].testo && s.cronaca.some(e => e.tipo === 'proposta'), 'nella lista e nella cronaca');
   ok(normalizzaAzione({ tipo: 'proponi', testo: '' }).errore, 'proposta vuota rifiutata');
+}
+
+// 12) abitudine: una routine che si segue da soli, gratis; e i primi 2 giorni si pensa almeno ogni 10 minuti
+{
+  const s = nuovoStato(T0), c = finto(risp([{ tipo: 'abitudine', testo: 'mattina: Fontana; pomeriggio: Laghetto; sera: Torre della Cometa; notte: Fontana' }], { prossimo_pensiero_minuti: 600 }));
+  let t = await scorri(s, T0, 2, c);
+  const ada = s.agenti.ada;
+  ok(ada.abitudine && ada.abitudine.pomeriggio === 'Laghetto', 'abitudine salvata');
+  ok(ada.prossimoPensiero - ada.ultimaVolta <= 3 * 60000, 'nei primi giorni ripensa entro 3 minuti');
+  ok(/SEI NEL BORGO DA POCO/.test(percezione(s, ada, t)) && /LA TUA ABITUDINE/.test(percezione(s, ada, t)), 'lo sa');
+  Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; a.prossimoPensiero = t + 864e5; });
+  const chiamate = c.chiamate.length;
+  t = await scorri(s, t, 50, c);   // pomeriggio a Roma: va da sola al Laghetto (x=38 z=32)
+  ok(Math.hypot(ada.x - 38, ada.z - 35) < 4.5 && c.chiamate.length === chiamate, 'segue l\'abitudine senza pensare (' + ada.x + ',' + ada.z + ')');
+  ok(normalizzaAzione({ tipo: 'abitudine', testo: 'mattina: Luna' }).errore && normalizzaAzione({ tipo: 'abitudine', testo: 'nessuna' }).abitudine === null, 'luoghi controllati, si puo\' togliere');
 }
 
 // 9) pezzi piccoli

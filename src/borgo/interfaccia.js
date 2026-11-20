@@ -259,7 +259,7 @@
       b.addEventListener('mousedown', ev => ev.preventDefault());
       b.addEventListener('click', () => {
         const ins = '@' + u.nick + ' ', inizio = pos - m[2].length - 1;
-        i.value = (i.value.slice(0, inizio) + ins + i.value.slice(pos)).slice(0, 120);
+        i.value = (i.value.slice(0, inizio) + ins + i.value.slice(pos)).slice(0, 300);
         try { i.setSelectionRange(inizio + ins.length, inizio + ins.length); i.focus(); } catch (x) { /* ok */ }
         box.hidden = true; UI.aggiornaArea();
       });
