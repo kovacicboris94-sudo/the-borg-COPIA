@@ -231,6 +231,56 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   REGOLE.giochi = giochiPrima;
 }
 
+// 15) edifici: si entra dalla porta, dentro non ti vede chi e' in piazza, si esce da soli o con "esci"
+{
+  const s = nuovoStato(T0); Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; });
+  const ada = s.agenti.ada, teo = s.agenti.teo; teo.prossimoPensiero = T0 + 1e12;
+  const c = finto((req, n) => n === 1 ? risp([{ tipo: 'entra', luogo: 'Sala TCG' }, { tipo: 'di', testo: 'Che bello qui dentro!' }], { prossimo_pensiero_minuti: 600 }) : risp([], { prossimo_pensiero_minuti: 600 }));
+  await passo(s, T0 + 20000, c);
+  ok(c.chiamate[0].system.includes('EDIFICI') && c.chiamate[0].system.includes('"tipo":"entra"'), 'nel prompt le direttive per entrare');
+  ok(ada.stanza == null && ada.tz < 0, 'cammina verso la porta di Laugh Tale Collectibles');
+  let t = await scorri(s, T0 + 20000, 2, c);
+  ok(ada.stanza === 'collectibles', 'entrata in Laugh Tale Collectibles ' + JSON.stringify([ada.x, ada.z, ada.stanza, ada.esiti]));
+  t = await scorri(s, t, 1, c);
+  ok(ada.stanza === 'tcg' && ada.detto && ada.detto.testo === 'Che bello qui dentro!', 'poi nella Sala TCG, e parla li\' dentro');
+  const ev = s.eventi.filter(e => e.tipo === 'parla' && e.chi === 'ada').pop();
+  ok(ev.stanza === 'tcg', 'la voce resta nella stanza');
+  ok(!/Ada, a/.test(percezione(s, teo, t)), 'Teo in piazza non la vede');
+  ok(/DOVE SEI: dentro Sala TCG/.test(percezione(s, ada, t)), 'Ada sa di essere dentro');
+  ok(vistaPubblica(s, t).agenti.find(a => a.id === 'ada').stanza === 'tcg', 'il gioco sa in che stanza e\' Ada');
+  ada.tx = ada.x; ada.tz = ada.z; ada.coda = [normalizzaAzione({ tipo: 'costruisci', forma: 'cubo' })]; await passo(s, t + 1000, c);
+  ok(/dentro gli edifici non si costruisce/.test(ada.esiti.join()), 'dentro non si costruisce');
+  // un "vai" in un luogo della piazza la fa uscire da sola (da due stanze)
+  ada.coda = [normalizzaAzione({ tipo: 'vai', luogo: 'Fontana' })];
+  t = await scorri(s, t + 1000, 4, c);
+  ok(ada.stanza == null, 'uscita in piazza ' + JSON.stringify([ada.stanza, ada.x, ada.z]));
+  t = await scorri(s, t, 1, c);
+  ok(Math.hypot(ada.x - 0, ada.z - 30) < 10, 'e va alla Fontana ' + JSON.stringify([ada.x, ada.z, ada.tx, ada.tz, ada.esiti]));
+  // esplorando da sola, davanti a un edificio mai visto entra a dare un'occhiata e poi esce
+  teo.esplora = 'Biblioteca'; teo.ancora = { x: -27.7, z: -1 }; teo.x = teo.tx = -27.7; teo.z = teo.tz = -1; teo.prossimaGita = 0;
+  await passo(s, t + 1000, c); t = await scorri(s, t + 1000, 2, c);
+  ok(teo.stanza === 'biblioteca', 'Teo esplorando entra in Biblioteca ' + JSON.stringify([teo.x, teo.z, teo.tx, teo.tz, teo.coda, teo.stanza, teo.diario.slice(-2)]));
+  t = await scorri(s, t, 6, c);
+  ok(teo.stanza == null, 'dopo qualche minuto esce da solo');
+  ok(normalizzaAzione({ tipo: 'entra', luogo: 'casa di Boris' }).errore && normalizzaAzione({ tipo: 'entra', luogo: 'sala giochi' }).stanza === 'sala', 'si entra solo negli edifici pubblici');
+}
+
+// 16) parlarsi da lontano: un giocatore scrive a un agente in un altro posto, e lui risponde con "scrivi"
+{
+  const s = nuovoStato(T0); Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; });
+  const ada = s.agenti.ada, teo = s.agenti.teo; teo.prossimoPensiero = T0 + 1e12; ada.prossimoPensiero = T0 + 1e9; ada.ultimaVolta = T0 - 3600000;
+  ok(!giocatoreParla(s, 'Boris', 'ciao', 0, 0, T0, { a: 'nessuno' }), 'solo agenti veri');
+  ok(giocatoreParla(s, 'Boris', 'Ada mi senti? Sono in Sala Giochi', 0, 5, T0 + 1000, { a: 'ada', stanza: 'sala' }), 'messaggio da lontano consegnato');
+  ok(ada.prossimoPensiero < T0 + 60000 * 5, 'Ada si sveglia per il messaggio');
+  ok(/Boris \(persona vera\) ti ha scritto da lontano: "Ada mi senti\?/.test(percezione(s, ada, T0 + 70000)), 'lo legge anche se e\' lontana');
+  ok(!/mi senti/.test(percezione(s, teo, T0 + 70000)), 'Teo no: era per Ada');
+  const c = finto(risp([{ tipo: 'scrivi', nome: 'Boris', testo: 'Ti sento! Arrivo.' }, { tipo: 'scrivi', nome: 'Pippo', testo: 'x' }], { prossimo_pensiero_minuti: 600 }));
+  await passo(s, ada.prossimoPensiero + 1, c);
+  const v = vistaPubblica(s, T0 + 80000);
+  ok(v.messaggi.some(m => m.da === 'Ada' && m.a === 'Boris' && m.testo === 'Ti sento! Arrivo.' && m.agente === 'ada'), 'la risposta arriva a Boris');
+  ok(/non conosci nessuno/.test(ada.esiti.join()), 'non si scrive a sconosciuti');
+}
+
 // 9) pezzi piccoli
 ok(normalizzaAzione({ tipo: 'vai', luogo: 'fontana' }).x === 0, 'luogo per nome');
 ok(normalizzaAzione({ tipo: 'vola' }).errore, 'azione sconosciuta');

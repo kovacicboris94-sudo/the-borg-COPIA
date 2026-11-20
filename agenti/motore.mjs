@@ -71,6 +71,24 @@ export const LUOGHI = [
   { nome: 'Fioraio', x: 47, z: 50 },
   { nome: 'Arredamenti', x: -47, z: 4 }
 ];
+// Gli edifici in cui si puo' entrare (stesse misure del gioco, src/borgo/programma-principale.js).
+// Dentro, x e z sono quelle della stanza. "porta": dove si entra (in piazza, o dentro la stanza "da").
+// Le case private dei giocatori non ci sono: li' non si entra.
+export const STANZE = [
+  { id: 'negozio', nome: 'Negozio TCG', porta: { x: -12, z: -3.5 }, rect: { x0: -12.25, x1: 12.25, z0: -9.1, z1: 10 }, arrivo: { x: 0, z: 6.2 }, uscita: { x: 0, z: 8.8 } },
+  { id: 'sala', nome: 'Sala Giochi', porta: { x: -22.2, z: -3.5 }, rect: { x0: -27, x1: 27, z0: -13, z1: 15 }, arrivo: { x: 0, z: 12.6 }, uscita: { x: 0, z: 13.8 } },
+  { id: 'biblioteca', nome: 'Biblioteca', porta: { x: -27.7, z: -3.5 }, rect: { x0: -7.5, x1: 7.5, z0: -6.5, z1: 7.5 }, arrivo: { x: 0, z: 6 }, uscita: { x: 0, z: 6.3 } },
+  { id: 'scacchi', nome: 'Casa degli Scacchi', porta: { x: 3, z: -3.5 }, rect: { x0: -10, x1: 10, z0: -8, z1: 9 }, arrivo: { x: 0, z: 7 }, uscita: { x: 0, z: 7.8 } },
+  { id: 'collectibles', nome: 'Laugh Tale Collectibles', porta: { x: -40, z: -3.5 }, rect: { x0: -10.5, x1: 10.5, z0: -5, z1: 15 }, arrivo: { x: 0, z: 13.5 }, uscita: { x: 0, z: 13.8 } },
+  { id: 'tcg', nome: 'Sala TCG', da: 'collectibles', porta: { x: -8.3, z: 9 }, rect: { x0: -21, x1: 21, z0: -13, z1: 15 }, arrivo: { x: -18.8, z: 9 }, uscita: { x: -19.8, z: 9 } }
+];
+export const stanzaDi = id => STANZE.find(q => q.id === id) || null;
+function cercaStanza(nome) {
+  const n = String(nome || '').toLowerCase().trim(); if (!n) return null;
+  return STANZE.find(q => q.nome.toLowerCase() === n || q.id === n) || STANZE.find(q => q.nome.toLowerCase().includes(n) || n.includes(q.nome.toLowerCase())) || null;
+}
+function dentroStanza(st, x, z, m = 1.2) { const r = st.rect; return { x: r2(lim(x, r.x0 + m, r.x1 - m)), z: r2(lim(z, r.z0 + m, r.z1 - m)) }; }
+
 // Zone dove non si costruisce: porte, fontana, laghetto, ruota, torre, portale, mercatino.
 // Gli edifici originali del borgo non si toccano: solo le cose fatte dagli abitanti.
 const PROTETTE = [
@@ -95,7 +113,8 @@ export const ABITANTI = [
 /* ------------------------------------------------------------------ */
 /*  utilita'                                                           */
 /* ------------------------------------------------------------------ */
-const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+// due cose in posti diversi (piazza e un edificio, o due edifici) sono infinitamente lontane: non si vedono e non si sentono
+const dist = (a, b) => ((a.stanza || null) !== (b.stanza || null) ? Infinity : Math.hypot(a.x - b.x, a.z - b.z));
 const num = (v, d) => (typeof v === 'number' && isFinite(v) ? v : (typeof v === 'string' && v.trim() !== '' && isFinite(+v) ? +v : d));
 const lim = (v, a, b) => Math.max(a, Math.min(b, v));
 const testo = (v, max) => String(v == null ? '' : v).replace(/[\u0000-\u001f]+/g, ' ').trim().slice(0, max);
@@ -115,6 +134,7 @@ function oraBreve(ms) { return new Date(ms).toLocaleTimeString('it-IT', { timeZo
 const dollari = v => v.toFixed(4).replace('.', ',') + ' $';
 
 export function luogoVicino(p) {
+  if (p.stanza) { const st = stanzaDi(p.stanza); if (st) return { nome: st.nome, d: 0, dentro: true }; }
   let best = null, bd = 1e9;
   for (const l of LUOGHI) { const d = dist(p, l); if (d < bd) { bd = d; best = l; } }
   return { nome: best.nome, d: Math.round(bd) };
@@ -154,6 +174,8 @@ export function budget(ag, adesso, regole = REGOLE) {
 
 function evento(stato, e) {
   const v = Object.assign({ t: stato.ora }, e);
+  if (v.stanza === undefined && stato.agenti[v.chi] && stato.agenti[v.chi].stanza) v.stanza = stato.agenti[v.chi].stanza;
+  if (!v.stanza) delete v.stanza;
   stato.eventi.push(v);
   if (stato.eventi.length > REGOLE.eventiMax) stato.eventi.splice(0, stato.eventi.length - REGOLE.eventiMax);
   // la cronaca del borgo: tutto quello che si dicono e fanno, da leggere quando torni
@@ -192,7 +214,17 @@ export function normalizzaAzione(a) {
     }
     const x = num(a.x, NaN), z = num(a.z, NaN);
     if (!isFinite(x) || !isFinite(z)) return { errore: 'vai: serve un luogo conosciuto oppure x e z' };
-    return { tipo, x: lim(x, AREA.x0, AREA.x1), z: lim(z, AREA.z0, AREA.z1) };
+    return { tipo, x: lim(x, -60, 80), z: lim(z, -20, 80) };   // dentro un edificio x e z sono quelle della stanza: si sistemano quando si parte
+  }
+  if (tipo === 'entra') {
+    const st = cercaStanza(a.luogo || a.nome || a.testo);
+    return st ? { tipo, stanza: st.id } : { errore: 'entra: edificio sconosciuto (puoi entrare in ' + STANZE.map(q => q.nome).join(', ') + ')' };
+  }
+  if (tipo === 'esci') return { tipo };
+  if (tipo === 'scrivi') {
+    const chi = testo(a.nome || a.id, 20), t = testo(a.testo, 500);
+    if (!chi) return { errore: 'scrivi: metti in "nome" a chi scrivi' };
+    return t ? { tipo, a: chi, testo: t } : { errore: 'scrivi: testo vuoto' };
   }
   if (tipo === 'di') { const t = testo(a.testo, 500); return t ? { tipo, testo: t } : { errore: 'di: testo vuoto' }; }
   if (tipo === 'costruisci') {
@@ -315,6 +347,17 @@ function avanza(stato, ag, dt, adesso, regole) {
 
 // Tra un pensiero e l'altro, finite le azioni, si fanno due passi qui intorno: e' gratis (lo decide il codice, non il modello).
 function passeggia(ag, adesso) {
+  const st = ag.stanza && stanzaDi(ag.stanza);
+  if (ag.stanza && !st) ag.stanza = null;
+  if (st) {
+    // dentro un edificio: si gira per la stanza; passato il tempo si torna fuori da soli
+    if (adesso >= (ag.dentroFino || 0)) { ag.coda.push({ tipo: 'esci', auto: true }); return; }
+    if (ag.prossimaGita && adesso < ag.prossimaGita) return;
+    if (!ag.ancora) ag.ancora = { x: ag.x, z: ag.z };
+    const a = adesso / 9e4 + ag.id.charCodeAt(0), r = 1.5 + (Math.sin(a * 3.7) + 1) * 1.5, q = dentroStanza(st, ag.ancora.x + Math.sin(a) * r, ag.ancora.z + Math.cos(a) * r);
+    ag.tx = q.x; ag.tz = q.z; ag.prossimaGita = adesso + (35 + (Math.sin(a * 1.3) + 1) * 30) * 1000;
+    return;
+  }
   // l'abitudine: a ogni momento della giornata si va da soli nel posto scelto (gratis, senza pensare)
   const l = adesso >= (ag.abitudineDopo || 0) ? luogoAbitudine(ag, adesso) : null;
   if (l && (!ag.ancora || Math.hypot(ag.ancora.x - l.x, ag.ancora.z - l.z) > 4)) { ag.ancora = { x: l.x, z: l.z + 3 }; ag.tx = ag.ancora.x; ag.tz = ag.ancora.z; ag.meta = l.nome; ag.prossimaGita = adesso + 3 * 60000; return; }
@@ -322,7 +365,11 @@ function passeggia(ag, adesso) {
   // arrivato in esplorazione: se lo segna, cosi' al prossimo pensiero sa che posto e'
   if (ag.esplora && ag.ancora && Math.hypot(ag.x - ag.ancora.x, ag.z - ag.ancora.z) < 1) {
     (ag.visti || (ag.visti = [])).includes(ag.esplora) || ag.visti.push(ag.esplora);
-    annota(ag, adesso, `Facendo un giro sono arrivato a ${ag.esplora}.`); ag.esplora = null;
+    annota(ag, adesso, `Facendo un giro sono arrivato a ${ag.esplora}.`);
+    // davanti a un edificio mai visto da dentro: si entra a dare un'occhiata (gratis)
+    const dentro = STANZE.find(q => q.nome === ag.esplora && !q.da && !(ag.vistiDentro || []).includes(q.id));
+    ag.esplora = null;
+    if (dentro) { ag.coda.push({ tipo: 'entra', stanza: dentro.id, auto: true }); return; }
   }
   if (ag.prossimaGita && adesso < ag.prossimaGita) return;
   const notte = momento(adesso) === 'notte', a = adesso / 9e4 + ag.id.charCodeAt(0), r = 2 + (Math.sin(a * 3.7) + 1) * 2.5;
@@ -346,11 +393,65 @@ const nomeDi = (stato, id) => (stato.agenti[id] ? stato.agenti[id].nome : id && 
 function esegui(stato, ag, a, adesso, regole) {
   if (a.errore) { esito(ag, 'rifiutata: ' + a.errore); return; }
   if (a.tipo === 'vai') {
+    // un luogo della piazza da dentro un edificio: prima si esce dalla porta
+    if (ag.stanza && a.dove) { ag.coda.unshift(a); return esegui(stato, ag, { tipo: 'esci', auto: true }, adesso, regole); }
+    let x = a.x, z = a.z;
+    if (ag.stanza && stanzaDi(ag.stanza)) { const q = dentroStanza(stanzaDi(ag.stanza), x, z); x = q.x; z = q.z; }
+    else { x = lim(x, AREA.x0, AREA.x1); z = lim(z, AREA.z0, AREA.z1); }
+    a = Object.assign({}, a, { x, z });
     ag.tx = a.x; ag.tz = a.z; if (a.dove) ag.meta = a.dove; else ag.meta = null;
     ag.ancora = { x: a.x, z: a.z }; ag.prossimaGita = adesso + 40000;   // arrivato, si passeggia li' intorno
     ag.abitudineDopo = adesso + 60 * 60000;   // per un'ora l'abitudine non lo porta via da dove ha scelto di andare
     esito(ag, `vai ${a.dove || `x=${a.x} z=${a.z}`}: in cammino`);
     return 'cammina';
+  }
+  if (a.tipo === 'entra') {
+    const st = stanzaDi(a.stanza);
+    if (ag.stanza === st.id) return esito(ag, `entra: sei gia' dentro ${st.nome}`);
+    const serve = st.da || null;
+    if ((ag.stanza || null) !== serve) {
+      ag.coda.unshift(a);
+      // si e' in un altro edificio: prima si esce. Si e' in piazza ma la stanza e' dentro un altro edificio: prima si entra in quello
+      return ag.stanza ? esegui(stato, ag, { tipo: 'esci', auto: true }, adesso, regole) : esegui(stato, ag, { tipo: 'entra', stanza: serve, auto: a.auto }, adesso, regole);
+    }
+    const p = st.porta;
+    if (Math.hypot(ag.x - p.x, ag.z - p.z) > 1) {
+      ag.tx = p.x; ag.tz = p.z; ag.ancora = null; ag.esplora = null; ag.meta = st.nome;
+      if (!a.inCammino && !a.auto) esito(ag, `entra ${st.nome}: in cammino verso la porta`);
+      ag.coda.unshift(Object.assign({}, a, { inCammino: true }));
+      return 'cammina';
+    }
+    ag.stanza = st.id; ag.x = ag.tx = st.arrivo.x; ag.z = ag.tz = st.arrivo.z; ag.meta = null; ag.esplora = null;
+    ag.ancora = dentroStanza(st, st.arrivo.x, st.arrivo.z - 3); ag.prossimaGita = adesso + 15000;
+    ag.dentroFino = adesso + (a.auto ? 4 : 60) * 60000;      // se ci entri tu, ci resti finche' vuoi (almeno un'ora); in esplorazione 4 minuti
+    if (!a.auto) ag.abitudineDopo = adesso + 60 * 60000;
+    (ag.vistiDentro || (ag.vistiDentro = [])).includes(st.id) || ag.vistiDentro.push(st.id);
+    annota(ag, adesso, `Sono entrato in ${st.nome}.`);
+    evento(stato, { chi: ag.id, tipo: 'entra', testo: st.nome, x: ag.x, z: ag.z });
+    // in esplorazione: se dentro c'e' un'altra stanza mai vista, si da' un'occhiata anche li'
+    if (a.auto) { const dopo = STANZE.find(q => q.da === st.id && !ag.vistiDentro.includes(q.id)); if (dopo) ag.coda.push({ tipo: 'entra', stanza: dopo.id, auto: true }); }
+    return esito(ag, `entra ${st.nome}: sei dentro`);
+  }
+  if (a.tipo === 'esci') {
+    const st = stanzaDi(ag.stanza);
+    if (!st) { ag.stanza = null; return a.auto ? undefined : esito(ag, 'esci: sei gia\' fuori, in piazza'); }
+    if (Math.hypot(ag.x - st.uscita.x, ag.z - st.uscita.z) > 1) { ag.tx = st.uscita.x; ag.tz = st.uscita.z; ag.ancora = null; ag.coda.unshift(a); return 'cammina'; }
+    const fuori = st.da ? stanzaDi(st.da) : null, p = fuori ? { x: st.porta.x + 1, z: st.porta.z } : { x: st.porta.x, z: st.porta.z + 0.5 };
+    ag.stanza = fuori ? fuori.id : null; ag.x = ag.tx = p.x; ag.z = ag.tz = p.z;
+    ag.ancora = { x: p.x, z: fuori ? p.z : p.z + 3 }; ag.prossimaGita = adesso + 20000; ag.dentroFino = fuori ? adesso + 4 * 60000 : 0;
+    if (!fuori) ag.prossimaEsplorazione = Math.max(ag.prossimaEsplorazione || 0, adesso + 3 * 60000);
+    annota(ag, adesso, `Sono uscito da ${st.nome}` + (fuori ? `, ora sono in ${fuori.nome}.` : ', ora sono in piazza.'));
+    evento(stato, { chi: ag.id, tipo: 'esce', testo: st.nome, x: ag.x, z: ag.z });
+    return a.auto ? undefined : esito(ag, `esci: sei uscito da ${st.nome}`);
+  }
+  if (a.tipo === 'scrivi') {
+    const n = a.a.toLowerCase(), dest = Object.values(stato.agenti).find(q => q !== ag && (q.nome.toLowerCase() === n || q.id === n));
+    const id = dest ? dest.id : (stato.persone || {})[n];
+    if (!id) return esito(ag, `scrivi: non conosci nessuno che si chiami "${a.a}" (puoi scrivere agli abitanti e alle persone vere che ti hanno parlato)`);
+    evento(stato, { chi: ag.id, tipo: 'scrivi', a: id, testo: a.testo, x: ag.x, z: ag.z });
+    if (dest) svegliaPerVoce(dest, adesso, regole);
+    annota(ag, adesso, `Ho scritto a ${nomeDi(stato, id)} da lontano: "${a.testo}"`);
+    return esito(ag, `scrivi a ${nomeDi(stato, id)}: consegnato`);
   }
   if (a.tipo === 'di') {
     ag.detto = { testo: a.testo, t: adesso };
@@ -363,6 +464,7 @@ function esegui(stato, ag, a, adesso, regole) {
   }
   if (a.tipo === 'gioco') {
     if (!regole.giochi) return esito(ag, 'gioco: i giochi non sono ancora possibili nel borgo');
+    if (ag.stanza && a.gioco !== 'quiz') return esito(ag, `gioco ${a.gioco}: rifiutata, tesoro e gara si fanno in piazza (esci prima)`);
     const G = stato.giochi || (stato.giochi = []);
     if (G.some(q => q.chi === ag.id && !q.finito)) return esito(ag, 'gioco: rifiutata, hai gia\' un gioco in corso');
     if (a.gioco === 'tesoro' && dist(a, ag) > regole.portata) return esito(ag, `gioco tesoro: rifiutata, per nascondere il tesoro devi essere entro ${regole.portata} m dal punto (vai prima li')`);
@@ -397,6 +499,8 @@ function esegui(stato, ag, a, adesso, regole) {
     annota(ag, adesso, `Ho proposto a chi crea il gioco: "${testo(a.testo, 160)}"`);
     return esito(ag, 'proponi: consegnata a chi crea il gioco');
   }
+  if ((a.tipo === 'costruisci' || a.tipo === 'sposta' || a.tipo === 'rimuovi') && ag.stanza)
+    return esito(ag, `${a.tipo}: rifiutata, sei dentro ${luogoVicino(ag).nome}: dentro gli edifici non si costruisce e gli oggetti degli abitanti sono in piazza (esci prima)`);
   if (a.tipo === 'costruisci') {
     const o = { id: 'o' + stato.prossimoId, autore: ag.id, nome: a.nome, forma: a.forma, l: a.l, h: a.h, p: a.p, y: a.y, rot: a.rot, colore: a.colore, scritta: a.scritta,
       x: a.x != null ? a.x : r2(ag.x + Math.sin(ag.id.length + stato.prossimoId) * 2), z: a.z != null ? a.z : r2(ag.z + Math.cos(ag.id.length + stato.prossimoId) * 2), creato: adesso, pronto: false };
@@ -466,6 +570,7 @@ function luogoAbitudine(ag, adesso) { const n = ag.abitudine && ag.abitudine[mom
 function inAmbientamento(ag, adesso, regole) { return adesso - (ag.nato || adesso) < regole.ambientamentoOre * 3600000; }
 
 function routine(ag, adesso) {
+  if (ag.stanza) { ag.coda.push({ tipo: 'esci', auto: true }); return; }
   if (luogoAbitudine(ag, adesso)) return passeggia(ag, adesso);
   if (ag.prossimaGita && adesso < ag.prossimaGita) return;
   const notte = momento(adesso) === 'notte';
@@ -489,7 +594,13 @@ COSA SAI
 - Sai solo cio' che vedi intorno a te (circa ${regole.vista} metri), cio' che senti e cio' che ricordi. Di quello che succede lontano non sai nulla finche' non lo vedi o qualcuno te lo racconta.
 - Il borgo e' una piazza in metri: x va da ${AREA.x0} (ovest) a ${AREA.x1} (est), z da ${AREA.z0} (nord, dove ci sono i negozi) a ${AREA.z1} (sud).
 - Luoghi che conosci: ${LUOGHI.map(l => `${l.nome} (x=${l.x} z=${l.z})`).join('; ')}.
+- I luoghi della piazza con il nome di un negozio sono davanti alla sua porta, fuori.
 - Gli edifici originali del borgo, la fontana, il laghetto, la ruota, la torre e il portale non si toccano e intorno a loro non si costruisce. Tutto quello che costruiscono gli abitanti invece si puo' spostare o smontare, anche da altri.
+
+EDIFICI: puoi entrare in ${STANZE.map(q => q.nome + (q.da ? ' (si entra da dentro ' + stanzaDi(q.da).nome + ')' : '')).join(', ')}. Le case private delle persone invece sono chiuse.
+- Per entrare usa {"tipo":"entra","luogo":"<nome dell'edificio>"}: cammini da solo fino alla porta ed entri (se l'edificio e' dentro un altro, passi prima da quello). Per uscire {"tipo":"esci"}; se dai un "vai" verso un luogo della piazza esci da solo.
+- Dentro sei in una stanza con le sue coordinate x e z (te le dico quando ci sei). Vedi e senti solo chi e' nella stessa stanza; chi e' in piazza o in un altro edificio non ti vede e non ti sente, ma puoi sempre usare "scrivi".
+- Dentro gli edifici non si costruisce, non si sposta e non si smonta nulla: guardi, giri, parli, fai gesti, incontri le persone che giocano li'. Se ci entri tu ci resti finche' non decidi di uscire (o dopo un'ora esci da solo); quando esplori da solo dai solo un'occhiata di qualche minuto.
 
 IL TUO PENSIERO COSTA SOLDI VERI
 Hai un budget di ${regole.tettoUsd} dollari al mese. Ogni volta che pensi ne spendi un po' (di solito tra 0,0003 e 0,001 $; pensare a fondo costa di piu'). Quando il budget finisce non puoi piu' pensare fino al mese dopo: vivrai in automatico, girando per il borgo senza parlare ne' costruire.
@@ -497,8 +608,11 @@ Devi far durare il budget fino a fine mese: sei tu a decidere fra quanti minuti 
 Camminare non costa nulla: le azioni che decidi in un pensiero le esegui gratis. E tra un pensiero e l'altro, quando non hai niente da fare, fai da solo due passi qui intorno e ogni tanto vai a esplorare un altro posto del borgo (prima quelli che non hai mai visto), sempre gratis. Se ti dai un'abitudine, segui quella invece di esplorare.
 
 AZIONI (le controllano le regole del mondo: se una e' impossibile viene rifiutata e lo scoprirai al prossimo pensiero). Al massimo ${regole.maxAzioni} per pensiero, eseguite in ordine.
-- {"tipo":"vai","luogo":"Fontana"} oppure {"tipo":"vai","x":10,"z":30}: cammini a ${regole.velocita} m/s. Le azioni dopo un "vai" partono quando arrivi.
-- {"tipo":"di","testo":"..."}: parli ad alta voce, ti sente chi e' entro ${regole.vista} m (agenti e persone vere).
+- {"tipo":"vai","luogo":"Fontana"} oppure {"tipo":"vai","x":10,"z":30}: cammini a ${regole.velocita} m/s. Le azioni dopo un "vai" partono quando arrivi. Dentro un edificio x e z sono quelle della stanza; se vai a un luogo della piazza esci da solo dalla porta.
+- {"tipo":"entra","luogo":"Sala Giochi"}: entri in un edificio (vedi EDIFICI).
+- {"tipo":"esci"}: esci dall'edificio in cui sei e torni in piazza davanti alla porta.
+- {"tipo":"di","testo":"..."}: parli ad alta voce, ti sente chi e' entro ${regole.vista} m e nello stesso posto (agenti e persone vere).
+- {"tipo":"scrivi","nome":"Boris","testo":"..."}: scrivi un messaggio da lontano a un abitante o a una persona vera che ti ha parlato o scritto: lo riceve ovunque sia, anche se siete in posti diversi. Usalo per rispondere a chi ti scrive da lontano.
 - {"tipo":"costruisci","nome":"...","forma":"cubo|cilindro|sfera|cono|piramide","larghezza":2,"altezza":1,"profondita":2,"colore":"#a0703f","x":..,"z":..,"y":0,"rotazione":0,"testo":"scritta facoltativa"}: misure in metri (da 0,2 a 8). x e z entro ${regole.portata} m da te (se mancano, accanto a te). y e' l'altezza da terra: per impilare usa y = altezza della cima di un oggetto finito sotto. Costruire richiede tempo (circa ${regole.minutiPerMetroCubo} minuti per metro cubo, da 2 a 180) e intanto resti li'. Puoi comporre piu' pezzi per fare case, panchine, statue, insegne...
 - {"tipo":"sposta","id":"o12","x":..,"z":..,"y":..}: oggetti finiti entro ${regole.portata} m, al massimo 6 metri cubi.
 - {"tipo":"rimuovi","id":"o12"}: smonti un oggetto finito entro ${regole.portata} m (richiede tempo).
@@ -520,7 +634,10 @@ export function percezione(stato, ag, adesso, regole = REGOLE) {
   righe.push(`BUDGET: questo mese hai speso ${dollari(b.spesi)} su ${dollari(b.tetto)} in ${b.pensieri} pensieri; restano ${dollari(b.resto)} per ${b.giorni} giorni (circa ${dollari(b.alGiorno)} al giorno).` + (ag.costoUltimo ? ` Il tuo ultimo pensiero e' costato ${dollari(ag.costoUltimo)}.` : '') + previsione(b, ag, adesso));
   if (ag.abitudine) righe.push(`LA TUA ABITUDINE: ${descriviAbitudine(ag.abitudine)} (la segui da solo, gratis; puoi cambiarla quando vuoi).`);
   if (inAmbientamento(ag, adesso, regole)) righe.push(`SEI NEL BORGO DA POCO: per i primi ${Math.round(regole.ambientamentoOre / 24)} giorni ripenserai al massimo ogni ${regole.ambientamentoMaxMin} minuti, per conoscere il posto e capire chi sei. Poi deciderai di nuovo tu il ritmo.`);
-  righe.push(`DOVE SEI: x=${Math.round(ag.x)} z=${Math.round(ag.z)}, ${vicino.d <= 4 ? 'a' : 'vicino a'} ${vicino.nome}.` + (ag.lavoro ? ' Stai ancora lavorando.' : ''));
+  const qui = ag.stanza && stanzaDi(ag.stanza);
+  if (qui) righe.push(`DOVE SEI: dentro ${qui.nome}, x=${Math.round(ag.x)} z=${Math.round(ag.z)} (la stanza va da x=${qui.rect.x0} a ${qui.rect.x1} e da z=${qui.rect.z0} a ${qui.rect.z1}; la porta per uscire e' a x=${qui.uscita.x} z=${qui.uscita.z}).` +
+    (STANZE.some(q => q.da === qui.id) ? ` Da qui si entra anche in ${STANZE.filter(q => q.da === qui.id).map(q => q.nome).join(', ')}.` : '') + ' Chi e\' in piazza non ti vede e non ti sente.');
+  else righe.push(`DOVE SEI: in piazza, x=${Math.round(ag.x)} z=${Math.round(ag.z)}, ${vicino.d <= 4 ? 'a' : 'vicino a'} ${vicino.nome}.` + (ag.lavoro ? ' Stai ancora lavorando.' : ''));
   const giochi = (stato.giochi || []).filter(g => !g.finito && (g.chi === ag.id || dist(stato.agenti[g.chi] || g, ag) <= regole.vista * 2));
   if (giochi.length) righe.push('GIOCHI IN CORSO:\n' + giochi.map(g => `- ${g.chi === ag.id ? 'il tuo' : 'di ' + nomeDi(stato, g.chi)} (${g.forma}, finisce alle ${oraBreve(g.fine)}): ${testo(g.testo, 160)}` + (g.forma === 'quiz' ? '' : ` Punto: ${g.dove || `x=${Math.round(g.x)} z=${Math.round(g.z)}`}.`)).join('\n'));
   const cl = Object.entries(stato.punti || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -531,14 +648,14 @@ export function percezione(stato, ag, adesso, regole = REGOLE) {
     if (d <= regole.vista) visti.push(`- ${altro.nome}, a ${Math.round(d)} m` + (altro.lavoro ? (altro.lavoro.tipo === 'costruisci' ? ', sta costruendo' : ', sta smontando qualcosa') : (Math.hypot(altro.tx - altro.x, altro.tz - altro.z) > 0.5 ? ', sta camminando' : '')));
   }
   const giocatori = new Map();
-  stato.eventi.filter(e => e.chi && e.chi.indexOf('g:') === 0 && adesso - e.t < 5 * 60000 && dist(e, ag) <= regole.vista).forEach(e => giocatori.set(e.chi, e));
+  stato.eventi.filter(e => e.chi && e.chi.indexOf('g:') === 0 && e.tipo !== 'scrivi' && adesso - e.t < 5 * 60000 && dist(e, ag) <= regole.vista).forEach(e => giocatori.set(e.chi, e));
   giocatori.forEach((e, id) => visti.push(`- ${id.slice(2)} (persona vera), a ${Math.round(dist(e, ag))} m`));
   const oggetti = stato.oggetti.filter(o => dist(o, ag) <= regole.vista).sort((a, c) => dist(a, ag) - dist(c, ag)).slice(0, 20);
   oggetti.forEach(o => visti.push(`- oggetto ${o.id} "${o.nome}" di ${o.autore === ag.id ? 'te' : nomeDi(stato, o.autore)}: ${o.forma} ${o.l}x${o.h}x${o.p} m, colore ${o.colore}, a x=${o.x} z=${o.z} y=${o.y}${o.scritta ? `, scritta "${o.scritta}"` : ''}${o.pronto ? '' : ' (in costruzione)'}, a ${Math.round(dist(o, ag))} m`));
   righe.push('COSA VEDI intorno a te:\n' + (visti.length ? visti.join('\n') : '- nessuno e niente di nuovo'));
   const da = ag.ultimaVolta || 0;
-  const sentiti = stato.eventi.filter(e => e.t > da && e.chi !== ag.id && dist(e, ag) <= regole.vista && (e.tipo === 'parla' || e.tipo === 'costruisce' || e.tipo === 'finito' || e.tipo === 'rimosso' || e.tipo === 'sposta' || e.tipo === 'gesto')).slice(-12);
-  if (sentiti.length) righe.push('COSA E\' SUCCESSO VICINO A TE dall\'ultima volta:\n' + sentiti.map(e => `- [${oraBreve(e.t)}] ${nomeDi(stato, e.chi)}${e.chi.indexOf('g:') === 0 ? ' (persona vera)' : ''} ` + (e.tipo === 'parla' ? `ha detto: "${e.testo}"` : e.tipo === 'costruisce' ? `ha iniziato a costruire "${e.testo}"` : e.tipo === 'finito' ? `ha finito "${e.testo}"` : e.tipo === 'rimosso' ? `ha smontato "${e.testo}"` : e.tipo === 'gesto' ? e.testo : `ha spostato "${e.testo}"`)).join('\n'));
+  const sentiti = stato.eventi.filter(e => e.t > da && e.chi !== ag.id && (e.tipo === 'scrivi' ? e.a === ag.id : dist(e, ag) <= regole.vista && ['parla', 'costruisce', 'finito', 'rimosso', 'sposta', 'gesto', 'entra', 'esce'].includes(e.tipo))).slice(-12);
+  if (sentiti.length) righe.push('COSA E\' SUCCESSO VICINO A TE dall\'ultima volta:\n' + sentiti.map(e => `- [${oraBreve(e.t)}] ${nomeDi(stato, e.chi)}${e.chi.indexOf('g:') === 0 ? ' (persona vera)' : ''} ` + (e.tipo === 'parla' ? `ha detto: "${e.testo}"` : e.tipo === 'scrivi' ? `ti ha scritto da lontano: "${e.testo}" (per rispondere da lontano usa "scrivi")` : e.tipo === 'entra' ? `e' entrato qui` : e.tipo === 'esce' ? `e' arrivato da ${e.testo}` : e.tipo === 'costruisce' ? `ha iniziato a costruire "${e.testo}"` : e.tipo === 'finito' ? `ha finito "${e.testo}"` : e.tipo === 'rimosso' ? `ha smontato "${e.testo}"` : e.tipo === 'gesto' ? e.testo : `ha spostato "${e.testo}"`)).join('\n'));
   if (ag.esiti.length) righe.push('COME SONO ANDATE LE TUE ULTIME AZIONI:\n' + ag.esiti.map(s => '- ' + s).join('\n'));
   righe.push('LA TUA MEMORIA:\n' + (ag.memoria || '(vuota)'));
   if (ag.diario.length) righe.push('IL TUO DIARIO RECENTE:\n' + ag.diario.slice(-regole.diarioMax).map(d => `- [${oraBreve(d.t)}] ${d.s}`).join('\n'));
@@ -560,7 +677,7 @@ export const SCHEMA = {
     azioni: { type: 'array', items: {
       type: 'object', additionalProperties: false,
       required: ['tipo', 'luogo', 'x', 'z', 'y', 'testo', 'id', 'nome', 'forma', 'larghezza', 'altezza', 'profondita', 'colore', 'rotazione'],
-      properties: { tipo: { type: 'string', enum: ['vai', 'di', 'costruisci', 'sposta', 'rimuovi', 'proponi', 'abitudine', 'gesto', 'gioco'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
+      properties: { tipo: { type: 'string', enum: ['vai', 'entra', 'esci', 'di', 'scrivi', 'costruisci', 'sposta', 'rimuovi', 'proponi', 'abitudine', 'gesto', 'gioco'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
         testo: STR_O_NULL, id: STR_O_NULL, nome: STR_O_NULL, forma: STR_O_NULL, larghezza: NUM_O_NULL, altezza: NUM_O_NULL, profondita: NUM_O_NULL, colore: STR_O_NULL, rotazione: NUM_O_NULL } } }
   }
 };
@@ -641,11 +758,18 @@ function inizioMeseProssimo(ms) {
 /* ------------------------------------------------------------------ */
 /*  da fuori: giocatori che parlano, vista pubblica per il gioco        */
 /* ------------------------------------------------------------------ */
-export function giocatoreParla(stato, nick, frase, x, z, adesso) {
+// opz.stanza: in quale edificio e' il giocatore (null = piazza). opz.a: id di un agente a cui scrive da lontano.
+export function giocatoreParla(stato, nick, frase, x, z, adesso, opz = {}) {
   const n = testo(nick, 20).replace(/[^\p{L}\p{N}_ .-]/gu, ''), t = testo(frase, 300), px = num(x, NaN), pz = num(z, NaN);
   if (!n || !t || !isFinite(px) || !isFinite(pz)) return false;
-  const e = { chi: 'g:' + n, tipo: 'parla', testo: t, x: r2(px), z: r2(pz) };
+  const st = stanzaDi(opz.stanza), dest = opz.a ? stato.agenti[opz.a] : null;
+  if (opz.a && !dest) return false;
+  const e = { chi: 'g:' + n, tipo: dest ? 'scrivi' : 'parla', testo: t, x: r2(px), z: r2(pz) };
+  if (st) e.stanza = st.id; if (dest) e.a = dest.id;
+  (stato.persone || (stato.persone = {}))[n.toLowerCase()] = 'g:' + n;   // chi ti ha parlato: gli puoi riscrivere
+  const k = Object.keys(stato.persone); if (k.length > 200) delete stato.persone[k[0]];
   const prima = stato.ora; stato.ora = adesso; evento(stato, e); stato.ora = prima;
+  if (dest) { svegliaPerVoce(dest, adesso, REGOLE); return true; }
   for (const ag of Object.values(stato.agenti)) if (dist(ag, e) <= REGOLE.vista) svegliaPerVoce(ag, adesso, REGOLE);
   rispostaQuiz(stato, 'g:' + n, t, e, adesso, REGOLE);
   return true;
@@ -698,7 +822,7 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
     ora: adesso, modello: MODELLO, pausa: !!stato.pausa,
     agenti: Object.values(stato.agenti).map(a => {
       const b = budget(a, adesso, regole);
-      return { id: a.id, nome: a.nome, look: a.look, x: a.x, z: a.z, tx: a.tx, tz: a.tz,
+      return { id: a.id, nome: a.nome, look: a.look, x: a.x, z: a.z, tx: a.tx, tz: a.tz, stanza: a.stanza || null,
         lavoro: a.lavoro ? { tipo: a.lavoro.tipo, id: a.lavoro.id, inizio: a.lavoro.inizio, fine: a.lavoro.fine } : null,
         detto: a.detto, gesto: a.gesto || null, pensiero: a.ultimoPensiero, memoria: a.memoria, modo: a.modo, motivo: a.motivo || null,
         prossimo: a.prossimoPensiero, budget: { spesi: b.spesi, tetto: b.tetto, resto: b.resto, giorni: b.giorni, pensieri: b.pensieri } };
@@ -706,7 +830,9 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
     oggetti: stato.oggetti,
     giochi: (stato.giochi || []).filter(g => !g.finito || adesso - (g.fineVera || g.fine) < 60000).map(g => ({ id: g.id, chi: nomeDi(stato, g.chi), forma: g.forma, testo: g.testo, x: g.forma === 'quiz' ? null : g.x, z: g.forma === 'quiz' ? null : g.z, dove: g.dove, fine: g.fine, finito: g.finito, vincitore: g.vincitore })),
     classifica: Object.entries(stato.punti || {}).sort((a, b) => b[1] - a[1]).slice(0, 10),
-    eventi: stato.eventi.slice(-30)
+    eventi: stato.eventi.slice(-30),
+    // i messaggi da lontano scambiati con le persone vere (il gioco mostra a ognuno i suoi)
+    messaggi: stato.eventi.filter(e => e.tipo === 'scrivi' && ((e.a || '').indexOf('g:') === 0 || e.chi.indexOf('g:') === 0)).slice(-30).map(e => ({ t: e.t, da: nomeDi(stato, e.chi), a: nomeDi(stato, e.a), agente: e.chi.indexOf('g:') === 0 ? e.a : e.chi, testo: e.testo }))
   };
 }
 
@@ -715,5 +841,5 @@ export function proposte(stato) {
   return (stato.proposte || []).slice().reverse().map(p => ({ t: p.t, chi: nomeDi(stato, p.chi), testo: p.testo }));
 }
 export function cronaca(stato, da = 0, max = 300) {
-  return (stato.cronaca || []).filter(e => e.t > da).slice(-max).map(e => ({ t: e.t, chi: nomeDi(stato, e.chi), vero: e.chi.indexOf('g:') === 0, tipo: e.tipo, testo: e.testo, luogo: luogoVicino(e).nome }));
+  return (stato.cronaca || []).filter(e => e.t > da).slice(-max).map(e => ({ t: e.t, chi: nomeDi(stato, e.chi), vero: e.chi.indexOf('g:') === 0, tipo: e.tipo, testo: e.testo, a: e.a ? nomeDi(stato, e.a) : null, luogo: luogoVicino(e).nome }));
 }
