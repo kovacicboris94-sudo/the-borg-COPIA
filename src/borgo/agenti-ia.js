@@ -14,7 +14,7 @@
 (function () {
   'use strict';
   const B = window.B3, T = B.T, G = window.Gioco, PI = Math.PI;
-  const URL_PREDEFINITO = '';
+  const URL_PREDEFINITO = 'https://borgo-agenti.kovacic-boris-94.workers.dev';
   const CHIAVE = 'borg_agenti_url', VISTA = 20, VEL = 1.3;
 
   function indirizzo() {
