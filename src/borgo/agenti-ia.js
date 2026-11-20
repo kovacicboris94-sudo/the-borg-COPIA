@@ -289,11 +289,38 @@
     l.forEach(m => {
       if (m.t <= visto || String(m.a).toLowerCase() !== io || !A.agenti.has(m.agente)) return;
       visto = m.t;
-      if (G.aggiungiVoce) G.aggiungiVoce({ id: 'agente:' + m.agente, nick: m.da + ' 🤖 ✉️', testo: m.testo, ora: new Date().toTimeString().slice(0, 5), io: false });
-      if (G.emetti) G.emetti('toast', '✉️ ' + m.da + ' ti ha scritto');
+      // arriva nei messaggi privati, come quelli di un amico
+      const id = 'agente:' + m.agente, c = G.conversazione(id);
+      c.msgs.push({ da: id, testo: m.testo, ora: new Date().toTimeString().slice(0, 5), quando: Date.now() });
+      if (G.stato.dmAperto !== id) { c.nonLetti++; G.emetti('toast', '✉️ ' + m.da + ' ti ha scritto'); }
+      G.emetti('dm', { id });
     });
     A.msgVisto = visto; try { localStorage.setItem('borg_agenti_msg', String(visto)); } catch (e) { /* niente */ }
   }
+  // Ada e Teo tra gli amici: scheda, posizione e messaggi privati (che arrivano davvero, ovunque siano)
+  const nomeDove = s => !s ? 'Nel borgo' : s.stanza === 'tetto' ? 'Sul tetto della Torre' : s.stanza ? 'In ' + (({ negozio: 'Negozio TCG', tcg: 'Sala TCG' })[s.stanza] || (app && app.stanze[s.stanza] || {}).nome || s.stanza) : 'In piazza';
+  B.amiciAgenti = () => (A.dati ? A.dati.agenti : []).map(s => G.utente('agente:' + s.id));
+  const utenteOrig = G.utente;
+  G.utente = function (id) {
+    if (typeof id !== 'string' || id.indexOf('agente:') !== 0) return utenteOrig(id);
+    const s = A.dati && A.dati.agenti.find(a => a.id === id.slice(7)), nick = s ? s.nome : id.slice(7);
+    return { id, nick, look: (s && s.look) || {}, online: true, amico: true, agente: true, dove: nomeDove(s),
+      bio: 'Agente IA che vive nel borgo. Scrivigli: legge i messaggi ovunque sia e ti risponde qui (ogni risposta gli costa un po\' di budget).' };
+  };
+  const inviaOrig = G.inviaDM;
+  G.inviaDM = function (id, t) {
+    if (typeof id !== 'string' || id.indexOf('agente:') !== 0) return inviaOrig(id, t);
+    if (!mioNick()) { G.emetti('toast', 'Prima scegli il tuo nome'); return false; }
+    t = G.controllaMessaggio(t, 'dm', 300); if (!t) return false;
+    const c = G.conversazione(id), m = { da: 'io', testo: t, ora: new Date().toTimeString().slice(0, 5), quando: Date.now(), stato: 'inviato' };
+    c.msgs.push(m); G.emetti('dm', { id });
+    fetch(A.url + '/parla', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nick: mioNick(), testo: t, a: id.slice(7), x: app ? app.io.x : 0, z: app ? app.io.z : 0, stanza: app ? doveIo() : null }) })
+      .then(r => { if (r.status === 429) throw new Error('piano'); return r.json(); })
+      .then(j => { if (!j.ok) throw new Error('no'); m.stato = 'letto'; G.emetti('dm', { id }); })
+      .catch(e => { m.testo += e.message === 'piano' ? '  ⚠️ non inviato: aspetta qualche secondo' : '  ⚠️ non inviato, riprova'; delete m.stato; G.emetti('dm', { id }); });
+    return true;
+  };
+
   async function scriviDaLontano() {
     const el = A.scheda; if (!el) return;
     const inp = el.querySelector('.ag-testo'), nota = el.querySelector('.ag-nota'), testo = inp.value.trim().slice(0, 300), id = el.dataset.id;

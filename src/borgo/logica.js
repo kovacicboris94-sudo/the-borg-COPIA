@@ -132,7 +132,7 @@
     tSalvaDM = setTimeout(() => {
       try {
         const o = {};
-        Object.keys(stato.dm).filter(id => id.indexOf('amico:') === 0 && stato.dm[id].msgs.length).slice(-30)
+        Object.keys(stato.dm).filter(id => (id.indexOf('amico:') === 0 || id.indexOf('agente:') === 0) && stato.dm[id].msgs.length).slice(-30)
           .forEach(id => { o[id] = { msgs: stato.dm[id].msgs.slice(-100), nonLetti: stato.dm[id].nonLetti }; });
         localStorage.setItem(CHIAVE_DM, JSON.stringify(o));
       } catch (e) { /* storage non disponibile */ }
@@ -142,7 +142,7 @@
     try {
       const o = JSON.parse(localStorage.getItem(CHIAVE_DM) || '{}');
       Object.keys(o).forEach(id => {
-        if (id.indexOf('amico:') !== 0 || !o[id] || !Array.isArray(o[id].msgs)) return;
+        if ((id.indexOf('amico:') !== 0 && id.indexOf('agente:') !== 0) || !o[id] || !Array.isArray(o[id].msgs)) return;
         stato.dm[id] = { msgs: o[id].msgs.filter(m => m && typeof m.testo === 'string').slice(-100), nonLetti: Math.max(0, +o[id].nonLetti || 0) };
       });
     } catch (e) { /* niente */ }

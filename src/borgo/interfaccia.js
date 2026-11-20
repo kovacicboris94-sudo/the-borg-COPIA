@@ -360,11 +360,13 @@
     idFoglio = id; lookFoglio = u.look;
     $('#foglio-nick').textContent = u.nick; $('#foglio-bio').textContent = u.bio;
     $('#foglio-dove').textContent = u.dove || (u.online ? 'In piazza' : 'Non in linea');
-    $('#foglio-tipo').textContent = u.amico ? 'Amico vero' : 'Utente dimostrativo';
-    $('#foglio-amico').hidden = !u.amico;
+    $('#foglio-tipo').textContent = u.agente ? 'Agente IA 🤖' : u.amico ? 'Amico vero' : 'Utente dimostrativo';
+    $('#foglio-amico').hidden = !u.amico || !!u.agente;
     $('#foglio-dm').hidden = !u.amico;   // ai bot non si scrivono messaggi privati
-    $('#foglio-sussurra').hidden = G.stato.bloccati.has(id) || !u.online;
+    $('#foglio-sussurra').hidden = G.stato.bloccati.has(id) || !u.online || !!u.agente;
     aggiornaBottoneBlocco();
+    $('#foglio-segnala').parentNode.hidden = !!u.agente;   // gli agenti IA non si segnalano né si bloccano
+    $('#foglio .nota-piccola').hidden = !!u.agente;
     $('#foglio').hidden = false;
   }
   function chiudiFoglio() { $('#foglio').hidden = true; idFoglio = null; lookFoglio = null; }
@@ -424,6 +426,15 @@
   /* ---------- amici (utenti dimostrativi) ---------- */
   function aggiornaAmici() {
     const box = $('#amici-lista'); box.innerHTML = '';
+    // gli agenti IA del borgo (Ada, Teo...) in cima: dalla loro scheda gli scrivi in privato
+    (B.amiciAgenti ? B.amiciAgenti() : []).forEach(u => {
+      const b = el('div', 'amico'); b.setAttribute('role', 'button'); b.tabIndex = 0;
+      const cv = el('canvas', 'mini-avatar'); cv.width = 88; cv.height = 104; disegnaMini(cv, u.look);
+      const t = el('div', 'amico-testo'), nome = el('div', 'amico-nome', u.nick + ' 🤖');
+      nome.prepend(el('span', 'stato-pt')); t.append(nome, el('div', 'amico-bio', u.dove + ' · ' + u.bio));
+      b.addEventListener('click', () => apriFoglio(u.id));
+      b.append(cv, t); box.append(b);
+    });
     CFG.utentiDemo.filter(u => !u.extra).forEach(u => {
       const bloccato = G.stato.bloccati.has(u.id);
       const b = el('div', 'amico'); b.setAttribute('role', 'button'); b.tabIndex = 0;
