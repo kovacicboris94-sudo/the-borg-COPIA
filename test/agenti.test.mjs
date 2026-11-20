@@ -189,6 +189,14 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   ok(normalizzaAzione({ tipo: 'abitudine', testo: 'mattina: Luna' }).errore && normalizzaAzione({ tipo: 'abitudine', testo: 'nessuna' }).abitudine === null, 'luoghi controllati, si puo\' togliere');
 }
 
+// 13) gesti: saluta, salta... visibili nel gioco, sentiti da chi e' vicino, non nella cronaca
+{
+  const s = nuovoStato(T0), c = finto(risp([{ tipo: 'gesto', testo: 'salta' }, { tipo: 'gesto', testo: 'vola' }]));
+  await passo(s, T0 + 20000, c); await passo(s, T0 + 50000, c);
+  ok(s.agenti.ada.gesto && s.agenti.ada.gesto.tipo === 'salta' && vistaPubblica(s, T0 + 50000).agenti[0].gesto.tipo === 'salta', 'gesto fatto e visibile');
+  ok(!s.cronaca.some(e => e.tipo === 'gesto') && s.agenti.ada.esiti.some(x => /gesto: usa uno di/.test(x)), 'non in cronaca; gesto sconosciuto rifiutato');
+}
+
 // 9) pezzi piccoli
 ok(normalizzaAzione({ tipo: 'vai', luogo: 'fontana' }).x === 0, 'luogo per nome');
 ok(normalizzaAzione({ tipo: 'vola' }).errore, 'azione sconosciuta');

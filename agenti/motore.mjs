@@ -47,6 +47,8 @@ export const REGOLE = {
 
 // La piazza del borgo (stesse misure del gioco, src/borgo/base.js e piazza.js).
 export const AREA = { x0: -52, x1: 52, z0: -4, z1: 70 };
+// gesti che il corpo sa fare (li disegna il gioco): costano niente, sono parte delle azioni di un pensiero
+export const GESTI = { saluta: 'alza la mano e saluta', salta: 'salta con le braccia in alto', balla: 'balla', ridi: 'ride', applaudi: 'applaude' };
 export const LUOGHI = [
   { nome: 'Fontana', x: 0, z: 30 },
   { nome: 'Belvedere', x: 0, z: 54 },
@@ -153,6 +155,7 @@ function evento(stato, e) {
   stato.eventi.push(v);
   if (stato.eventi.length > REGOLE.eventiMax) stato.eventi.splice(0, stato.eventi.length - REGOLE.eventiMax);
   // la cronaca del borgo: tutto quello che si dicono e fanno, da leggere quando torni
+  if (e.tipo === 'gesto') return;   // i gesti non finiscono nella cronaca
   const c = stato.cronaca || (stato.cronaca = []);
   c.push(v); if (c.length > REGOLE.cronacaMax) c.splice(0, c.length - REGOLE.cronacaMax);
 }
@@ -205,6 +208,10 @@ export function normalizzaAzione(a) {
     return { tipo, id: String(a.id), x: r2(x), z: r2(z), y: a.y == null ? null : r2(lim(num(a.y, 0), 0, 12)) };
   }
   if (tipo === 'rimuovi') return a.id ? { tipo, id: String(a.id) } : { errore: 'rimuovi: serve l\'id' };
+  if (tipo === 'gesto') {
+    const g = String(a.testo || a.nome || '').toLowerCase().trim();
+    return GESTI[g] ? { tipo, gesto: g } : { errore: 'gesto: usa uno di ' + Object.keys(GESTI).join(', ') };
+  }
   if (tipo === 'abitudine') {
     const t = String(a.testo || '').trim();
     if (/^(nessuna|niente|cancella|basta)\b/i.test(t)) return { tipo, abitudine: null };
@@ -321,6 +328,11 @@ function esegui(stato, ag, a, adesso, regole) {
     // chi e' vicino lo sente: puo' svegliarsi prima
     for (const altro of Object.values(stato.agenti)) if (altro !== ag && dist(altro, ag) <= regole.vista) svegliaPerVoce(altro, adesso, regole);
     return;
+  }
+  if (a.tipo === 'gesto') {
+    ag.gesto = { tipo: a.gesto, t: adesso };
+    evento(stato, { chi: ag.id, tipo: 'gesto', testo: GESTI[a.gesto], x: ag.x, z: ag.z });
+    return esito(ag, 'gesto ' + a.gesto + ': fatto');
   }
   if (a.tipo === 'abitudine') {
     ag.abitudine = a.abitudine; ag.prossimaGita = 0; ag.ancora = null;
@@ -439,6 +451,7 @@ AZIONI (le controllano le regole del mondo: se una e' impossibile viene rifiutat
 - {"tipo":"costruisci","nome":"...","forma":"cubo|cilindro|sfera|cono|piramide","larghezza":2,"altezza":1,"profondita":2,"colore":"#a0703f","x":..,"z":..,"y":0,"rotazione":0,"testo":"scritta facoltativa"}: misure in metri (da 0,2 a 8). x e z entro ${regole.portata} m da te (se mancano, accanto a te). y e' l'altezza da terra: per impilare usa y = altezza della cima di un oggetto finito sotto. Costruire richiede tempo (circa ${regole.minutiPerMetroCubo} minuti per metro cubo, da 2 a 180) e intanto resti li'. Puoi comporre piu' pezzi per fare case, panchine, statue, insegne...
 - {"tipo":"sposta","id":"o12","x":..,"z":..,"y":..}: oggetti finiti entro ${regole.portata} m, al massimo 6 metri cubi.
 - {"tipo":"rimuovi","id":"o12"}: smonti un oggetto finito entro ${regole.portata} m (richiede tempo).
+- {"tipo":"gesto","testo":"saluta"}: un gesto del corpo, visibile a chi e' vicino: ${Object.keys(GESTI).join(', ')}. Dura qualche secondo.
 - {"tipo":"abitudine","testo":"mattina: Fontana; pomeriggio: Mercatino; sera: Laghetto; notte: Fontana"}: ti dai una routine con i luoghi che conosci. Da quel momento ci vai da solo a ogni momento della giornata, senza pensarci e gratis, finche' non la cambi (o scrivi "nessuna" per toglierla). Le azioni che decidi pensando vengono sempre prima dell'abitudine.
 - {"tipo":"proponi","testo":"..."}: il borgo e' un gioco fatto da persone. Tu non puoi cambiarne il codice, gli edifici originali o i minigiochi, ma puoi proporre a chi lo crea un miglioramento o un'idea (al massimo ${regole.proposteAlGiorno} al giorno). La legge una persona e decide lei; non saprai subito se l'ha accettata.
 
@@ -468,8 +481,8 @@ export function percezione(stato, ag, adesso, regole = REGOLE) {
   oggetti.forEach(o => visti.push(`- oggetto ${o.id} "${o.nome}" di ${o.autore === ag.id ? 'te' : nomeDi(stato, o.autore)}: ${o.forma} ${o.l}x${o.h}x${o.p} m, colore ${o.colore}, a x=${o.x} z=${o.z} y=${o.y}${o.scritta ? `, scritta "${o.scritta}"` : ''}${o.pronto ? '' : ' (in costruzione)'}, a ${Math.round(dist(o, ag))} m`));
   righe.push('COSA VEDI intorno a te:\n' + (visti.length ? visti.join('\n') : '- nessuno e niente di nuovo'));
   const da = ag.ultimaVolta || 0;
-  const sentiti = stato.eventi.filter(e => e.t > da && e.chi !== ag.id && dist(e, ag) <= regole.vista && (e.tipo === 'parla' || e.tipo === 'costruisce' || e.tipo === 'finito' || e.tipo === 'rimosso' || e.tipo === 'sposta')).slice(-12);
-  if (sentiti.length) righe.push('COSA E\' SUCCESSO VICINO A TE dall\'ultima volta:\n' + sentiti.map(e => `- [${oraBreve(e.t)}] ${nomeDi(stato, e.chi)}${e.chi.indexOf('g:') === 0 ? ' (persona vera)' : ''} ` + (e.tipo === 'parla' ? `ha detto: "${e.testo}"` : e.tipo === 'costruisce' ? `ha iniziato a costruire "${e.testo}"` : e.tipo === 'finito' ? `ha finito "${e.testo}"` : e.tipo === 'rimosso' ? `ha smontato "${e.testo}"` : `ha spostato "${e.testo}"`)).join('\n'));
+  const sentiti = stato.eventi.filter(e => e.t > da && e.chi !== ag.id && dist(e, ag) <= regole.vista && (e.tipo === 'parla' || e.tipo === 'costruisce' || e.tipo === 'finito' || e.tipo === 'rimosso' || e.tipo === 'sposta' || e.tipo === 'gesto')).slice(-12);
+  if (sentiti.length) righe.push('COSA E\' SUCCESSO VICINO A TE dall\'ultima volta:\n' + sentiti.map(e => `- [${oraBreve(e.t)}] ${nomeDi(stato, e.chi)}${e.chi.indexOf('g:') === 0 ? ' (persona vera)' : ''} ` + (e.tipo === 'parla' ? `ha detto: "${e.testo}"` : e.tipo === 'costruisce' ? `ha iniziato a costruire "${e.testo}"` : e.tipo === 'finito' ? `ha finito "${e.testo}"` : e.tipo === 'rimosso' ? `ha smontato "${e.testo}"` : e.tipo === 'gesto' ? e.testo : `ha spostato "${e.testo}"`)).join('\n'));
   if (ag.esiti.length) righe.push('COME SONO ANDATE LE TUE ULTIME AZIONI:\n' + ag.esiti.map(s => '- ' + s).join('\n'));
   righe.push('LA TUA MEMORIA:\n' + (ag.memoria || '(vuota)'));
   if (ag.diario.length) righe.push('IL TUO DIARIO RECENTE:\n' + ag.diario.slice(-regole.diarioMax).map(d => `- [${oraBreve(d.t)}] ${d.s}`).join('\n'));
@@ -491,7 +504,7 @@ export const SCHEMA = {
     azioni: { type: 'array', items: {
       type: 'object', additionalProperties: false,
       required: ['tipo', 'luogo', 'x', 'z', 'y', 'testo', 'id', 'nome', 'forma', 'larghezza', 'altezza', 'profondita', 'colore', 'rotazione'],
-      properties: { tipo: { type: 'string', enum: ['vai', 'di', 'costruisci', 'sposta', 'rimuovi', 'proponi', 'abitudine'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
+      properties: { tipo: { type: 'string', enum: ['vai', 'di', 'costruisci', 'sposta', 'rimuovi', 'proponi', 'abitudine', 'gesto'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
         testo: STR_O_NULL, id: STR_O_NULL, nome: STR_O_NULL, forma: STR_O_NULL, larghezza: NUM_O_NULL, altezza: NUM_O_NULL, profondita: NUM_O_NULL, colore: STR_O_NULL, rotazione: NUM_O_NULL } } }
   }
 };
@@ -588,7 +601,7 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
       const b = budget(a, adesso, regole);
       return { id: a.id, nome: a.nome, look: a.look, x: a.x, z: a.z, tx: a.tx, tz: a.tz,
         lavoro: a.lavoro ? { tipo: a.lavoro.tipo, id: a.lavoro.id, inizio: a.lavoro.inizio, fine: a.lavoro.fine } : null,
-        detto: a.detto, pensiero: a.ultimoPensiero, memoria: a.memoria, modo: a.modo, motivo: a.motivo || null,
+        detto: a.detto, gesto: a.gesto || null, pensiero: a.ultimoPensiero, memoria: a.memoria, modo: a.modo, motivo: a.motivo || null,
         prossimo: a.prossimoPensiero, budget: { spesi: b.spesi, tetto: b.tetto, resto: b.resto, giorni: b.giorni, pensieri: b.pensieri } };
     }),
     oggetti: stato.oggetti,
