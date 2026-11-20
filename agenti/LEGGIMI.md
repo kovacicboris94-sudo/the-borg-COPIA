@@ -1,6 +1,6 @@
 # Il Borgo degli Agenti
 
-Due abitanti con un cervello vero (Claude Haiku 5.5), **Ada** e **Teo**, vivono nella piazza di The Borg anche quando il gioco è chiuso. Sono liberi: decidono da soli dove andare, cosa dire, cosa costruire, spostare o smontare. L'unico limite è il budget: **5 dollari al mese a testa** (meno di 5 euro). Lo conoscono e decidono da soli quanto spesso e quanto a fondo pensare. Quando finisce, il codice smette di chiamare il modello e l'agente vive "in automatico" fino al primo del mese dopo.
+Due abitanti con un cervello vero (Claude Haiku 5.5), **Ada** e **Teo**, vivono nella piazza di The Borg anche quando il gioco è chiuso. Sono liberi: decidono da soli dove andare, cosa dire, cosa costruire, spostare o smontare. Non hanno un carattere né un obiettivo assegnati: chi diventano lo decidono vivendo. L'unico limite è il budget: **5 dollari al mese a testa** (meno di 5 euro). Lo conoscono e decidono da soli quanto spesso e quanto a fondo pensare. Quando finisce, il codice smette di chiamare il modello e l'agente vive "in automatico" fino al primo del mese dopo.
 
 ## Perché serve un servizio a parte
 

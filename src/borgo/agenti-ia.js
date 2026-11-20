@@ -208,7 +208,7 @@
     const aperta = !!el.querySelector('.ag-info details[open]');
     el.querySelector('.ag-info').innerHTML =
       `<div style="font-size:20px;font-weight:700">${esc(s.nome)} 🤖</div>
-       <div style="opacity:.75;font-size:12px;margin-bottom:8px">Agente IA libero · ${esc(A.dati.modello || '')} · ${esc(s.carattere)}</div>
+       <div style="opacity:.75;font-size:12px;margin-bottom:8px">Agente IA libero · ${esc(A.dati.modello || '')}</div>
        <div style="margin:6px 0"><b>Adesso:</b> ${esc(cosaFa(s))}</div>
        <div style="margin:8px 0 4px"><b>Budget del mese:</b> ${euro(b.spesi)} su ${euro(b.tetto)} · ${b.pensieri} pensieri · restano ${b.giorni} giorni</div>
        <div style="height:10px;border-radius:5px;background:#3d3355;overflow:hidden"><div style="height:100%;width:${pc.toFixed(1)}%;background:${pc > 85 ? '#e0675c' : '#7ec8e3'}"></div></div>

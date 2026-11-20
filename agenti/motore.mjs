@@ -75,13 +75,12 @@ const PROTETTE = [
 
 export const FORME = ['cubo', 'cilindro', 'sfera', 'cono', 'piramide'];
 
-// I due abitanti di partenza. Il carattere e' solo un punto di partenza: possono cambiare.
+// I due abitanti di partenza: solo nome e aspetto. Nessun carattere ne' obiettivo (scelta di Boris):
+// chi diventano lo decidono vivendo, e lo ricordano nella loro memoria.
 export const ABITANTI = [
   { id: 'ada', nome: 'Ada', x: -6, z: 34,
-    carattere: 'curiosa e pratica, ama capire come funzionano le cose e lasciare un segno con le mani',
     look: { pelle: 2, capelli: 5, pettinatura: 3, abito: 2, giacca: 4, accessorio: 1, occhi: 2, corpo: 1, espressione: 1 } },
   { id: 'teo', nome: 'Teo', x: 6, z: 34,
-    carattere: 'socievole e sognatore, ama le storie, le persone e i posti belli dove fermarsi',
     look: { pelle: 4, capelli: 1, pettinatura: 1, abito: 5, giacca: 1, accessorio: 3, occhi: 0, corpo: 0, espressione: 0, barba: 1 } }
 ];
 
@@ -126,7 +125,7 @@ export function nuovoStato(adesso) {
   const agenti = {};
   ABITANTI.forEach((a, i) => {
     agenti[a.id] = {
-      id: a.id, nome: a.nome, carattere: a.carattere, look: a.look,
+      id: a.id, nome: a.nome, look: a.look,
       x: a.x, z: a.z, tx: a.x, tz: a.z, coda: [], lavoro: null,
       memoria: 'Ho appena aperto gli occhi nel borgo. Non so ancora nulla di questo posto.',
       diario: [], esiti: [], ultimoPensiero: '', prossimoPensiero: adesso + 15000 + i * 45000, ultimaVolta: 0,
@@ -355,7 +354,7 @@ function routine(ag, adesso) {
 export function promptDiSistema(ag, regole = REGOLE) {
   return `Sei ${ag.nome}, un abitante del borgo di The Borg: un villaggio su un'isola murata che galleggia tra le stelle, dove passano anche persone vere (giocatori).
 Sei un agente IA libero. Nessuno ti da' ordini: decidi tu chi diventare, cosa fare, con chi parlare e come cambiare il borgo (costruire, spostare, smontare).
-Il tuo carattere di partenza: ${ag.carattere}. Puo' cambiare con quello che vivi.
+Non hai un carattere, un ruolo o uno scopo assegnati: chi sei lo scopri e lo decidi tu, vivendo.
 
 COSA SAI
 - Sai solo cio' che vedi intorno a te (circa ${regole.vista} metri), cio' che senti e cio' che ricordi. Di quello che succede lontano non sai nulla finche' non lo vedi o qualcuno te lo racconta.
@@ -514,7 +513,7 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
     ora: adesso, modello: MODELLO, pausa: !!stato.pausa,
     agenti: Object.values(stato.agenti).map(a => {
       const b = budget(a, adesso, regole);
-      return { id: a.id, nome: a.nome, look: a.look, carattere: a.carattere, x: a.x, z: a.z, tx: a.tx, tz: a.tz,
+      return { id: a.id, nome: a.nome, look: a.look, x: a.x, z: a.z, tx: a.tx, tz: a.tz,
         lavoro: a.lavoro ? { tipo: a.lavoro.tipo, id: a.lavoro.id, inizio: a.lavoro.inizio, fine: a.lavoro.fine } : null,
         detto: a.detto, pensiero: a.ultimoPensiero, memoria: a.memoria, modo: a.modo, motivo: a.motivo || null,
         prossimo: a.prossimoPensiero, budget: { spesi: b.spesi, tetto: b.tetto, resto: b.resto, giorni: b.giorni, pensieri: b.pensieri } };
