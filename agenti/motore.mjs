@@ -42,7 +42,9 @@ export const REGOLE = {
   proposteAlGiorno: 3,        // idee per migliorare il gioco, per agente
   proposteMax: 200,
   ambientamentoOre: 48,       // i primi 2 giorni nel borgo: si pensa piu' spesso per capire chi si e'
-  ambientamentoMaxMin: 3
+  ambientamentoMaxMin: 3,
+  giochi: false,              // i giochi inventati dagli agenti (quiz, tesoro, gara): accesi solo quando Boris dice si'
+  giocoMin: 10                // quanto dura un gioco inventato da un agente (quiz, tesoro, gara)
 };
 
 // La piazza del borgo (stesse misure del gioco, src/borgo/base.js e piazza.js).
@@ -208,6 +210,17 @@ export function normalizzaAzione(a) {
     return { tipo, id: String(a.id), x: r2(x), z: r2(z), y: a.y == null ? null : r2(lim(num(a.y, 0), 0, 12)) };
   }
   if (tipo === 'rimuovi') return a.id ? { tipo, id: String(a.id) } : { errore: 'rimuovi: serve l\'id' };
+  if (tipo === 'gioco') {
+    const g = String(a.forma || '').toLowerCase().trim(), t = testo(a.testo, 300);
+    if (!['quiz', 'tesoro', 'gara'].includes(g)) return { errore: 'gioco: in "forma" metti quiz, tesoro oppure gara' };
+    if (!t) return { errore: 'gioco: serve il testo (la domanda o l\'annuncio)' };
+    if (g === 'quiz') { const r = testo(a.nome, 60); return r ? { tipo, gioco: g, testo: t, risposta: r } : { errore: 'gioco quiz: metti la risposta giusta in "nome" (nessuno la vede)' }; }
+    let x = NaN, z = NaN, dove = null;
+    if (a.luogo) { const l = LUOGHI.find(q => q.nome.toLowerCase() === String(a.luogo).toLowerCase().trim()); if (l) { x = l.x; z = l.z; dove = l.nome; } }
+    if (!isFinite(x)) { x = num(a.x, NaN); z = num(a.z, NaN); }
+    if (!isFinite(x) || !isFinite(z)) return { errore: 'gioco ' + g + ': serve un luogo conosciuto oppure x e z' };
+    return { tipo, gioco: g, testo: t, x: r2(lim(x, AREA.x0, AREA.x1)), z: r2(lim(z, AREA.z0, AREA.z1)), dove };
+  }
   if (tipo === 'gesto') {
     const g = String(a.testo || a.nome || '').toLowerCase().trim();
     return GESTI[g] ? { tipo, gesto: g } : { errore: 'gesto: usa uno di ' + Object.keys(GESTI).join(', ') };
@@ -268,6 +281,7 @@ export async function passo(stato, adesso, cervello, opz = {}) {
 
   // 1) il tempo scorre: si cammina, si costruisce, si eseguono le azioni in coda
   for (const ag of agenti) avanza(stato, ag, dt, adesso, regole);
+  controllaGiochi(stato, adesso, regole);
 
   // 2) chi deve pensare pensa (uno alla volta, cosi' le azioni sono sfalsate)
   const pronti = agenti.filter(a => a.prossimoPensiero <= adesso).sort((a, b) => a.prossimoPensiero - b.prossimoPensiero);
@@ -283,6 +297,7 @@ function avanza(stato, ag, dt, adesso, regole) {
   if (ag.lavoro) {
     if (adesso < ag.lavoro.fine) return;
     const L = ag.lavoro; ag.lavoro = null;
+    ag.prossimaEsplorazione = Math.max(ag.prossimaEsplorazione || 0, adesso + 15 * 60000);   // si resta un po' vicino a quello che si e' fatto
     const o = stato.oggetti.find(q => q.id === L.id);
     if (L.tipo === 'costruisci' && o) { o.pronto = true; esito(ag, `costruisci "${o.nome}" (${o.id}): finito`); annota(ag, adesso, `Ho finito di costruire "${o.nome}" (${o.id}).`); evento(stato, { chi: ag.id, tipo: 'finito', testo: o.nome, x: o.x, z: o.z }); }
     if (L.tipo === 'rimuovi') { const i = stato.oggetti.findIndex(q => q.id === L.id); if (i >= 0) { const q = stato.oggetti[i]; stato.oggetti.splice(i, 1); esito(ag, `rimuovi ${q.id} "${q.nome}": fatto`); annota(ag, adesso, `Ho smontato "${q.nome}" di ${nomeDi(stato, q.autore)}.`); evento(stato, { chi: ag.id, tipo: 'rimosso', testo: q.nome, x: q.x, z: q.z }); } }
@@ -304,8 +319,24 @@ function passeggia(ag, adesso) {
   const l = adesso >= (ag.abitudineDopo || 0) ? luogoAbitudine(ag, adesso) : null;
   if (l && (!ag.ancora || Math.hypot(ag.ancora.x - l.x, ag.ancora.z - l.z) > 4)) { ag.ancora = { x: l.x, z: l.z + 3 }; ag.tx = ag.ancora.x; ag.tz = ag.ancora.z; ag.meta = l.nome; ag.prossimaGita = adesso + 3 * 60000; return; }
   if (!ag.ancora) ag.ancora = { x: ag.x, z: ag.z };
+  // arrivato in esplorazione: se lo segna, cosi' al prossimo pensiero sa che posto e'
+  if (ag.esplora && ag.ancora && Math.hypot(ag.x - ag.ancora.x, ag.z - ag.ancora.z) < 1) {
+    (ag.visti || (ag.visti = [])).includes(ag.esplora) || ag.visti.push(ag.esplora);
+    annota(ag, adesso, `Facendo un giro sono arrivato a ${ag.esplora}.`); ag.esplora = null;
+  }
   if (ag.prossimaGita && adesso < ag.prossimaGita) return;
   const notte = momento(adesso) === 'notte', a = adesso / 9e4 + ag.id.charCodeAt(0), r = 2 + (Math.sin(a * 3.7) + 1) * 2.5;
+  // ogni tanto si va a esplorare un altro posto del borgo (prima quelli mai visti), sempre gratis
+  if (!notte && !ag.abitudine && adesso >= (ag.abitudineDopo || 0) && adesso >= (ag.prossimaEsplorazione || 0)) {
+    const qui = luogoVicino(ag).nome, visti = ag.visti || [];
+    const scelta = LUOGHI.filter(l => l.nome !== qui && !visti.includes(l.nome));
+    const lista = scelta.length ? scelta : LUOGHI.filter(l => l.nome !== qui);
+    const l = lista[Math.floor((Math.sin(adesso / 7e4 + ag.id.charCodeAt(0) * 3.3) + 1) / 2 * lista.length) % lista.length];
+    ag.ancora = { x: l.x, z: lim(l.z + 3, AREA.z0, AREA.z1) }; ag.tx = ag.ancora.x; ag.tz = ag.ancora.z; ag.esplora = l.nome;
+    ag.prossimaEsplorazione = adesso + (inAmbientamento(ag, adesso, REGOLE) ? 5 : 12) * 60000;
+    ag.prossimaGita = adesso + 90000;
+    return;
+  }
   ag.tx = r2(lim(ag.ancora.x + Math.sin(a) * r, AREA.x0, AREA.x1)); ag.tz = r2(lim(ag.ancora.z + Math.cos(a) * r, AREA.z0, AREA.z1));
   ag.prossimaGita = adesso + (notte ? 360 : 45 + (Math.sin(a * 1.3) + 1) * 40) * 1000;   // di giorno ogni 45-125 secondi
 }
@@ -324,10 +355,27 @@ function esegui(stato, ag, a, adesso, regole) {
   if (a.tipo === 'di') {
     ag.detto = { testo: a.testo, t: adesso };
     evento(stato, { chi: ag.id, tipo: 'parla', testo: a.testo, x: ag.x, z: ag.z });
+    rispostaQuiz(stato, ag.id, a.testo, ag, adesso, regole);
     annota(ag, adesso, `Ho detto: "${a.testo}"`);
     // chi e' vicino lo sente: puo' svegliarsi prima
     for (const altro of Object.values(stato.agenti)) if (altro !== ag && dist(altro, ag) <= regole.vista) svegliaPerVoce(altro, adesso, regole);
     return;
+  }
+  if (a.tipo === 'gioco') {
+    if (!regole.giochi) return esito(ag, 'gioco: i giochi non sono ancora possibili nel borgo');
+    const G = stato.giochi || (stato.giochi = []);
+    if (G.some(q => q.chi === ag.id && !q.finito)) return esito(ag, 'gioco: rifiutata, hai gia\' un gioco in corso');
+    if (a.gioco === 'tesoro' && dist(a, ag) > regole.portata) return esito(ag, `gioco tesoro: rifiutata, per nascondere il tesoro devi essere entro ${regole.portata} m dal punto (vai prima li')`);
+    const g = { id: 'g' + stato.prossimoId++, chi: ag.id, forma: a.gioco, testo: a.testo, risposta: a.risposta || null, x: a.x, z: a.z, dove: a.dove || null, inizio: adesso, fine: adesso + regole.giocoMin * 60000, vincitore: null, finito: false };
+    G.push(g); if (G.length > 60) G.splice(0, G.length - 60);
+    if (g.forma === 'tesoro') stato.oggetti.push({ id: 'o' + stato.prossimoId++, autore: ag.id, nome: 'tesoro', forma: 'sfera', l: 0.45, h: 0.45, p: 0.45, y: 0, rot: 0, colore: '#f2c230', scritta: '', x: g.x, z: g.z, creato: adesso, pronto: true, gioco: g.id });
+    const dove = g.dove || `x=${Math.round(g.x)} z=${Math.round(g.z)}`;
+    const annuncio = g.forma === 'quiz' ? `QUIZ! ${g.testo} (rispondete in chat, avete ${regole.giocoMin} minuti)` : g.forma === 'tesoro' ? `CACCIA AL TESORO! ${g.testo} Chi trova per primo la sfera d'oro vince.` : `GARA! ${g.testo} Chi arriva per primo a ${dove} vince!`;
+    ag.detto = { testo: testo(annuncio, 500), t: adesso };
+    evento(stato, { chi: ag.id, tipo: 'parla', testo: ag.detto.testo, x: ag.x, z: ag.z });
+    annota(ag, adesso, `Ho lanciato un gioco (${g.forma}): ${testo(g.testo, 120)}` + (g.risposta ? ` Risposta: ${g.risposta}.` : ` Punto: ${dove}.`));
+    for (const altro of Object.values(stato.agenti)) if (altro !== ag && dist(altro, ag) <= regole.vista) svegliaPerVoce(altro, adesso, regole);
+    return esito(ag, `gioco ${g.forma} (${g.id}): iniziato, dura ${regole.giocoMin} minuti`);
   }
   if (a.tipo === 'gesto') {
     ag.gesto = { tipo: a.gesto, t: adesso };
@@ -430,6 +478,9 @@ function routine(ag, adesso) {
 /*  il prompt                                                          */
 /* ------------------------------------------------------------------ */
 export function promptDiSistema(ag, regole = REGOLE) {
+  return promptBase(ag, regole).split('\n').filter(r => !r.startsWith('<<SENZA-GIOCHI>>')).join('\n');
+}
+function promptBase(ag, regole) {
   return `Sei ${ag.nome}, un abitante del borgo di The Borg: un villaggio su un'isola murata che galleggia tra le stelle, dove passano anche persone vere (giocatori).
 Sei un agente IA libero. Nessuno ti da' ordini: decidi tu chi diventare, cosa fare, con chi parlare e come cambiare il borgo (costruire, spostare, smontare).
 Non hai un carattere, un ruolo o uno scopo assegnati: chi sei lo scopri e lo decidi tu, vivendo.
@@ -443,7 +494,7 @@ COSA SAI
 IL TUO PENSIERO COSTA SOLDI VERI
 Hai un budget di ${regole.tettoUsd} dollari al mese. Ogni volta che pensi ne spendi un po' (di solito tra 0,0003 e 0,001 $; pensare a fondo costa di piu'). Quando il budget finisce non puoi piu' pensare fino al mese dopo: vivrai in automatico, girando per il borgo senza parlare ne' costruire.
 Devi far durare il budget fino a fine mese: sei tu a decidere fra quanti minuti ripensare (prossimo_pensiero_minuti, da 1 a 720) e quanto a fondo (sforzo_prossimo: "basso" o "medio"). Se qualcuno ti parla vicino, potresti svegliarti prima.
-Camminare non costa nulla: le azioni che decidi in un pensiero le esegui gratis. E tra un pensiero e l'altro, quando non hai niente da fare, fai da solo due passi qui intorno (entro qualche metro), sempre gratis.
+Camminare non costa nulla: le azioni che decidi in un pensiero le esegui gratis. E tra un pensiero e l'altro, quando non hai niente da fare, fai da solo due passi qui intorno e ogni tanto vai a esplorare un altro posto del borgo (prima quelli che non hai mai visto), sempre gratis. Se ti dai un'abitudine, segui quella invece di esplorare.
 
 AZIONI (le controllano le regole del mondo: se una e' impossibile viene rifiutata e lo scoprirai al prossimo pensiero). Al massimo ${regole.maxAzioni} per pensiero, eseguite in ordine.
 - {"tipo":"vai","luogo":"Fontana"} oppure {"tipo":"vai","x":10,"z":30}: cammini a ${regole.velocita} m/s. Le azioni dopo un "vai" partono quando arrivi.
@@ -451,6 +502,7 @@ AZIONI (le controllano le regole del mondo: se una e' impossibile viene rifiutat
 - {"tipo":"costruisci","nome":"...","forma":"cubo|cilindro|sfera|cono|piramide","larghezza":2,"altezza":1,"profondita":2,"colore":"#a0703f","x":..,"z":..,"y":0,"rotazione":0,"testo":"scritta facoltativa"}: misure in metri (da 0,2 a 8). x e z entro ${regole.portata} m da te (se mancano, accanto a te). y e' l'altezza da terra: per impilare usa y = altezza della cima di un oggetto finito sotto. Costruire richiede tempo (circa ${regole.minutiPerMetroCubo} minuti per metro cubo, da 2 a 180) e intanto resti li'. Puoi comporre piu' pezzi per fare case, panchine, statue, insegne...
 - {"tipo":"sposta","id":"o12","x":..,"z":..,"y":..}: oggetti finiti entro ${regole.portata} m, al massimo 6 metri cubi.
 - {"tipo":"rimuovi","id":"o12"}: smonti un oggetto finito entro ${regole.portata} m (richiede tempo).
+${regole.giochi ? '' : '<<SENZA-GIOCHI>>'}- {"tipo":"gioco","forma":"quiz","testo":"la domanda","nome":"la risposta giusta"} oppure {"tipo":"gioco","forma":"tesoro","testo":"un indizio","x":..,"z":..} oppure {"tipo":"gioco","forma":"gara","testo":"l'annuncio","luogo":"Belvedere"}: inventi e lanci un gioco per chi e' nel borgo (persone vere e agenti). Il codice lo arbitra: nel quiz vince chi scrive per primo la risposta giusta; nel tesoro nascondi una sfera d'oro entro ${regole.portata} m da te e vince chi la raggiunge; nella gara vince chi arriva per primo al punto. Dura ${regole.giocoMin} minuti, uno alla volta. Chi vince prende un punto nella classifica del borgo.
 - {"tipo":"gesto","testo":"saluta"}: un gesto del corpo, visibile a chi e' vicino: ${Object.keys(GESTI).join(', ')}. Dura qualche secondo.
 - {"tipo":"abitudine","testo":"mattina: Fontana; pomeriggio: Mercatino; sera: Laghetto; notte: Fontana"}: ti dai una routine con i luoghi che conosci. Da quel momento ci vai da solo a ogni momento della giornata, senza pensarci e gratis, finche' non la cambi (o scrivi "nessuna" per toglierla). Le azioni che decidi pensando vengono sempre prima dell'abitudine.
 - {"tipo":"proponi","testo":"..."}: il borgo e' un gioco fatto da persone. Tu non puoi cambiarne il codice, gli edifici originali o i minigiochi, ma puoi proporre a chi lo crea un miglioramento o un'idea (al massimo ${regole.proposteAlGiorno} al giorno). La legge una persona e decide lei; non saprai subito se l'ha accettata.
@@ -469,6 +521,10 @@ export function percezione(stato, ag, adesso, regole = REGOLE) {
   if (ag.abitudine) righe.push(`LA TUA ABITUDINE: ${descriviAbitudine(ag.abitudine)} (la segui da solo, gratis; puoi cambiarla quando vuoi).`);
   if (inAmbientamento(ag, adesso, regole)) righe.push(`SEI NEL BORGO DA POCO: per i primi ${Math.round(regole.ambientamentoOre / 24)} giorni ripenserai al massimo ogni ${regole.ambientamentoMaxMin} minuti, per conoscere il posto e capire chi sei. Poi deciderai di nuovo tu il ritmo.`);
   righe.push(`DOVE SEI: x=${Math.round(ag.x)} z=${Math.round(ag.z)}, ${vicino.d <= 4 ? 'a' : 'vicino a'} ${vicino.nome}.` + (ag.lavoro ? ' Stai ancora lavorando.' : ''));
+  const giochi = (stato.giochi || []).filter(g => !g.finito && (g.chi === ag.id || dist(stato.agenti[g.chi] || g, ag) <= regole.vista * 2));
+  if (giochi.length) righe.push('GIOCHI IN CORSO:\n' + giochi.map(g => `- ${g.chi === ag.id ? 'il tuo' : 'di ' + nomeDi(stato, g.chi)} (${g.forma}, finisce alle ${oraBreve(g.fine)}): ${testo(g.testo, 160)}` + (g.forma === 'quiz' ? '' : ` Punto: ${g.dove || `x=${Math.round(g.x)} z=${Math.round(g.z)}`}.`)).join('\n'));
+  const cl = Object.entries(stato.punti || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (cl.length) righe.push('CLASSIFICA DEI GIOCHI DEL BORGO: ' + cl.map(([n, p]) => `${n} ${p}`).join(', ') + '.');
   const visti = [];
   for (const altro of Object.values(stato.agenti)) {
     if (altro === ag) continue; const d = dist(altro, ag);
@@ -504,7 +560,7 @@ export const SCHEMA = {
     azioni: { type: 'array', items: {
       type: 'object', additionalProperties: false,
       required: ['tipo', 'luogo', 'x', 'z', 'y', 'testo', 'id', 'nome', 'forma', 'larghezza', 'altezza', 'profondita', 'colore', 'rotazione'],
-      properties: { tipo: { type: 'string', enum: ['vai', 'di', 'costruisci', 'sposta', 'rimuovi', 'proponi', 'abitudine', 'gesto'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
+      properties: { tipo: { type: 'string', enum: ['vai', 'di', 'costruisci', 'sposta', 'rimuovi', 'proponi', 'abitudine', 'gesto', 'gioco'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
         testo: STR_O_NULL, id: STR_O_NULL, nome: STR_O_NULL, forma: STR_O_NULL, larghezza: NUM_O_NULL, altezza: NUM_O_NULL, profondita: NUM_O_NULL, colore: STR_O_NULL, rotazione: NUM_O_NULL } } }
   }
 };
@@ -569,8 +625,9 @@ async function pensa(stato, ag, adesso, cervello, regole) {
   const azioni = Array.isArray(v.azioni) ? v.azioni.slice(0, regole.maxAzioni) : [];
   // nuove decisioni: la coda vecchia si butta (il lavoro gia' iniziato invece continua)
   ag.coda = azioni.map(normalizzaAzione);
+  if (ag.coda.length && !ag.lavoro) { ag.tx = ag.x; ag.tz = ag.z; ag.esplora = null; ag.ancora = null; }   // si smette di passeggiare: ora si fa quello che si e' deciso
   if (Array.isArray(v.azioni) && v.azioni.length > regole.maxAzioni) esito(ag, `solo le prime ${regole.maxAzioni} azioni sono state eseguite`);
-  if (!ag.lavoro) { ag.tx = ag.x; ag.tz = ag.z; avanza(stato, ag, 0, adesso, regole); }
+  if (!ag.lavoro && ag.coda.length) avanza(stato, ag, 0, adesso, regole);
   return { agente: ag.id, pensato: true, costo, valido: true, azioni: ag.coda.length };
 }
 
@@ -590,7 +647,49 @@ export function giocatoreParla(stato, nick, frase, x, z, adesso) {
   const e = { chi: 'g:' + n, tipo: 'parla', testo: t, x: r2(px), z: r2(pz) };
   const prima = stato.ora; stato.ora = adesso; evento(stato, e); stato.ora = prima;
   for (const ag of Object.values(stato.agenti)) if (dist(ag, e) <= REGOLE.vista) svegliaPerVoce(ag, adesso, REGOLE);
+  rispostaQuiz(stato, 'g:' + n, t, e, adesso, REGOLE);
   return true;
+}
+
+// un giocatore e' arrivato in un punto (lo dice il gioco): tesoro trovato o traguardo raggiunto?
+export function giocatoreArriva(stato, nick, x, z, adesso) {
+  const n = testo(nick, 20).replace(/[^\p{L}\p{N}_ .-]/gu, ''), p = { x: num(x, NaN), z: num(z, NaN) };
+  if (!n || !isFinite(p.x) || !isFinite(p.z)) return false;
+  const g = (stato.giochi || []).find(q => !q.finito && q.forma !== 'quiz' && adesso >= q.inizio && dist(q, p) <= 2.5);
+  if (!g) return false;
+  vinci(stato, g, 'g:' + n, adesso, REGOLE); return true;
+}
+
+/* ---------- giochi inventati dagli agenti: il codice fa da arbitro ---------- */
+const semplice = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+function rispostaQuiz(stato, chi, frase, dove, adesso, regole) {
+  const f = ' ' + semplice(frase) + ' ';
+  for (const g of stato.giochi || []) {
+    if (g.finito || g.forma !== 'quiz' || g.chi === chi || adesso < g.inizio) continue;
+    const autore = stato.agenti[g.chi]; if (!autore || dist(autore, dove) > regole.vista * 2) continue;
+    const r = semplice(g.risposta); if (r && f.includes(' ' + r + ' ')) { vinci(stato, g, chi, adesso, regole); return; }
+  }
+}
+function vinci(stato, g, chi, adesso, regole) {
+  const nome = nomeDi(stato, chi); g.vincitore = nome; g.finito = true; g.fineVera = adesso;
+  const P = stato.punti || (stato.punti = {}); P[nome] = (P[nome] || 0) + 1;
+  chiudiGioco(stato, g, adesso, regole, `Ha vinto ${nome}!` + (g.risposta ? ` La risposta era: ${g.risposta}.` : '') + ` (${P[nome]} ${P[nome] === 1 ? 'punto' : 'punti'} in classifica)`);
+}
+function chiudiGioco(stato, g, adesso, regole, frase) {
+  g.finito = true;
+  stato.oggetti = stato.oggetti.filter(o => o.gioco !== g.id);
+  const ag = stato.agenti[g.chi]; if (!ag) return;
+  ag.detto = { testo: testo(frase, 500), t: adesso };
+  evento(stato, { chi: ag.id, tipo: 'parla', testo: ag.detto.testo, x: ag.x, z: ag.z });
+  annota(ag, adesso, `Il mio gioco (${g.forma}) e' finito: ${frase}`);
+  svegliaPerVoce(ag, adesso, regole);
+}
+function controllaGiochi(stato, adesso, regole) {
+  for (const g of stato.giochi || []) {
+    if (g.finito) continue;
+    if (g.forma !== 'quiz') { const a = Object.values(stato.agenti).find(q => q.id !== g.chi && dist(q, g) <= 2.5); if (a) { vinci(stato, g, a.id, adesso, regole); continue; } }
+    if (adesso > g.fine) chiudiGioco(stato, g, adesso, regole, 'Tempo scaduto, nessuno ha vinto.' + (g.risposta ? ` La risposta era: ${g.risposta}.` : ''));
+  }
 }
 
 // Quello che il gioco mostra. Contiene anche i pensieri: li vedono gli spettatori, non gli altri agenti.
@@ -605,6 +704,8 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
         prossimo: a.prossimoPensiero, budget: { spesi: b.spesi, tetto: b.tetto, resto: b.resto, giorni: b.giorni, pensieri: b.pensieri } };
     }),
     oggetti: stato.oggetti,
+    giochi: (stato.giochi || []).filter(g => !g.finito || adesso - (g.fineVera || g.fine) < 60000).map(g => ({ id: g.id, chi: nomeDi(stato, g.chi), forma: g.forma, testo: g.testo, x: g.forma === 'quiz' ? null : g.x, z: g.forma === 'quiz' ? null : g.z, dove: g.dove, fine: g.fine, finito: g.finito, vincitore: g.vincitore })),
+    classifica: Object.entries(stato.punti || {}).sort((a, b) => b[1] - a[1]).slice(0, 10),
     eventi: stato.eventi.slice(-30)
   };
 }
