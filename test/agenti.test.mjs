@@ -1,7 +1,7 @@
 // Prove del motore degli agenti (agenti/motore.mjs), senza chiave e senza spendere niente.
 //   node test/agenti.test.mjs
 import assert from 'node:assert/strict';
-import { nuovoStato, passo, budget, percezione, giocatoreParla, vistaPubblica, normalizzaAzione, leggiRisposta, costoDi, meseDi, REGOLE, SCHEMA, proposte, giocatoreArriva } from '../agenti/motore.mjs';
+import { nuovoStato, passo, budget, percezione, giocatoreParla, vistaPubblica, normalizzaAzione, leggiRisposta, costoDi, meseDi, REGOLE, SCHEMA, proposte, giocatoreArriva, promptDiSistema } from '../agenti/motore.mjs';
 
 const T0 = Date.UTC(2026, 10, 20, 12, 0, 0);   // 20 novembre 2026, 13:00 a Roma
 let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -302,6 +302,65 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   const v = vistaPubblica(s, T0 + 80000);
   ok(v.messaggi.some(m => m.da === 'Ada' && m.a === 'Boris' && m.testo === 'Ti sento! Arrivo.' && m.agente === 'ada'), 'la risposta arriva a Boris');
   ok(/non conosci nessuno/.test(ada.esiti.join()), 'non si scrive a sconosciuti');
+}
+
+// 17) il manuale del borgo: "usa" porta da solo alla cosa (anche dentro gli edifici) e la usa
+{
+  const s = nuovoStato(T0); Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; a.prossimoPensiero = T0 + 1e12; });
+  const ada = s.agenti.ada, teo = s.agenti.teo, c = finto(risp([]));
+  ok(/MANUALE DEL BORGO/.test(promptDiSistema(ada)) && /Telescopio/.test(promptDiSistema(ada)), 'il manuale e\' nel prompt');
+  ok(normalizzaAzione({ tipo: 'usa', nome: 'telescopio' }).cosa === 'telescopio' && normalizzaAzione({ tipo: 'usa', nome: 'aereo' }).errore, 'usa: cose conosciute');
+  const via = (ag, l) => { ag.coda = l.map(normalizzaAzione); ag.tx = ag.x; ag.tz = ag.z; };
+  via(ada, [{ tipo: 'usa', nome: 'Pesca' }]);
+  let t = await scorri(s, T0, 40, c);
+  ok(/Hai pescato|non ha abboccato/.test(ada.diario.map(d => d.s).join()) && ada.stanza == null, 'Ada va al Laghetto e pesca ' + JSON.stringify(ada.esiti));
+  via(ada, [{ tipo: 'usa', nome: 'Telescopio' }]);
+  t = await scorri(s, t, 15, c);
+  ok(ada.stanza === 'tetto' && /Dall'alto vedi tutto il borgo. In piazza: Teo vicino a/.test(ada.diario.map(d => d.s).join()), 'dal Laghetto al telescopio sul tetto ' + JSON.stringify([ada.stanza, ada.esiti]));
+  via(ada, [{ tipo: 'usa', nome: 'Belinverse 2' }]);
+  t = await scorri(s, t, 25, c);
+  ok(ada.stanza === 'tcg' && /Belinverse 2: hai/.test(ada.esiti.join()), 'dal tetto alla Sala TCG passando da Laugh Tale ' + JSON.stringify([ada.stanza, ada.esiti]));
+  // la bici: tre volte piu' veloce, e si scende entrando
+  via(teo, [{ tipo: 'usa', nome: 'bici' }, { tipo: 'vai', luogo: 'Belvedere' }]);
+  t = await scorri(s, t, 1, c);
+  ok(teo.bici && teo.z > 45, 'Teo in bici arriva al Belvedere in un minuto ' + JSON.stringify([teo.x, teo.z]));
+  ok(vistaPubblica(s, t).agenti.find(a => a.id === 'teo').bici, 'il gioco vede la bici');
+  // scacchi: Teo raggiunge Ada al tavolo e giocano insieme
+  via(ada, [{ tipo: 'usa', nome: 'Scacchi' }]); via(teo, [{ tipo: 'usa', nome: 'scacchi' }]);
+  for (let i = 0; i < 60 && !(teo.lavoro && teo.lavoro.compagno); i++) t = await scorri(s, t, 0.5, c);
+  ok(!teo.bici && teo.lavoro && teo.lavoro.compagno === 'ada' && ada.lavoro.compagno === 'teo', 'Ada e Teo giocano a scacchi insieme ' + JSON.stringify([ada.stanza, teo.stanza, ada.esiti, teo.esiti]));
+  t = await scorri(s, t, 16, c);
+  ok(/Partita a scacchi contro Teo/.test(ada.esiti.join()) && /Partita a scacchi contro Ada/.test(teo.esiti.join()), 'il risultato arriva a tutti e due');
+  ok(/usa: Scacchi|ha finito\. Partita a scacchi/.test(percezione(s, ada, t)), 'chi e\' vicino vede cosa fanno gli altri');
+}
+
+// 18) gli Starlight: si parte con 150, si guadagnano (pesci, giochi) e si spendono al Mercatino e in Sala TCG
+{
+  const s = nuovoStato(T0); Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; a.prossimoPensiero = T0 + 1e12; });
+  const ada = s.agenti.ada, c = finto(risp([]));
+  const via = l => { ada.coda = l.map(normalizzaAzione); ada.tx = ada.x; ada.tz = ada.z; };
+  ok(/STARLIGHT: ne hai 150\./.test(percezione(s, ada, T0)) && /Mobili usati: Sedia 28/.test(promptDiSistema(ada)), 'dotazione iniziale e listino nel prompt');
+  ada.secchio = [{ n: 'Luccio', p: 18 }, { n: 'Koi drago', p: 40 }];
+  ok(/Secchio: Luccio, Koi drago/.test(percezione(s, ada, T0)), 'vede il suo secchio');
+  via([{ tipo: 'usa', nome: 'Pescheria' }, { tipo: 'usa', nome: 'Mobili usati', testo: 'poltrona' }, { tipo: 'usa', nome: 'Luci e decorazioni', testo: 'Fontana' }]);
+  let t = await scorri(s, T0, 30, c);
+  ok(ada.starlight >= 150 + 48 - 85 && ada.starlight <= 150 + 68 - 85 && ada.zaino.Poltrona === 1 && !ada.secchio.length, 'vende i pesci e compra la poltrona ' + JSON.stringify([ada.starlight, ada.esiti]));
+  ok(/costa 300 Starlight ma ne hai solo/.test(ada.esiti.join()) && !ada.zaino.Fontana, 'la fontana costa troppo');
+  via([{ tipo: 'vai', x: -8, z: 16 }, { tipo: 'metti', nome: 'Poltrona', x: -8, z: 19 }]);
+  t = await scorri(s, t, 3, c);
+  const o = s.oggetti.find(q => q.nome === 'Poltrona');
+  ok(o && o.pronto && o.arredo && !ada.zaino.Poltrona, 'la poltrona e\' in piazza ' + JSON.stringify(ada.esiti));
+  via([{ tipo: 'rimuovi', id: o.id }]);
+  t = await scorri(s, t, 5, c);
+  ok(!s.oggetti.includes(o) && ada.zaino.Poltrona === 1, 'smontata torna nello zaino');
+  const prima = ada.starlight;
+  via([{ tipo: 'usa', nome: 'Pacchetto Belinverse' }, { tipo: 'usa', nome: 'Pacchetto Belinverse' }]);
+  t = await scorri(s, t, 30, c);
+  ok(ada.stanza === 'tcg' && Object.values(ada.carte).reduce((a, b) => a + b, 0) === 6 && ada.starlight === prima, 'un pacchetto gratis, il secondo non se lo puo\' permettere ' + JSON.stringify([ada.starlight, ada.esiti]));
+  via([{ tipo: 'usa', nome: 'Belinverse 2' }]);
+  t = await scorri(s, t, 12, c);
+  ok(ada.starlight === prima + 2 || ada.starlight === prima + 10, 'giocando si guadagna');
+  ok(vistaPubblica(s, t).agenti.find(a => a.id === 'ada').starlight === ada.starlight, 'il gioco vede gli Starlight');
 }
 
 // 9) pezzi piccoli

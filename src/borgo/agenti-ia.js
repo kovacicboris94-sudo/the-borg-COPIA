@@ -15,7 +15,7 @@
   'use strict';
   const B = window.B3, T = B.T, G = window.Gioco, PI = Math.PI;
   const URL_PREDEFINITO = 'https://borgo-agenti.kovacic-boris-94.workers.dev';
-  const CHIAVE = 'borg_agenti_url', VISTA = 20, VEL = 1.3;
+  const CHIAVE = 'borg_agenti_url', VISTA = 20, VEL = 1.3, VEL_BICI = 3.9;
 
   function indirizzo() {
     let u = '';
@@ -106,8 +106,11 @@
       if (ora() - s.gesto.t < 40000 && qui(s)) fai(e, s.gesto.tipo);
     }
     const lk = s.lavoro ? s.lavoro.tipo + s.lavoro.id : null;
-    if (lk && lk !== e.lavoroVisto && qui(s)) app.mostraBolla(e, s.lavoro.tipo === 'costruisci' ? '🔨' : '🧰', 3);
+    if (lk && lk !== e.lavoroVisto && qui(s)) app.mostraBolla(e, s.lavoro.icona || (s.lavoro.tipo === 'costruisci' ? '🔨' : '🧰'), 3);
     e.lavoroVisto = lk;
+    // la bici: la stessa dei giocatori, montata sotto l'avatar (solo in piazza)
+    const bk = !!s.bici && !s.stanza;
+    if (bk !== !!e.bk) { if (e.bk) { e.av.root.remove(e.bk); e.bk = null; } else if (app.creaBici) { e.bk = app.creaBici(); e.av.root.add(e.bk); } }
   }
 
   // il servizio non conosce aiuole e panchine: se il punto e' occupato si cerca il posto libero piu' vicino
@@ -183,7 +186,8 @@
         while (e.via.length > 1 && Math.hypot(e.via[0].x - e.x, e.via[0].z - e.z) < 0.45) e.via.shift();
         const w = e.via[0] || { x: gx, z: gz }, wx = w.x - e.x, wz = w.z - e.z, wd = Math.hypot(wx, wz) || 1;
         const k = 1 - Math.exp(-dt * 5);
-        e.vx += (wx / wd * VEL - e.vx) * k; e.vz += (wz / wd * VEL - e.vz) * k;
+        const V = s.bici && !s.stanza ? VEL_BICI : VEL;
+        e.vx += (wx / wd * V - e.vx) * k; e.vz += (wz / wd * V - e.vz) * k;
         const px = e.x, pz = e.z;
         app.muovi(e, e.vx * dt, e.vz * dt);
         if (Math.hypot(e.x - px, e.z - pz) < VEL * dt * 0.2) e.fermo += dt; else e.fermo = 0;
@@ -342,6 +346,7 @@
   function cosaFa(s) {
     if (A.dati && A.dati.pausa) return 'In pausa: è fermo, non pensa e non spende nulla';
     if (s.modo === 'automatico') return s.motivo === 'budget-finito' ? 'Ha finito il budget del mese: vive in automatico fino al mese prossimo' : 'Vive in automatico (il cervello non è collegato)';
+    if (s.lavoro && s.lavoro.tipo === 'usa') return 'Sta usando: ' + s.lavoro.nome + ' ' + (s.lavoro.icona || '');
     if (s.lavoro) { const o = A.oggetti.get(s.lavoro.id); return (s.lavoro.tipo === 'costruisci' ? 'Sta costruendo ' : 'Sta smontando ') + (o ? '"' + o.d.nome + '"' : ''); }
     if (Math.hypot(s.tx - s.x, s.tz - s.z) > 0.5) return 'Sta camminando';
     const m = Math.max(0, Math.round((s.prossimo - ora()) / 60000));
@@ -357,6 +362,7 @@
        <div style="opacity:.75;font-size:12px;margin-bottom:8px">Agente IA libero · ${esc(A.dati.modello || '')}</div>
        <div style="margin:6px 0"><b>Adesso:</b> ${esc(cosaFa(s))}</div>
        <div style="margin:6px 0"><b>Dove:</b> ${esc(s.stanza === 'tetto' ? 'sul tetto della Torre della Cometa' : s.stanza ? 'dentro ' + ({ negozio: 'Negozio TCG', tcg: 'Sala TCG' }[s.stanza] || (app.stanze[s.stanza] || {}).nome || s.stanza) : 'in piazza')}</div>
+       ${s.starlight != null ? `<div style="margin:8px 0 4px"><b>Starlight:</b> ${s.starlight}${Object.keys(s.zaino || {}).length ? ' · zaino: ' + esc(Object.keys(s.zaino).join(', ')) : ''}</div>` : ''}
        <div style="margin:8px 0 4px"><b>Budget del mese:</b> ${euro(b.spesi)} su ${euro(b.tetto)} · ${b.pensieri} pensieri · restano ${b.giorni} giorni</div>
        <div style="height:10px;border-radius:5px;background:#3d3355;overflow:hidden"><div style="height:100%;width:${pc.toFixed(1)}%;background:${pc > 85 ? '#e0675c' : '#7ec8e3'}"></div></div>
        ${s.pensiero ? `<div style="margin-top:10px"><b>Ultimo pensiero:</b> <i>${esc(s.pensiero)}</i></div>` : ''}
@@ -380,7 +386,7 @@
     box.innerHTML = '<div style="margin-top:8px;max-height:38vh;overflow:auto;background:#1f1729;border-radius:10px;padding:6px 10px">' + A.voci.slice().reverse().map(v => {
       const g = giorno(v.t), h = new Date(v.t).toTimeString().slice(0, 5), testa = g !== ultimo ? `<div style="margin:8px 0 2px;font-size:11px;opacity:.6;text-transform:uppercase">${esc(g)}</div>` : ''; ultimo = g;
       const chi = `<b>${esc(v.chi)}</b>${v.vero ? '' : ' 🤖'}`;
-      const cosa = v.tipo === 'parla' ? `: “${esc(v.testo)}”` : v.tipo === 'costruisce' ? ` inizia a costruire <i>${esc(v.testo)}</i>` : v.tipo === 'finito' ? ` ha finito <i>${esc(v.testo)}</i>` : v.tipo === 'rimosso' ? ` ha smontato <i>${esc(v.testo)}</i>` : v.tipo === 'proposta' ? ` propone per il gioco 💡 “${esc(v.testo)}”` : v.tipo === 'entra' ? ` entra in <i>${esc(v.testo)}</i>` : v.tipo === 'esce' ? ` esce da <i>${esc(v.testo)}</i>` : v.tipo === 'scrivi' ? ` scrive da lontano a <b>${esc(v.a)}</b> ✉️ “${esc(v.testo)}”` : ` ha spostato <i>${esc(v.testo)}</i>`;
+      const cosa = v.tipo === 'parla' ? `: “${esc(v.testo)}”` : v.tipo === 'costruisce' ? ` inizia a costruire <i>${esc(v.testo)}</i>` : v.tipo === 'finito' ? ` ha finito <i>${esc(v.testo)}</i>` : v.tipo === 'rimosso' ? ` ha smontato <i>${esc(v.testo)}</i>` : v.tipo === 'proposta' ? ` propone per il gioco 💡 “${esc(v.testo)}”` : v.tipo === 'entra' ? ` entra in <i>${esc(v.testo)}</i>` : v.tipo === 'esce' ? ` esce da <i>${esc(v.testo)}</i>` : v.tipo === 'scrivi' ? ` scrive da lontano a <b>${esc(v.a)}</b> ✉️ “${esc(v.testo)}”` : v.tipo === 'usa' ? ` usa <i>${esc(v.testo)}</i>` : v.tipo === 'usato' ? `: ${esc(v.testo)}` : ` ha spostato <i>${esc(v.testo)}</i>`;
       return testa + `<div style="margin:3px 0"><span style="opacity:.6;font-size:12px">${h} · ${esc(v.luogo)}</span><br>${chi}${cosa}</div>`;
     }).join('') + '</div>';
   }
