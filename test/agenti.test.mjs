@@ -148,6 +148,20 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   ok(!s.pausa, 'ripartito');
 }
 
+// 10) tra un pensiero e l'altro si passeggia gratis lì intorno, e si vede la previsione del budget
+{
+  const s = nuovoStato(T0), c = finto(risp([{ tipo: 'vai', x: 0, z: 40 }], { prossimo_pensiero_minuti: 600 }));
+  let t = await scorri(s, T0, 3, c);
+  const ada = s.agenti.ada, chiamate = c.chiamate.length;
+  t = await scorri(s, t, 60, c);
+  ok(c.chiamate.length === chiamate, 'passeggiare non chiama il modello');
+  const posti = new Set(); let lontano = 0;
+  for (let i = 0; i < 40; i++) { t = await scorri(s, t, 1, c); posti.add(ada.x + ',' + ada.z); lontano = Math.max(lontano, Math.hypot(ada.x - 0, ada.z - 40)); }
+  ok(posti.size > 3 && lontano <= 4.1, 'passeggia vicino a dove era andata (' + posti.size + ' posti, max ' + lontano.toFixed(1) + ' m)');
+  const m = percezione(s, s.agenti.teo, t);
+  ok(/te ne restano circa \d+/.test(m), 'previsione del budget nella percezione');
+}
+
 // 9) pezzi piccoli
 ok(normalizzaAzione({ tipo: 'vai', luogo: 'fontana' }).x === 0, 'luogo per nome');
 ok(normalizzaAzione({ tipo: 'vola' }).errore, 'azione sconosciuta');
