@@ -270,6 +270,10 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   t = await scorri(s, t, 6, c);
   ok(ada.stanza == null && ada.x > 0, 'scende, esce e va al Laghetto ' + JSON.stringify([ada.stanza, ada.x, ada.z]));
   ok(normalizzaAzione({ tipo: 'entra', luogo: 'Torre della Cometa' }).stanza === 'torre0', 'Torre della Cometa = ingresso');
+  ok(normalizzaAzione({ tipo: 'entra', luogo: 'tetto' }).stanza === 'tetto', 'si sale anche sul tetto');
+  ada.coda = [normalizzaAzione({ tipo: 'entra', luogo: 'Tetto della Torre della Cometa' })]; ada.tx = ada.x; ada.tz = ada.z;
+  t = await scorri(s, t, 8, c);
+  ok(ada.stanza === 'tetto' && ada.x < -42, 'Ada arriva sul tetto ' + JSON.stringify([ada.stanza, ada.x, ada.z, ada.esiti]));
   ok(normalizzaAzione({ tipo: 'entra', luogo: 'casa di Boris' }).errore && normalizzaAzione({ tipo: 'entra', luogo: 'sala giochi' }).stanza === 'sala', 'si entra solo negli edifici pubblici');
 }
 
