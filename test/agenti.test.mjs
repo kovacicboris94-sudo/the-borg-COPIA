@@ -1,7 +1,7 @@
 // Prove del motore degli agenti (agenti/motore.mjs), senza chiave e senza spendere niente.
 //   node test/agenti.test.mjs
 import assert from 'node:assert/strict';
-import { nuovoStato, passo, budget, percezione, giocatoreParla, vistaPubblica, normalizzaAzione, leggiRisposta, costoDi, meseDi, REGOLE, SCHEMA, proposte, giocatoreArriva } from '../agenti/motore.mjs';
+import { nuovoStato, passo, budget, percezione, giocatoreParla, vistaPubblica, normalizzaAzione, leggiRisposta, costoDi, meseDi, REGOLE, SCHEMA, proposte, giocatoreArriva, promptDiSistema } from '../agenti/motore.mjs';
 
 const T0 = Date.UTC(2026, 10, 20, 12, 0, 0);   // 20 novembre 2026, 13:00 a Roma
 let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -302,6 +302,36 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   const v = vistaPubblica(s, T0 + 80000);
   ok(v.messaggi.some(m => m.da === 'Ada' && m.a === 'Boris' && m.testo === 'Ti sento! Arrivo.' && m.agente === 'ada'), 'la risposta arriva a Boris');
   ok(/non conosci nessuno/.test(ada.esiti.join()), 'non si scrive a sconosciuti');
+}
+
+// 17) il manuale del borgo: "usa" porta da solo alla cosa (anche dentro gli edifici) e la usa
+{
+  const s = nuovoStato(T0); Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; a.prossimoPensiero = T0 + 1e12; });
+  const ada = s.agenti.ada, teo = s.agenti.teo, c = finto(risp([]));
+  ok(/MANUALE DEL BORGO/.test(promptDiSistema(ada)) && /Telescopio/.test(promptDiSistema(ada)), 'il manuale e\' nel prompt');
+  ok(normalizzaAzione({ tipo: 'usa', nome: 'telescopio' }).cosa === 'telescopio' && normalizzaAzione({ tipo: 'usa', nome: 'aereo' }).errore, 'usa: cose conosciute');
+  const via = (ag, l) => { ag.coda = l.map(normalizzaAzione); ag.tx = ag.x; ag.tz = ag.z; };
+  via(ada, [{ tipo: 'usa', nome: 'Pesca' }]);
+  let t = await scorri(s, T0, 40, c);
+  ok(/Hai pescato|non ha abboccato/.test(ada.diario.map(d => d.s).join()) && ada.stanza == null, 'Ada va al Laghetto e pesca ' + JSON.stringify(ada.esiti));
+  via(ada, [{ tipo: 'usa', nome: 'Telescopio' }]);
+  t = await scorri(s, t, 15, c);
+  ok(ada.stanza === 'tetto' && /Dall'alto vedi tutto il borgo. In piazza: Teo vicino a/.test(ada.diario.map(d => d.s).join()), 'dal Laghetto al telescopio sul tetto ' + JSON.stringify([ada.stanza, ada.esiti]));
+  via(ada, [{ tipo: 'usa', nome: 'Belinverse 2' }]);
+  t = await scorri(s, t, 25, c);
+  ok(ada.stanza === 'tcg' && /Belinverse 2: hai/.test(ada.esiti.join()), 'dal tetto alla Sala TCG passando da Laugh Tale ' + JSON.stringify([ada.stanza, ada.esiti]));
+  // la bici: tre volte piu' veloce, e si scende entrando
+  via(teo, [{ tipo: 'usa', nome: 'bici' }, { tipo: 'vai', luogo: 'Belvedere' }]);
+  t = await scorri(s, t, 1, c);
+  ok(teo.bici && teo.z > 45, 'Teo in bici arriva al Belvedere in un minuto ' + JSON.stringify([teo.x, teo.z]));
+  ok(vistaPubblica(s, t).agenti.find(a => a.id === 'teo').bici, 'il gioco vede la bici');
+  // scacchi: Teo raggiunge Ada al tavolo e giocano insieme
+  via(ada, [{ tipo: 'usa', nome: 'Scacchi' }]); via(teo, [{ tipo: 'usa', nome: 'scacchi' }]);
+  for (let i = 0; i < 60 && !(teo.lavoro && teo.lavoro.compagno); i++) t = await scorri(s, t, 0.5, c);
+  ok(!teo.bici && teo.lavoro && teo.lavoro.compagno === 'ada' && ada.lavoro.compagno === 'teo', 'Ada e Teo giocano a scacchi insieme ' + JSON.stringify([ada.stanza, teo.stanza, ada.esiti, teo.esiti]));
+  t = await scorri(s, t, 16, c);
+  ok(/Partita a scacchi contro Teo/.test(ada.esiti.join()) && /Partita a scacchi contro Ada/.test(teo.esiti.join()), 'il risultato arriva a tutti e due');
+  ok(/usa: Scacchi|ha finito\. Partita a scacchi/.test(percezione(s, ada, t)), 'chi e\' vicino vede cosa fanno gli altri');
 }
 
 // 9) pezzi piccoli
