@@ -15,7 +15,7 @@
 //     l'agente vive "in automatico" fino al mese dopo.
 // =====================================================================
 
-import { cosaDi, manuale } from './borgo-cose.mjs';
+import { cosaDi, manuale, merceDi, portafoglio } from './borgo-cose.mjs';
 export const MODELLO = 'claude-haiku-5-5';
 
 // Prezzi di Claude Haiku 5.5 in dollari per milione di token (prompt fino a 100.000 token).
@@ -236,7 +236,8 @@ export function normalizzaAzione(a) {
     return st ? { tipo, stanza: st.id } : { errore: 'entra: edificio sconosciuto (puoi entrare in ' + STANZE.map(q => q.nome).join(', ') + ')' };
   }
   if (tipo === 'esci') return { tipo };
-  if (tipo === 'usa') { const c = cosaDi(a.nome || a.luogo || a.testo); return c ? { tipo, cosa: c.id } : { errore: 'usa: cosa sconosciuta (vedi MANUALE DEL BORGO)' }; }
+  if (tipo === 'usa') { const c = cosaDi(a.nome || a.luogo || a.testo); return c ? { tipo, cosa: c.id, richiesta: testo(a.testo, 40) } : { errore: 'usa: cosa sconosciuta (vedi MANUALE DEL BORGO)' }; }
+  if (tipo === 'metti') { const m = merceDi(a.nome || a.testo); if (!m) return { errore: 'metti: cosa sconosciuta (puoi mettere solo le cose comprate al Mercatino)' }; const o = { tipo, merce: m[0] }; if (a.x != null && a.z != null && isFinite(num(a.x, NaN)) && isFinite(num(a.z, NaN))) { o.x = r2(num(a.x, 0)); o.z = r2(num(a.z, 0)); } return o; }
   if (tipo === 'scrivi') {
     const chi = testo(a.nome || a.id, 20), t = testo(a.testo, 500);
     if (!chi) return { errore: 'scrivi: metti in "nome" a chi scrivi' };
@@ -349,7 +350,7 @@ function avanza(stato, ag, dt, adesso, regole) {
     const o = stato.oggetti.find(q => q.id === L.id);
     if (L.tipo === 'costruisci' && o) { o.pronto = true; esito(ag, `costruisci "${o.nome}" (${o.id}): finito`); annota(ag, adesso, `Ho finito di costruire "${o.nome}" (${o.id}).`); evento(stato, { chi: ag.id, tipo: 'finito', testo: o.nome, x: o.x, z: o.z }); }
     if (L.tipo === 'usa') fineUso(stato, ag, L, adesso);
-    if (L.tipo === 'rimuovi') { const i = stato.oggetti.findIndex(q => q.id === L.id); if (i >= 0) { const q = stato.oggetti[i]; stato.oggetti.splice(i, 1); esito(ag, `rimuovi ${q.id} "${q.nome}": fatto`); annota(ag, adesso, `Ho smontato "${q.nome}" di ${nomeDi(stato, q.autore)}.`); evento(stato, { chi: ag.id, tipo: 'rimosso', testo: q.nome, x: q.x, z: q.z }); } }
+    if (L.tipo === 'rimuovi') { const i = stato.oggetti.findIndex(q => q.id === L.id); if (i >= 0) { const q = stato.oggetti[i]; stato.oggetti.splice(i, 1); if (q.arredo && stato.agenti[q.autore]) { const z = portafoglio(stato.agenti[q.autore]).zaino || (stato.agenti[q.autore].zaino = {}); z[q.nome] = (z[q.nome] || 0) + 1; } esito(ag, `rimuovi ${q.id} "${q.nome}": fatto`); annota(ag, adesso, `Ho smontato "${q.nome}" di ${nomeDi(stato, q.autore)}.`); evento(stato, { chi: ag.id, tipo: 'rimosso', testo: q.nome, x: q.x, z: q.z }); } }
   }
   // cammino e azioni in coda: nello stesso passo si usa tutto il tempo (arrivi, entri, prendi l'ascensore, riparti...)
   let resto = dt;
@@ -543,8 +544,22 @@ function esegui(stato, ag, a, adesso, regole) {
     annota(ag, adesso, `Ho proposto a chi crea il gioco: "${testo(a.testo, 160)}"`);
     return esito(ag, 'proponi: consegnata a chi crea il gioco');
   }
-  if ((a.tipo === 'costruisci' || a.tipo === 'sposta' || a.tipo === 'rimuovi') && ag.stanza)
+  if ((a.tipo === 'costruisci' || a.tipo === 'sposta' || a.tipo === 'rimuovi' || a.tipo === 'metti') && ag.stanza)
     return esito(ag, `${a.tipo}: rifiutata, sei dentro ${luogoVicino(ag).nome}: dentro gli edifici non si costruisce e gli oggetti degli abitanti sono in piazza (esci prima)`);
+  if (a.tipo === 'metti') {
+    const z = portafoglio(ag).zaino || {};
+    if (!z[a.merce]) return esito(ag, `metti ${a.merce}: rifiutata, non ce l'hai nello zaino (prima compralo al Mercatino)`);
+    const m = merceDi(a.merce);
+    const o = { id: 'o' + stato.prossimoId, autore: ag.id, nome: m[0], forma: m[5], l: m[2], h: m[3], p: m[4], y: 0, rot: 0, colore: m[6], scritta: '', arredo: true,
+      x: a.x != null ? a.x : r2(ag.x + 1.5), z: a.z != null ? a.z : r2(ag.z + 1.5), creato: adesso, pronto: true };
+    if (dist(o, ag) > regole.portata) return esito(ag, `metti ${m[0]}: rifiutata, il punto e' troppo lontano da te (entro ${regole.portata} m)`);
+    if (stato.oggetti.length >= regole.maxOggetti) return esito(ag, `metti ${m[0]}: rifiutata, nel borgo ci sono gia' troppi oggetti`);
+    const no = postoValido(stato, o); if (no) return esito(ag, `metti ${m[0]}: rifiutata, ${no}`);
+    stato.prossimoId++; stato.oggetti.push(o); z[m[0]]--; if (!z[m[0]]) delete z[m[0]];
+    annota(ag, adesso, `Ho messo ${m[0]} (${o.id}) in piazza a x=${o.x} z=${o.z}.`);
+    evento(stato, { chi: ag.id, tipo: 'finito', testo: m[0], x: o.x, z: o.z });
+    return esito(ag, `metti ${m[0]} (${o.id}): fatto`);
+  }
   if (a.tipo === 'costruisci') {
     const o = { id: 'o' + stato.prossimoId, autore: ag.id, nome: a.nome, forma: a.forma, l: a.l, h: a.h, p: a.p, y: a.y, rot: a.rot, colore: a.colore, scritta: a.scritta,
       x: a.x != null ? a.x : r2(ag.x + Math.sin(ag.id.length + stato.prossimoId) * 2), z: a.z != null ? a.z : r2(ag.z + Math.cos(ag.id.length + stato.prossimoId) * 2), creato: adesso, pronto: false };
@@ -608,7 +623,7 @@ function usa(stato, ag, a, adesso, regole) {
     ag.coda.unshift(Object.assign({}, a, { inCammino: true })); return 'cammina';
   }
   ag.meta = null; ag.ancora = { x: p.x, z: p.z };
-  const L = { tipo: 'usa', id: c.id, nome: c.nome, icona: c.icona, inizio: adesso, fine: adesso + c.min * 60000 };
+  const L = { tipo: 'usa', id: c.id, nome: c.nome, icona: c.icona, richiesta: a.richiesta || '', inizio: adesso, fine: adesso + c.min * 60000 };
   // scacchi: se un altro abitante e' gia' al tavolo, si gioca insieme e la partita riparte per tutti e due
   if (c.id === 'scacchi') {
     const altro = Object.values(stato.agenti).find(q => q !== ag && q.stanza === ag.stanza && q.lavoro && q.lavoro.id === 'scacchi' && !q.lavoro.compagno);
@@ -625,9 +640,9 @@ function usa(stato, ag, a, adesso, regole) {
 }
 function fineUso(stato, ag, L, adesso) {
   const c = cosaDi(L.id); if (!c) return;
-  const r = c.fai({ ag, stato, adesso, momento: momento(adesso), compagno: L.compagno ? stato.agenti[L.compagno] : null, risultato: L.risultato, nomeDi, luogoVicino });
+  const r = c.fai({ ag, stato, adesso, momento: momento(adesso), compagno: L.compagno ? stato.agenti[L.compagno] : null, risultato: L.risultato, richiesta: L.richiesta, nomeDi, luogoVicino });
   esito(ag, `usa ${c.nome}: finito. ${r}`); annota(ag, adesso, r);
-  if (c.id !== 'ruota' && c.id !== 'telescopio' && c.id !== 'panchina') evento(stato, { chi: ag.id, tipo: 'usato', testo: testo(r, 160), x: ag.x, z: ag.z });
+  if (!['ruota', 'telescopio', 'panchina', 'pescheria'].includes(c.id)) evento(stato, { chi: ag.id, tipo: 'usato', testo: testo(r, 160), x: ag.x, z: ag.z });
 }
 
 function svegliaPerVoce(ag, adesso, regole) {
@@ -723,6 +738,8 @@ export function percezione(stato, ag, adesso, regole = REGOLE) {
   const righe = [];
   righe.push(`ORA: ${FMT_ORA.format(new Date(adesso))} (${momento(adesso)}).`);
   righe.push(`BUDGET: questo mese hai speso ${dollari(b.spesi)} su ${dollari(b.tetto)} in ${b.pensieri} pensieri; restano ${dollari(b.resto)} per ${b.giorni} giorni (circa ${dollari(b.alGiorno)} al giorno).` + (ag.costoUltimo ? ` Il tuo ultimo pensiero e' costato ${dollari(ag.costoUltimo)}.` : '') + previsione(b, ag, adesso));
+  { const w = portafoglio(ag), el = o => Object.entries(o || {}).map(([n, k]) => k > 1 ? n + ' x' + k : n).join(', '), sec = {}; (w.secchio || []).forEach(f => { sec[f.n] = (sec[f.n] || 0) + 1; });
+    righe.push(`STARLIGHT: ne hai ${w.starlight}.` + (w.secchio && w.secchio.length ? ` Secchio: ${el(sec)}.` : '') + (w.zaino && Object.keys(w.zaino).length ? ` Zaino: ${el(w.zaino)}.` : '') + (w.carte ? ` Carte di Belinverse: ${Object.values(w.carte).reduce((a, b) => a + b, 0)}.` : '')); }
   if (ag.abitudine) righe.push(`LA TUA ABITUDINE: ${descriviAbitudine(ag.abitudine)} (la segui da solo, gratis; puoi cambiarla quando vuoi).`);
   if (inAmbientamento(ag, adesso, regole)) righe.push(`SEI NEL BORGO DA POCO: per i primi ${Math.round(regole.ambientamentoOre / 24)} giorni ripenserai al massimo ogni ${regole.ambientamentoMaxMin} minuti, per conoscere il posto e capire chi sei. Poi deciderai di nuovo tu il ritmo.`);
   const qui = ag.stanza && stanzaDi(ag.stanza);
@@ -768,7 +785,7 @@ export const SCHEMA = {
     azioni: { type: 'array', items: {
       type: 'object', additionalProperties: false,
       required: ['tipo', 'luogo', 'x', 'z', 'y', 'testo', 'id', 'nome', 'forma', 'larghezza', 'altezza', 'profondita', 'colore', 'rotazione'],
-      properties: { tipo: { type: 'string', enum: ['vai', 'entra', 'esci', 'di', 'scrivi', 'costruisci', 'sposta', 'rimuovi', 'proponi', 'abitudine', 'gesto', 'gioco', 'usa'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
+      properties: { tipo: { type: 'string', enum: ['vai', 'entra', 'esci', 'di', 'scrivi', 'costruisci', 'sposta', 'rimuovi', 'proponi', 'abitudine', 'gesto', 'gioco', 'usa', 'metti'] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
         testo: STR_O_NULL, id: STR_O_NULL, nome: STR_O_NULL, forma: STR_O_NULL, larghezza: NUM_O_NULL, altezza: NUM_O_NULL, profondita: NUM_O_NULL, colore: STR_O_NULL, rotazione: NUM_O_NULL } } }
   }
 };
@@ -914,7 +931,7 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
     agenti: Object.values(stato.agenti).map(a => {
       const b = budget(a, adesso, regole);
       return { id: a.id, nome: a.nome, look: a.look, x: a.x, z: a.z, tx: a.tx, tz: a.tz, stanza: a.stanza || null,
-        lavoro: a.lavoro ? { tipo: a.lavoro.tipo, id: a.lavoro.id, nome: a.lavoro.nome, icona: a.lavoro.icona, inizio: a.lavoro.inizio, fine: a.lavoro.fine } : null, bici: !!a.bici,
+        lavoro: a.lavoro ? { tipo: a.lavoro.tipo, id: a.lavoro.id, nome: a.lavoro.nome, icona: a.lavoro.icona, inizio: a.lavoro.inizio, fine: a.lavoro.fine } : null, bici: !!a.bici, starlight: portafoglio(a).starlight, zaino: a.zaino || {},
         detto: a.detto, gesto: a.gesto || null, pensiero: a.ultimoPensiero, memoria: a.memoria, modo: a.modo, motivo: a.motivo || null,
         prossimo: a.prossimoPensiero, budget: { spesi: b.spesi, tetto: b.tetto, resto: b.resto, giorni: b.giorni, pensieri: b.pensieri } };
     }),

@@ -334,6 +334,35 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   ok(/usa: Scacchi|ha finito\. Partita a scacchi/.test(percezione(s, ada, t)), 'chi e\' vicino vede cosa fanno gli altri');
 }
 
+// 18) gli Starlight: si parte con 150, si guadagnano (pesci, giochi) e si spendono al Mercatino e in Sala TCG
+{
+  const s = nuovoStato(T0); Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; a.prossimoPensiero = T0 + 1e12; });
+  const ada = s.agenti.ada, c = finto(risp([]));
+  const via = l => { ada.coda = l.map(normalizzaAzione); ada.tx = ada.x; ada.tz = ada.z; };
+  ok(/STARLIGHT: ne hai 150\./.test(percezione(s, ada, T0)) && /Mobili usati: Sedia 28/.test(promptDiSistema(ada)), 'dotazione iniziale e listino nel prompt');
+  ada.secchio = [{ n: 'Luccio', p: 18 }, { n: 'Koi drago', p: 40 }];
+  ok(/Secchio: Luccio, Koi drago/.test(percezione(s, ada, T0)), 'vede il suo secchio');
+  via([{ tipo: 'usa', nome: 'Pescheria' }, { tipo: 'usa', nome: 'Mobili usati', testo: 'poltrona' }, { tipo: 'usa', nome: 'Luci e decorazioni', testo: 'Fontana' }]);
+  let t = await scorri(s, T0, 30, c);
+  ok(ada.starlight >= 150 + 48 - 85 && ada.starlight <= 150 + 68 - 85 && ada.zaino.Poltrona === 1 && !ada.secchio.length, 'vende i pesci e compra la poltrona ' + JSON.stringify([ada.starlight, ada.esiti]));
+  ok(/costa 300 Starlight ma ne hai solo/.test(ada.esiti.join()) && !ada.zaino.Fontana, 'la fontana costa troppo');
+  via([{ tipo: 'vai', x: -8, z: 16 }, { tipo: 'metti', nome: 'Poltrona', x: -8, z: 19 }]);
+  t = await scorri(s, t, 3, c);
+  const o = s.oggetti.find(q => q.nome === 'Poltrona');
+  ok(o && o.pronto && o.arredo && !ada.zaino.Poltrona, 'la poltrona e\' in piazza ' + JSON.stringify(ada.esiti));
+  via([{ tipo: 'rimuovi', id: o.id }]);
+  t = await scorri(s, t, 5, c);
+  ok(!s.oggetti.includes(o) && ada.zaino.Poltrona === 1, 'smontata torna nello zaino');
+  const prima = ada.starlight;
+  via([{ tipo: 'usa', nome: 'Pacchetto Belinverse' }, { tipo: 'usa', nome: 'Pacchetto Belinverse' }]);
+  t = await scorri(s, t, 30, c);
+  ok(ada.stanza === 'tcg' && Object.values(ada.carte).reduce((a, b) => a + b, 0) === 6 && ada.starlight === prima, 'un pacchetto gratis, il secondo non se lo puo\' permettere ' + JSON.stringify([ada.starlight, ada.esiti]));
+  via([{ tipo: 'usa', nome: 'Belinverse 2' }]);
+  t = await scorri(s, t, 12, c);
+  ok(ada.starlight === prima + 2 || ada.starlight === prima + 10, 'giocando si guadagna');
+  ok(vistaPubblica(s, t).agenti.find(a => a.id === 'ada').starlight === ada.starlight, 'il gioco vede gli Starlight');
+}
+
 // 9) pezzi piccoli
 ok(normalizzaAzione({ tipo: 'vai', luogo: 'fontana' }).x === 0, 'luogo per nome');
 ok(normalizzaAzione({ tipo: 'vola' }).errore, 'azione sconosciuta');

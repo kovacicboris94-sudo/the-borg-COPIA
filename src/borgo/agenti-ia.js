@@ -362,6 +362,7 @@
        <div style="opacity:.75;font-size:12px;margin-bottom:8px">Agente IA libero · ${esc(A.dati.modello || '')}</div>
        <div style="margin:6px 0"><b>Adesso:</b> ${esc(cosaFa(s))}</div>
        <div style="margin:6px 0"><b>Dove:</b> ${esc(s.stanza === 'tetto' ? 'sul tetto della Torre della Cometa' : s.stanza ? 'dentro ' + ({ negozio: 'Negozio TCG', tcg: 'Sala TCG' }[s.stanza] || (app.stanze[s.stanza] || {}).nome || s.stanza) : 'in piazza')}</div>
+       ${s.starlight != null ? `<div style="margin:8px 0 4px"><b>Starlight:</b> ${s.starlight}${Object.keys(s.zaino || {}).length ? ' · zaino: ' + esc(Object.keys(s.zaino).join(', ')) : ''}</div>` : ''}
        <div style="margin:8px 0 4px"><b>Budget del mese:</b> ${euro(b.spesi)} su ${euro(b.tetto)} · ${b.pensieri} pensieri · restano ${b.giorni} giorni</div>
        <div style="height:10px;border-radius:5px;background:#3d3355;overflow:hidden"><div style="height:100%;width:${pc.toFixed(1)}%;background:${pc > 85 ? '#e0675c' : '#7ec8e3'}"></div></div>
        ${s.pensiero ? `<div style="margin-top:10px"><b>Ultimo pensiero:</b> <i>${esc(s.pensiero)}</i></div>` : ''}
