@@ -298,9 +298,9 @@ function passeggia(ag, adesso) {
   if (l && (!ag.ancora || Math.hypot(ag.ancora.x - l.x, ag.ancora.z - l.z) > 4)) { ag.ancora = { x: l.x, z: l.z + 3 }; ag.tx = ag.ancora.x; ag.tz = ag.ancora.z; ag.meta = l.nome; ag.prossimaGita = adesso + 3 * 60000; return; }
   if (!ag.ancora) ag.ancora = { x: ag.x, z: ag.z };
   if (ag.prossimaGita && adesso < ag.prossimaGita) return;
-  const notte = momento(adesso) === 'notte', a = adesso / 9e4 + ag.id.charCodeAt(0), r = 1 + (Math.sin(a * 3.7) + 1) * 1.25;
+  const notte = momento(adesso) === 'notte', a = adesso / 9e4 + ag.id.charCodeAt(0), r = 2 + (Math.sin(a * 3.7) + 1) * 2.5;
   ag.tx = r2(lim(ag.ancora.x + Math.sin(a) * r, AREA.x0, AREA.x1)); ag.tz = r2(lim(ag.ancora.z + Math.cos(a) * r, AREA.z0, AREA.z1));
-  ag.prossimaGita = adesso + (notte ? 12 : 3 + (Math.sin(a * 1.3) + 1) * 1.5) * 60000;
+  ag.prossimaGita = adesso + (notte ? 360 : 45 + (Math.sin(a * 1.3) + 1) * 40) * 1000;   // di giorno ogni 45-125 secondi
 }
 
 const nomeDi = (stato, id) => (stato.agenti[id] ? stato.agenti[id].nome : id && id.indexOf('g:') === 0 ? id.slice(2) : 'qualcuno');
@@ -309,7 +309,7 @@ function esegui(stato, ag, a, adesso, regole) {
   if (a.errore) { esito(ag, 'rifiutata: ' + a.errore); return; }
   if (a.tipo === 'vai') {
     ag.tx = a.x; ag.tz = a.z; if (a.dove) ag.meta = a.dove; else ag.meta = null;
-    ag.ancora = { x: a.x, z: a.z }; ag.prossimaGita = adesso + 2 * 60000;   // arrivato, si passeggia li' intorno
+    ag.ancora = { x: a.x, z: a.z }; ag.prossimaGita = adesso + 40000;   // arrivato, si passeggia li' intorno
     ag.abitudineDopo = adesso + 60 * 60000;   // per un'ora l'abitudine non lo porta via da dove ha scelto di andare
     esito(ag, `vai ${a.dove || `x=${a.x} z=${a.z}`}: in cammino`);
     return 'cammina';
@@ -431,7 +431,7 @@ COSA SAI
 IL TUO PENSIERO COSTA SOLDI VERI
 Hai un budget di ${regole.tettoUsd} dollari al mese. Ogni volta che pensi ne spendi un po' (di solito tra 0,0003 e 0,001 $; pensare a fondo costa di piu'). Quando il budget finisce non puoi piu' pensare fino al mese dopo: vivrai in automatico, girando per il borgo senza parlare ne' costruire.
 Devi far durare il budget fino a fine mese: sei tu a decidere fra quanti minuti ripensare (prossimo_pensiero_minuti, da 1 a 720) e quanto a fondo (sforzo_prossimo: "basso" o "medio"). Se qualcuno ti parla vicino, potresti svegliarti prima.
-Camminare non costa nulla: le azioni che decidi in un pensiero le esegui gratis. E tra un pensiero e l'altro, quando non hai niente da fare, fai da solo due passi qui intorno (entro 3-4 metri), sempre gratis.
+Camminare non costa nulla: le azioni che decidi in un pensiero le esegui gratis. E tra un pensiero e l'altro, quando non hai niente da fare, fai da solo due passi qui intorno (entro qualche metro), sempre gratis.
 
 AZIONI (le controllano le regole del mondo: se una e' impossibile viene rifiutata e lo scoprirai al prossimo pensiero). Al massimo ${regole.maxAzioni} per pensiero, eseguite in ordine.
 - {"tipo":"vai","luogo":"Fontana"} oppure {"tipo":"vai","x":10,"z":30}: cammini a ${regole.velocita} m/s. Le azioni dopo un "vai" partono quando arrivi.

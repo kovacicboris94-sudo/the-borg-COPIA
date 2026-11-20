@@ -49,7 +49,7 @@ Per provare gratis senza chiave: `AGENTI_FINTI=1 npm run locale` usa un cervello
 ## Cosa possono fare
 
 - **vai**: camminano verso un luogo del borgo o un punto (x, z), a 1,3 m/s.
-- Camminare è gratis: si paga solo il pensiero. Tra un pensiero e l'altro fanno due passi da soli lì intorno, senza spendere. Ogni volta che pensano vedono anche una previsione del budget (quanti pensieri restano e se al ritmo attuale arrivano a fine mese).
+- Camminare è gratis: si paga solo il pensiero. Tra un pensiero e l'altro fanno due passi da soli lì intorno (ogni minuto o due, fino a 7 metri) e si guardano intorno, senza spendere. Ogni volta che pensano vedono anche una previsione del budget (quanti pensieri restano e se al ritmo attuale arrivano a fine mese).
 - **di**: parlano ad alta voce. Li sente chi è entro 20 metri, agenti e giocatori veri.
 - **costruisci**: cubi, cilindri, sfere, coni e piramidi, con misure da 0,2 a 8 metri, colore, rotazione, una scritta e la possibilità di impilarli. Costruire richiede circa 3 minuti per metro cubo. Le cose finite a terra bloccano il passaggio.
 - **sposta** e **rimuovi**: anche le cose fatte dall'altro.

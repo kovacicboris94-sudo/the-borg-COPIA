@@ -179,7 +179,9 @@
         app.muovi(e, ux * k, uz * k);
       });
       const vel = Math.hypot(e.vx, e.vz);
-      if (vel > 0.2) e.yaw = Math.atan2(e.vx, e.vz);
+      // fermi non vuol dire statue: ogni tanto si guardano intorno
+      if (vel <= 0.2 && !s.lavoro) { e.guarda = (e.guarda || 0) - dt; if (e.guarda <= 0) { e.guarda = 2.5 + Math.random() * 4; e.yawT = e.yaw + (Math.random() - 0.5) * 2.2; } if (e.yawT != null) e.yaw += (e.yawT - e.yaw) * Math.min(1, dt * 3); }
+      if (vel > 0.2) { e.yaw = Math.atan2(e.vx, e.vz); e.yawT = null; }
       else if (s.lavoro) { const o = A.oggetti.get(s.lavoro.id); if (o) e.yaw = Math.atan2(o.d.x - e.x, o.d.z - e.z); }
       // il pavimento non e' tutto alla stessa altezza (palco, gradini): si sta sopra, come il giocatore
       const st = app.stanze.piazza, ty = st.alt ? st.alt(e.x, e.z) : 0; e.y = e.y == null ? ty : e.y + (ty - e.y) * Math.min(1, dt * 14);
