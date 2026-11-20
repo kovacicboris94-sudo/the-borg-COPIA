@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="6a7c0c30b770">
+  <meta name="versione" content="978bc7af1048">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -6280,7 +6280,7 @@ window.CONFIG = {
     corpo.traverse(o => { if (o.isMesh && o.castShadow !== false) o.castShadow = true; });
 
     /* area invisibile per toccare l'avatar */
-    const proxy = new T.Mesh(new T.CylinderGeometry(0.5, 0.5, 2.3, 8), new T.MeshBasicMaterial()); proxy.position.y = 1.15; proxy.visible = false; root.add(proxy);
+    const proxy = new T.Mesh(new T.CylinderGeometry(0.5, 0.5, 2.3, 8), new T.MeshBasicMaterial()); proxy.position.y = 1.15; proxy.visible = false; proxy.userData.avatar = true; root.add(proxy);
 
     const av = { corporatura: p.corpo, parti: { busto, bL, bR, gL, gR }, root, corpo, testa, proxy, fase: 0, e: 0, sed: 0, sedT: 0, sdr: 0, sdrT: 0, emote: null, bic: 0, bicT: 0, fb: 0, p, look: Object.assign({}, look) };
     av.aggiorna = function (dt, vel, tempo) {
@@ -30157,7 +30157,13 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
     if (B.agentiToccabili && stanza.gruppo === gP) B.agentiToccabili().forEach(c => cand.push(c));
     stanza.toccabili.forEach(t => cand.push(t));
     let best = null, bd = 1e9;
-    cand.forEach(c => { c.obj.updateWorldMatrix(true, false); const h = ray.intersectObject(c.obj, false); if (h.length && h[0].distance < bd) { bd = h[0].distance; best = c; } });
+    const presi = [];
+    cand.forEach(c => { c.obj.updateWorldMatrix(true, false); const h = ray.intersectObject(c.obj, false); if (h.length) presi.push(c); if (h.length && h[0].distance < bd) { bd = h[0].distance; best = c; } });
+    // due persone vicine: i loro cilindri si sovrappongono, quindi vince quella il cui centro e' piu' vicino al dito
+    if (best && best.obj.userData.avatar) {
+      const pos = new T.Vector3(); let md = 1e9;
+      presi.forEach(c => { if (!c.obj.userData.avatar) return; c.obj.getWorldPosition(pos); const d = ray.ray.distanceSqToPoint(pos); if (d < md) { md = d; best = c; } });
+    }
     if (B.Arredo && B.Arredo.tocca(ray)) return;
     if (!best) return;
     if (best.tipo === 'npc') G.emetti('profilo', { id: best.id });
@@ -31517,6 +31523,14 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     }
     return { x, z };
   }
+  const SPAZIO = 0.8;   // distanza minima tra due persone
+  function corpi(e) {
+    const l = [];
+    (app.npc || []).forEach(n => { if (n.av && n.av.root.visible) l.push(n); });
+    if (app.io && inPiazza()) l.push(app.io);
+    A.agenti.forEach(o => { if (o !== e) l.push(o); });
+    return l;
+  }
   function frame(dt, t) {
     if (!app) return;
     A.agenti.forEach(e => {
@@ -31527,11 +31541,20 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
       const gx = e.meta.x, gz = e.meta.z;
       if (Math.hypot(s.x - e.x, s.z - e.z) > 12 || e.fermo > 3) { const q = libera(s.x, s.z); e.x = q.x; e.z = q.z; e.fermo = 0; }
       const dx = gx - e.x, dz = gz - e.z, d = Math.hypot(dx, dz);
-      if (d > 0.3) {
+      // le altre persone (abitanti, giocatore, l'altro agente): se il posto e' occupato ci si ferma accanto
+      const altri = corpi(e), occupato = altri.some(o => Math.hypot(o.x - gx, o.z - gz) < SPAZIO);
+      if (d > (occupato ? SPAZIO + 0.2 : 0.3)) {
         const k = 1 - Math.exp(-dt * 5);
         e.vx += (dx / d * VEL - e.vx) * k; e.vz += (dz / d * VEL - e.vz) * k;
         if (!app.muovi(e, e.vx * dt, e.vz * dt)) e.fermo += dt; else e.fermo = 0;
       } else { e.vx *= 0.8; e.vz *= 0.8; e.fermo = 0; }
+      // nessuno si compenetra: chi e' troppo vicino viene scansato piano
+      altri.forEach(o => {
+        const ox = e.x - o.x, oz = e.z - o.z, od = Math.hypot(ox, oz);
+        if (od >= SPAZIO) return;
+        const k = Math.min(1, dt * 4) * (SPAZIO - od), ux = od > 1e-3 ? ox / od : Math.sin(e.id.length + t), uz = od > 1e-3 ? oz / od : Math.cos(e.id.length + t);
+        app.muovi(e, ux * k, uz * k);
+      });
       const vel = Math.hypot(e.vx, e.vz);
       if (vel > 0.2) e.yaw = Math.atan2(e.vx, e.vz);
       else if (s.lavoro) { const o = A.oggetti.get(s.lavoro.id); if (o) e.yaw = Math.atan2(o.d.x - e.x, o.d.z - e.z); }
