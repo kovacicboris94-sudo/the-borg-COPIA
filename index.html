@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="5e0e329b92b5">
+  <meta name="versione" content="0909e62e1d39">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -31457,7 +31457,9 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
   const ora = () => Date.now() + A.scarto;   // orologio del servizio
   // gli agenti entrano anche negli edifici: ognuno si vede solo se e' nello stesso posto del giocatore
   const stanzaIo = () => { const st = app && app.stanza(); return st ? st.luogo || st.id : ''; };
-  const qui = s => app && app.gioco() && (s.stanza || 'piazza') === stanzaIo();
+  // il tetto della torre fa parte della piazza (lo si vede da giu'): chi e' lassu' si vede da tutta la piazza
+  const qui = s => app && app.gioco() && ((app.stanze[s.stanza] || {}).luogo || s.stanza || 'piazza') === stanzaIo();
+  const doveIo = () => { const id = app.stanza().id; return id === 'piazza' ? null : id; };
   const stanzaDi = id => (app.stanze[id || 'piazza'] || app.stanze.piazza);
 
   /* ---------- chiedere lo stato al servizio ---------- */
@@ -31693,8 +31695,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     if (!v.io || v.sussurro || !app || !app.gioco()) return;
     const vicino = [...A.agenti.values()].some(e => e.s && qui(e.s) && Math.hypot(e.x - app.io.x, e.z - app.io.z) <= VISTA);
     if (!vicino) return;
-    const dove = stanzaIo();
-    fetch(A.url + '/parla', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nick: v.nick, testo: v.testo, x: app.io.x, z: app.io.z, stanza: dove === 'piazza' ? null : dove }) }).catch(() => { });
+    fetch(A.url + '/parla', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nick: v.nick, testo: v.testo, x: app.io.x, z: app.io.z, stanza: doveIo() }) }).catch(() => { });
   });
 
   /* ---------- messaggi da lontano: gli scrivi dalla sua scheda, ti risponde ovunque tu sia ---------- */
@@ -31717,9 +31718,8 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     if (!testo) return;
     if (!mioNick()) { nota.textContent = 'Prima scegli il tuo nome nel gioco.'; return; }
     nota.textContent = 'Invio...';
-    const dove = stanzaIo();
     try {
-      const r = await fetch(A.url + '/parla', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nick: mioNick(), testo, a: id, x: app.io.x, z: app.io.z, stanza: dove === 'piazza' ? null : dove }) });
+      const r = await fetch(A.url + '/parla', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nick: mioNick(), testo, a: id, x: app.io.x, z: app.io.z, stanza: doveIo() }) });
       if (r.status === 429) { nota.textContent = 'Aspetta qualche secondo tra un messaggio e l\'altro.'; return; }
       const j = await r.json(); if (!j.ok) throw new Error('no');
       inp.value = ''; nota.textContent = 'Consegnato: lo leggerà al prossimo pensiero (di solito entro pochi minuti).';
@@ -31747,7 +31747,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
       `<div style="font-size:20px;font-weight:700">${esc(s.nome)} 🤖</div>
        <div style="opacity:.75;font-size:12px;margin-bottom:8px">Agente IA libero · ${esc(A.dati.modello || '')}</div>
        <div style="margin:6px 0"><b>Adesso:</b> ${esc(cosaFa(s))}</div>
-       <div style="margin:6px 0"><b>Dove:</b> ${esc(s.stanza ? 'dentro ' + ({ negozio: 'Negozio TCG', tcg: 'Sala TCG' }[s.stanza] || (app.stanze[s.stanza] || {}).nome || s.stanza) : 'in piazza')}</div>
+       <div style="margin:6px 0"><b>Dove:</b> ${esc(s.stanza === 'tetto' ? 'sul tetto della Torre della Cometa' : s.stanza ? 'dentro ' + ({ negozio: 'Negozio TCG', tcg: 'Sala TCG' }[s.stanza] || (app.stanze[s.stanza] || {}).nome || s.stanza) : 'in piazza')}</div>
        <div style="margin:8px 0 4px"><b>Budget del mese:</b> ${euro(b.spesi)} su ${euro(b.tetto)} · ${b.pensieri} pensieri · restano ${b.giorni} giorni</div>
        <div style="height:10px;border-radius:5px;background:#3d3355;overflow:hidden"><div style="height:100%;width:${pc.toFixed(1)}%;background:${pc > 85 ? '#e0675c' : '#7ec8e3'}"></div></div>
        ${s.pensiero ? `<div style="margin-top:10px"><b>Ultimo pensiero:</b> <i>${esc(s.pensiero)}</i></div>` : ''}

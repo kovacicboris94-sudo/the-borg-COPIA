@@ -84,7 +84,9 @@ export const STANZE = [
   // la Torre della Cometa: ingresso dalla piazza (portone a est), poi si sale piano per piano con le scale
   { id: 'torre0', nome: 'Torre della Cometa', porta: { x: -39, z: 26 }, rect: { x0: -8.5, x1: 8.5, z0: -7.5, z1: 7.5 }, arrivo: { x: 0, z: 5.5 }, uscita: { x: 0, z: 6.3 } },
   ...['Primo', 'Secondo', 'Terzo'].map((n, i) => ({ id: 'torre' + (i + 1), nome: 'Torre della Cometa · ' + n + ' piano', da: 'torre' + i, porta: { x: 4.85, z: -3.85 },
-    rect: { x0: -8.5, x1: 8.5, z0: -7.5, z1: 7.5 }, arrivo: { x: -4.3, z: -3.5 }, uscita: { x: -5.9, z: -4.9 }, ritorno: { x: 3.7, z: -2.7 } }))
+    rect: { x0: -8.5, x1: 8.5, z0: -7.5, z1: 7.5 }, arrivo: { x: -4.3, z: -3.5 }, uscita: { x: -5.9, z: -4.9 }, ritorno: { x: 3.7, z: -2.7 } })),
+  // il tetto della torre, con il telescopio: le sue x e z sono quelle della piazza, ma si sta 16 metri piu' in alto
+  { id: 'tetto', nome: 'Tetto della Torre della Cometa', da: 'torre3', porta: { x: 4.85, z: -3.85 }, rect: { x0: -52.5, x1: -42.5, z0: 21, z1: 31 }, arrivo: { x: -50.5, z: 30.2 }, uscita: { x: -51.8, z: 30.2 }, ritorno: { x: 3.2, z: -2.2 } }
 ];
 export const stanzaDi = id => STANZE.find(q => q.id === id) || null;
 function cercaStanza(nome) {
