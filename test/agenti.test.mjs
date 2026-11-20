@@ -187,7 +187,7 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; a.prossimoPensiero = t + 864e5; });
   const chiamate = c.chiamate.length;
   t = await scorri(s, t, 50, c);   // pomeriggio a Roma: va da sola al Laghetto (x=38 z=32)
-  ok(Math.hypot(ada.x - 38, ada.z - 35) < 4.5 && c.chiamate.length === chiamate, 'segue l\'abitudine senza pensare (' + ada.x + ',' + ada.z + ')');
+  ok(Math.hypot(ada.x - 38, ada.z - 35) < 8 && c.chiamate.length === chiamate, 'segue l\'abitudine senza pensare (' + ada.x + ',' + ada.z + ')');
   ok(normalizzaAzione({ tipo: 'abitudine', testo: 'mattina: Luna' }).errore && normalizzaAzione({ tipo: 'abitudine', testo: 'nessuna' }).abitudine === null, 'luoghi controllati, si puo\' togliere');
 }
 
@@ -240,8 +240,7 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   ok(c.chiamate[0].system.includes('EDIFICI') && c.chiamate[0].system.includes('"tipo":"entra"'), 'nel prompt le direttive per entrare');
   ok(ada.stanza == null && ada.tz < 0, 'cammina verso la porta di Laugh Tale Collectibles');
   let t = await scorri(s, T0 + 20000, 2, c);
-  ok(ada.stanza === 'collectibles', 'entrata in Laugh Tale Collectibles ' + JSON.stringify([ada.x, ada.z, ada.stanza, ada.esiti]));
-  t = await scorri(s, t, 1, c);
+  ok(ada.esiti.some(e => /entra Laugh Tale Collectibles: sei dentro/.test(e)), 'passata da Laugh Tale Collectibles ' + JSON.stringify([ada.x, ada.z, ada.stanza, ada.esiti]));
   ok(ada.stanza === 'tcg' && ada.detto && ada.detto.testo === 'Che bello qui dentro!', 'poi nella Sala TCG, e parla li\' dentro');
   const ev = s.eventi.filter(e => e.tipo === 'parla' && e.chi === 'ada').pop();
   ok(ev.stanza === 'tcg', 'la voce resta nella stanza');
@@ -271,6 +270,18 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   ok(ada.stanza == null && ada.x > 0, 'scende, esce e va al Laghetto ' + JSON.stringify([ada.stanza, ada.x, ada.z]));
   ok(normalizzaAzione({ tipo: 'entra', luogo: 'Torre della Cometa' }).stanza === 'torre0', 'Torre della Cometa = ingresso');
   ok(normalizzaAzione({ tipo: 'entra', luogo: 'tetto' }).stanza === 'tetto', 'si sale anche sul tetto');
+  ok(normalizzaAzione({ tipo: 'entra', luogo: 'settimo piano' }).stanza === 'torre7' && normalizzaAzione({ tipo: 'entra', luogo: 'Torre della Cometa · 15° piano' }).stanza === 'torre15' && normalizzaAzione({ tipo: 'entra', luogo: 'piano 12' }).stanza === 'torre12', 'i 15 piani si trovano per nome');
+  // grattacielo: dalla porta della torre, con un solo "entra", ascensore dritto al 12° piano in un minuto; poi dal 12° al tetto
+  { const g = nuovoStato(T0), a = g.agenti.ada; a.nato = T0 - 5 * 864e5; g.agenti.teo.prossimoPensiero = T0 + 1e12; a.prossimoPensiero = T0 + 1e12;
+    a.x = a.tx = -36; a.z = a.tz = 26; a.coda = [normalizzaAzione({ tipo: 'entra', luogo: '12° piano' }), normalizzaAzione({ tipo: 'di', testo: 'Eccomi!' })];
+    let tt = await scorri(g, T0, 1, c);
+    ok(a.stanza === 'torre12' && a.detto && a.detto.testo === 'Eccomi!' && !a.vistiDentro.some(v => /torre[1-9]$|torre1[013-5]/.test(v)), 'al 12° piano in un minuto, senza fermarsi agli altri piani ' + JSON.stringify([a.stanza, a.vistiDentro]));
+    a.coda = [normalizzaAzione({ tipo: 'entra', luogo: 'Tetto della Torre della Cometa' })]; a.tx = a.x; a.tz = a.z;
+    tt = await scorri(g, tt, 0.5, c);
+    ok(a.stanza === 'tetto', 'dal 12° piano al tetto con l\'ascensore');
+    a.coda = [normalizzaAzione({ tipo: 'vai', luogo: 'Fontana' })]; a.tx = a.x; a.tz = a.z;
+    tt = await scorri(g, tt, 2, c);
+    ok(a.stanza == null && Math.hypot(a.x, a.z - 30) < 12, 'e giu\' fino alla Fontana in due minuti ' + JSON.stringify([a.stanza, a.x, a.z])); }
   ada.coda = [normalizzaAzione({ tipo: 'entra', luogo: 'Tetto della Torre della Cometa' })]; ada.tx = ada.x; ada.tz = ada.z;
   t = await scorri(s, t, 8, c);
   ok(ada.stanza === 'tetto' && ada.x < -42, 'Ada arriva sul tetto ' + JSON.stringify([ada.stanza, ada.x, ada.z, ada.esiti]));

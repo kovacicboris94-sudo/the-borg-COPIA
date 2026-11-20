@@ -1,6 +1,7 @@
 /* =====================================================================
    THE BORG - I NEGOZI DELLA TORRE DELLA COMETA
-   Un negozio per piano (1 = primo piano, 2 = secondo, 3 = terzo).
+   Un negozio per piano (da 1 = primo piano a 15 = quindicesimo). Un piano senza
+   negozio usa il gruppo condiviso dei piani vuoti; con il negozio ha il suo.
    null = "spazio libero": il piano resta vuoto, con il cartello e il gesso
    sul pavimento dove andranno bancone, scaffali e tavoli.
 
@@ -39,8 +40,6 @@
   'use strict';
   const B = window.B3;
   B.TORRE_NEGOZI = {
-    1: null,
-    2: null,
-    3: null
+    // 1: { nome: ..., ... }   (vedi sopra; i piani non scritti qui sono spazi liberi)
   };
 })();

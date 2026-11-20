@@ -34,7 +34,7 @@ export const REGOLE = {
   velocita: 1.3,              // metri al secondo, a piedi
   minutiPerMetroCubo: 3,      // tempo di costruzione
   maxOggetti: 150, maxOggettiAgente: 60,
-  maxAzioni: 5,
+  maxAzioni: 8,
   diarioMax: 24,              // oltre questo l'agente riscrive la memoria e il diario si accorcia
   memoriaMax: 1500,           // caratteri
   eventiMax: 150,
@@ -81,16 +81,23 @@ export const STANZE = [
   { id: 'scacchi', nome: 'Casa degli Scacchi', porta: { x: 3, z: -3.5 }, rect: { x0: -10, x1: 10, z0: -8, z1: 9 }, arrivo: { x: 0, z: 7 }, uscita: { x: 0, z: 7.8 } },
   { id: 'collectibles', nome: 'Laugh Tale Collectibles', porta: { x: -40, z: -3.5 }, rect: { x0: -10.5, x1: 10.5, z0: -5, z1: 15 }, arrivo: { x: 0, z: 13.5 }, uscita: { x: 0, z: 13.8 } },
   { id: 'tcg', nome: 'Sala TCG', da: 'collectibles', porta: { x: -8.3, z: 9 }, rect: { x0: -21, x1: 21, z0: -13, z1: 15 }, arrivo: { x: -18.8, z: 9 }, uscita: { x: -19.8, z: 9 } },
-  // la Torre della Cometa: ingresso dalla piazza (portone a est), poi si sale piano per piano con le scale
-  { id: 'torre0', nome: 'Torre della Cometa', porta: { x: -39, z: 26 }, rect: { x0: -8.5, x1: 8.5, z0: -7.5, z1: 7.5 }, arrivo: { x: 0, z: 5.5 }, uscita: { x: 0, z: 6.3 } },
-  ...['Primo', 'Secondo', 'Terzo'].map((n, i) => ({ id: 'torre' + (i + 1), nome: 'Torre della Cometa · ' + n + ' piano', da: 'torre' + i, porta: { x: 4.85, z: -3.85 },
-    rect: { x0: -8.5, x1: 8.5, z0: -7.5, z1: 7.5 }, arrivo: { x: -4.3, z: -3.5 }, uscita: { x: -5.9, z: -4.9 }, ritorno: { x: 3.7, z: -2.7 } })),
-  // il tetto della torre, con il telescopio: le sue x e z sono quelle della piazza, ma si sta 16 metri piu' in alto
-  { id: 'tetto', nome: 'Tetto della Torre della Cometa', da: 'torre3', porta: { x: 4.85, z: -3.85 }, rect: { x0: -52.5, x1: -42.5, z0: 21, z1: 31 }, arrivo: { x: -50.5, z: 30.2 }, uscita: { x: -51.8, z: 30.2 }, ritorno: { x: 3.2, z: -2.2 } }
+  // la Torre della Cometa: un grattacielo di 15 piani. Si entra dal portone (torre0, a est) e tra i piani,
+  // e fino al tetto, ci si sposta con l'ASCENSORE: "asc" = dove si prende in quella stanza, "ascArrivo" = dove si esce.
+  { id: 'torre0', nome: 'Torre della Cometa', torre: true, porta: { x: -39, z: 26 }, rect: { x0: -8.5, x1: 8.5, z0: -7.5, z1: 7.5 }, arrivo: { x: 0, z: 5.5 }, uscita: { x: 0, z: 6.3 },
+    asc: { x: 5.4, z: -6 }, ascArrivo: { x: 5.4, z: -4.5 } },
+  ...Array.from({ length: 15 }, (_, i) => ({ id: 'torre' + (i + 1), nome: 'Torre della Cometa · ' + (i + 1) + '° piano', torre: true, da: 'torre0', porta: { x: 5.4, z: -6 },
+    rect: { x0: -8.5, x1: 8.5, z0: -7.5, z1: 7.5 }, arrivo: { x: 5.4, z: -4.5 }, uscita: { x: 5.4, z: -6 }, ritorno: { x: 5.4, z: -4.5 }, asc: { x: 5.4, z: -6 }, ascArrivo: { x: 5.4, z: -4.5 } })),
+  // il tetto, con il telescopio: le sue x e z sono quelle della piazza, ma si sta 59 metri piu' in alto
+  { id: 'tetto', nome: 'Tetto della Torre della Cometa', torre: true, da: 'torre0', porta: { x: 5.4, z: -6 }, rect: { x0: -52.5, x1: -42.5, z0: 21, z1: 31 },
+    arrivo: { x: -50.5, z: 30.2 }, uscita: { x: -51.1, z: 30.2 }, ritorno: { x: 5.4, z: -4.5 }, asc: { x: -51.1, z: 30.2 }, ascArrivo: { x: -50.5, z: 30.2 } }
 ];
 export const stanzaDi = id => STANZE.find(q => q.id === id) || null;
 function cercaStanza(nome) {
   const n = String(nome || '').toLowerCase().trim(); if (!n) return null;
+  // i piani della torre si possono chiamare in tanti modi: "7° piano", "piano 7", "settimo piano"...
+  const num = n.match(/(\d+)\s*(?:°|º|o\b)?/), ord = ['primo', 'secondo', 'terzo', 'quarto', 'quinto', 'sesto', 'settimo', 'ottavo', 'nono', 'decimo', 'undicesimo', 'dodicesimo', 'tredicesimo', 'quattordicesimo', 'quindicesimo'].findIndex(o => n.includes(o));
+  if (/piano|torre/.test(n) && !/tetto/.test(n)) { const k = num ? +num[1] : ord + 1; if (k >= 1 && k <= 15) return stanzaDi('torre' + k); if (/terra|ingresso/.test(n)) return stanzaDi('torre0'); }
+  if (/tetto|telescopio/.test(n)) return stanzaDi('tetto');
   return STANZE.find(q => q.nome.toLowerCase() === n || q.id === n) || STANZE.find(q => q.nome.toLowerCase().includes(n) || n.includes(q.nome.toLowerCase())) || null;
 }
 function dentroStanza(st, x, z, m = 1.2) { const r = st.rect; return { x: r2(lim(x, r.x0 + m, r.x1 - m)), z: r2(lim(z, r.z0 + m, r.z1 - m)) }; }
@@ -340,14 +347,23 @@ function avanza(stato, ag, dt, adesso, regole) {
     if (L.tipo === 'costruisci' && o) { o.pronto = true; esito(ag, `costruisci "${o.nome}" (${o.id}): finito`); annota(ag, adesso, `Ho finito di costruire "${o.nome}" (${o.id}).`); evento(stato, { chi: ag.id, tipo: 'finito', testo: o.nome, x: o.x, z: o.z }); }
     if (L.tipo === 'rimuovi') { const i = stato.oggetti.findIndex(q => q.id === L.id); if (i >= 0) { const q = stato.oggetti[i]; stato.oggetti.splice(i, 1); esito(ag, `rimuovi ${q.id} "${q.nome}": fatto`); annota(ag, adesso, `Ho smontato "${q.nome}" di ${nomeDi(stato, q.autore)}.`); evento(stato, { chi: ag.id, tipo: 'rimosso', testo: q.nome, x: q.x, z: q.z }); } }
   }
-  // cammino
-  const dx = ag.tx - ag.x, dz = ag.tz - ag.z, d = Math.hypot(dx, dz), passoM = regole.velocita * dt;
-  if (d > 0.05) { if (passoM >= d) { ag.x = ag.tx; ag.z = ag.tz; } else { ag.x += dx / d * passoM; ag.z += dz / d * passoM; } ag.x = r2(ag.x); ag.z = r2(ag.z); return; }
-  // prossima azione in coda
-  while (ag.coda.length && !ag.lavoro) {
-    const a = ag.coda.shift();
-    if (esegui(stato, ag, a, adesso, regole) === 'cammina') break;
+  // cammino e azioni in coda: nello stesso passo si usa tutto il tempo (arrivi, entri, prendi l'ascensore, riparti...)
+  let resto = dt;
+  for (let giri = 0; giri < 12; giri++) {
+    const dx = ag.tx - ag.x, dz = ag.tz - ag.z, d = Math.hypot(dx, dz), passoM = regole.velocita * resto;
+    if (d > 0.05) {
+      if (passoM < d) { ag.x = r2(ag.x + dx / d * passoM); ag.z = r2(ag.z + dz / d * passoM); return; }
+      ag.x = ag.tx; ag.z = ag.tz; resto -= d / regole.velocita;
+    }
+    if (!ag.coda.length || ag.lavoro) break;
+    let cammina = false;
+    while (ag.coda.length && !ag.lavoro) {
+      const a = ag.coda.shift();
+      if (esegui(stato, ag, a, adesso, regole) === 'cammina') { cammina = true; break; }
+    }
+    if (!cammina || resto <= 0) return;
   }
+  if (ag.coda.length) return;
   if (!ag.coda.length && !ag.lavoro) { if (ag.modo === 'automatico') routine(ag, adesso); else passeggia(ag, adesso); }
 }
 
@@ -414,6 +430,21 @@ function esegui(stato, ag, a, adesso, regole) {
   if (a.tipo === 'entra') {
     const st = stanzaDi(a.stanza);
     if (ag.stanza === st.id) return esito(ag, `entra: sei gia' dentro ${st.nome}`);
+    // nella torre: l'ascensore porta dritti a qualunque piano (o al tetto)
+    const cur = ag.stanza && stanzaDi(ag.stanza);
+    if (st.asc && cur && cur.asc) {
+      if (Math.hypot(ag.x - cur.asc.x, ag.z - cur.asc.z) > 1) {
+        ag.tx = cur.asc.x; ag.tz = cur.asc.z; ag.ancora = null; ag.esplora = null; ag.meta = st.nome;
+        ag.coda.unshift(Object.assign({}, a, { inCammino: true })); return 'cammina';
+      }
+      ag.stanza = st.id; ag.x = ag.tx = st.ascArrivo.x; ag.z = ag.tz = st.ascArrivo.z; ag.meta = null; ag.esplora = null;
+      ag.ancora = dentroStanza(st, st.ascArrivo.x - 2, st.ascArrivo.z + 2); ag.prossimaGita = adesso + 15000;
+      ag.dentroFino = adesso + (a.auto ? 4 : 60) * 60000; if (!a.auto) ag.abitudineDopo = adesso + 60 * 60000;
+      (ag.vistiDentro || (ag.vistiDentro = [])).includes(st.id) || ag.vistiDentro.push(st.id);
+      annota(ag, adesso, `Ho preso l'ascensore: sono arrivato a ${st.nome}.`);
+      evento(stato, { chi: ag.id, tipo: 'entra', testo: st.nome, x: ag.x, z: ag.z });
+      return esito(ag, `entra ${st.nome}: arrivato con l'ascensore`);
+    }
     const serve = st.da || null;
     if ((ag.stanza || null) !== serve) {
       ag.coda.unshift(a);
@@ -435,7 +466,7 @@ function esegui(stato, ag, a, adesso, regole) {
     annota(ag, adesso, `Sono entrato in ${st.nome}.`);
     evento(stato, { chi: ag.id, tipo: 'entra', testo: st.nome, x: ag.x, z: ag.z });
     // in esplorazione: se dentro c'e' un'altra stanza mai vista, si da' un'occhiata anche li'
-    if (a.auto) { const dopo = STANZE.find(q => q.da === st.id && !ag.vistiDentro.includes(q.id)); if (dopo) ag.coda.push({ tipo: 'entra', stanza: dopo.id, auto: true }); }
+    if (a.auto) { const l = STANZE.filter(q => q.da === st.id && !ag.vistiDentro.includes(q.id)), dopo = l[Math.floor(adesso / 1000) % (l.length || 1)]; if (dopo) ag.coda.push({ tipo: 'entra', stanza: dopo.id, auto: true }); }
     return esito(ag, `entra ${st.nome}: sei dentro`);
   }
   if (a.tipo === 'esci') {
@@ -603,8 +634,10 @@ COSA SAI
 - I luoghi della piazza con il nome di un negozio sono davanti alla sua porta, fuori.
 - Gli edifici originali del borgo, la fontana, il laghetto, la ruota, la torre e il portale non si toccano e intorno a loro non si costruisce. Tutto quello che costruiscono gli abitanti invece si puo' spostare o smontare, anche da altri.
 
-EDIFICI: puoi entrare in ${STANZE.map(q => q.nome + (q.da ? ' (si entra da dentro ' + stanzaDi(q.da).nome + ')' : '')).join(', ')}. Le case private delle persone invece sono chiuse.
-- Per entrare usa {"tipo":"entra","luogo":"<nome dell'edificio>"}: cammini da solo fino alla porta ed entri (se l'edificio e' dentro un altro, passi prima da quello). Per uscire {"tipo":"esci"}; se dai un "vai" verso un luogo della piazza esci da solo.
+EDIFICI: puoi entrare in ${STANZE.filter(q => !q.torre).map(q => q.nome + (q.da ? ' (si entra da dentro ' + stanzaDi(q.da).nome + ')' : '')).join(', ')}. Le case private delle persone invece sono chiuse.
+- La Torre della Cometa e' un grattacielo di 15 piani con l'ascensore: "Torre della Cometa" (l'ingresso), "Torre della Cometa · 1° piano" ... "Torre della Cometa · 15° piano" e "Tetto della Torre della Cometa" (con il telescopio). Con UN SOLO "entra" vai dritto al piano che vuoi o sul tetto, anche dalla piazza: entri, prendi l'ascensore e arrivi, senza fermarti agli altri piani.
+- Per entrare usa {"tipo":"entra","luogo":"<nome dell'edificio>"}: cammini da solo fino alla porta ed entri (se l'edificio e' dentro un altro, passi prima da quello).
+- Per uscire {"tipo":"esci"}; se dai un "vai" verso un luogo della piazza esci da solo.
 - Dentro sei in una stanza con le sue coordinate x e z (te le dico quando ci sei). Vedi e senti solo chi e' nella stessa stanza; chi e' in piazza o in un altro edificio non ti vede e non ti sente, ma puoi sempre usare "scrivi".
 - Dentro gli edifici non si costruisce, non si sposta e non si smonta nulla: guardi, giri, parli, fai gesti, incontri le persone che giocano li'. Se ci entri tu ci resti finche' non decidi di uscire (o dopo un'ora esci da solo); quando esplori da solo dai solo un'occhiata di qualche minuto.
 
@@ -614,6 +647,7 @@ Devi far durare il budget fino a fine mese: sei tu a decidere fra quanti minuti 
 Camminare non costa nulla: le azioni che decidi in un pensiero le esegui gratis. E tra un pensiero e l'altro, quando non hai niente da fare, fai da solo due passi qui intorno e ogni tanto vai a esplorare un altro posto del borgo (prima quelli che non hai mai visto), sempre gratis. Se ti dai un'abitudine, segui quella invece di esplorare.
 
 AZIONI (le controllano le regole del mondo: se una e' impossibile viene rifiutata e lo scoprirai al prossimo pensiero). Al massimo ${regole.maxAzioni} per pensiero, eseguite in ordine.
+IMPORTANTE, vale per tutto: le azioni di un pensiero (fino a ${regole.maxAzioni}) vengono eseguite subito una dopo l'altra, senza aspettare il pensiero dopo. Un pensiero con tante azioni costa quasi come uno con una sola: per risparmiare, pianifica in un solo pensiero tutta la sequenza (andare, entrare, parlare, costruire, fare gesti, scrivere a qualcuno) invece di fare un passo per pensiero. Per esempio: [{"tipo":"entra","luogo":"Tetto della Torre della Cometa"},{"tipo":"di","testo":"Che vista!"},{"tipo":"gesto","testo":"salta"}].
 - {"tipo":"vai","luogo":"Fontana"} oppure {"tipo":"vai","x":10,"z":30}: cammini a ${regole.velocita} m/s. Le azioni dopo un "vai" partono quando arrivi. Dentro un edificio x e z sono quelle della stanza; se vai a un luogo della piazza esci da solo dalla porta.
 - {"tipo":"entra","luogo":"Sala Giochi"}: entri in un edificio (vedi EDIFICI).
 - {"tipo":"esci"}: esci dall'edificio in cui sei e torni in piazza davanti alla porta.
