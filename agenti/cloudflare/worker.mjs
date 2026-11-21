@@ -4,10 +4,10 @@
 //  - una sveglia (alarm) ogni 30 secondi fa scorrere il tempo e pensare gli agenti;
 //  - AGENTI_PAUSA = 1 (variabile nel pannello di Cloudflare) li mette in pausa: niente pensieri, niente spese;
 //  - la chiave di Anthropic sta nei segreti di Cloudflare (ANTHROPIC_API_KEY),
-//    il gioco non la vede mai: riceve solo /stato e manda /parla.
+//    il gioco non la vede mai: riceve solo /stato e manda /parla, /regala, /turno e /vendi.
 // =====================================================================
 import { DurableObject } from 'cloudflare:workers';
-import { nuovoStato, passo, vistaPubblica, giocatoreParla, cronaca, proposte } from '../motore.mjs';
+import { nuovoStato, passo, vistaPubblica, giocatoreParla, giocatoreRegala, giocatoreTurno, giocatoreVende, cronaca, proposte } from '../motore.mjs';
 import { cervelloClaude, cervelloFinto } from '../cervello.mjs';
 
 const PASSO_MS = 30 * 1000;
@@ -51,6 +51,26 @@ export class Borgo extends DurableObject {
       const ok = giocatoreParla(s, d.nick, d.testo, d.x, d.z, ora, { stanza: d.stanza, a: d.a });
       if (ok) await this.ctx.storage.put('stato', s);
       return json({ ok });
+    }
+    if (url.pathname === '/regala' && req.method === 'POST') {
+      // un mobile regalato a un abitante, posato in piazza: al massimo uno ogni 20 secondi per chi lo manda
+      const chi = 'r' + (req.headers.get('CF-Connecting-IP') || 'x'), ora = Date.now();
+      if (ora - (this.voci.get(chi) || 0) < 20000) return json({ ok: false, motivo: 'Aspetta qualche secondo prima di un altro regalo.' }, 429);
+      this.voci.set(chi, ora); if (this.voci.size > 500) this.voci.clear();
+      let d = {}; try { d = await req.json(); } catch (e) { /* vuoto */ }
+      const r = giocatoreRegala(s, d.nick, d, ora);
+      if (r.ok) await this.ctx.storage.put('stato', s);
+      return json(r);
+    }
+    if ((url.pathname === '/turno' || url.pathname === '/vendi') && req.method === 'POST') {
+      // il turno al bancone di una persona vera e le sue proposte ai clienti (al massimo una richiesta ogni 3 secondi)
+      const chi = 't' + (req.headers.get('CF-Connecting-IP') || 'x'), ora = Date.now();
+      if (ora - (this.voci.get(chi) || 0) < 3000) return json({ ok: false, motivo: 'Piano, un attimo.' }, 429);
+      this.voci.set(chi, ora); if (this.voci.size > 500) this.voci.clear();
+      let d = {}; try { d = await req.json(); } catch (e) { /* vuoto */ }
+      const r = url.pathname === '/turno' ? giocatoreTurno(s, d.nick, d.negozio, d.on !== false, ora) : giocatoreVende(s, d.nick, d, ora);
+      if (r.ok) await this.ctx.storage.put('stato', s);
+      return json(r);
     }
     return json({ ok: true, borgo: 'Il Borgo degli Agenti', chiave: !!this.cervello, pausa: this.env.AGENTI_PAUSA === '1', agenti: Object.keys(s.agenti) });
   }

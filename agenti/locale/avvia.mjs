@@ -15,7 +15,7 @@ import http from 'node:http';
 import { readFileSync, writeFileSync, existsSync, renameSync, statSync } from 'node:fs';
 import { join, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nuovoStato, passo, vistaPubblica, giocatoreParla, cronaca, proposte } from '../motore.mjs';
+import { nuovoStato, passo, vistaPubblica, giocatoreParla, giocatoreRegala, giocatoreTurno, giocatoreVende, cronaca, proposte } from '../motore.mjs';
 import { cervelloClaude, cervelloFinto } from '../cervello.mjs';
 
 const qui = p => fileURLToPath(new URL(p, import.meta.url));
@@ -65,6 +65,19 @@ const server = http.createServer((req, res) => {
     voci.set(chi, ora);
     let corpo = ''; req.on('data', c => { corpo += c; if (corpo.length > 4000) req.destroy(); });
     req.on('end', () => { let d = {}; try { d = JSON.parse(corpo); } catch (e) { /* vuoto */ } const ok = giocatoreParla(stato, d.nick, d.testo, d.x, d.z, ora, { stanza: d.stanza, a: d.a }); if (ok) salva(); manda({ ok }); });
+    return;
+  }
+  if (url.pathname === '/regala' && req.method === 'POST') {
+    const chi = 'r' + (req.socket.remoteAddress || 'x'), ora = Date.now();
+    if (ora - (voci.get(chi) || 0) < 20000) return manda({ ok: false, motivo: 'Aspetta qualche secondo prima di un altro regalo.' }, 429);
+    voci.set(chi, ora);
+    let corpo = ''; req.on('data', c => { corpo += c; if (corpo.length > 4000) req.destroy(); });
+    req.on('end', () => { let d = {}; try { d = JSON.parse(corpo); } catch (e) { /* vuoto */ } const r = giocatoreRegala(stato, d.nick, d, ora); if (r.ok) salva(); manda(r); });
+    return;
+  }
+  if ((url.pathname === '/turno' || url.pathname === '/vendi') && req.method === 'POST') {
+    let corpo = ''; req.on('data', c => { corpo += c; if (corpo.length > 4000) req.destroy(); });
+    req.on('end', () => { let d = {}; try { d = JSON.parse(corpo); } catch (e) { /* vuoto */ } const ora = Date.now(); const r = url.pathname === '/turno' ? giocatoreTurno(stato, d.nick, d.negozio, d.on !== false, ora) : giocatoreVende(stato, d.nick, d, ora); if (r.ok) salva(); manda(r); });
     return;
   }
   if (url.pathname === '/info') return manda({ ok: true, borgo: 'Il Borgo degli Agenti', chiave: !!cervello, agenti: Object.keys(stato.agenti) });
