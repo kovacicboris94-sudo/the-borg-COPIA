@@ -26,6 +26,8 @@
     posseduti(id) { return S.inv[id] || 0; },
     liberi(id) { return (S.inv[id] || 0) - S.piazzati.filter(p => p.id === id).length; },
     regala(id) { S.inv[id] = (S.inv[id] || 0) + 1; salva(); avvisa(); },
+    // un mobile libero (non posato in casa) che esce dallo zaino: per esempio regalato a un abitante del borgo
+    togli(id) { if (Eco.liberi(id) <= 0) return false; S.inv[id]--; if (!S.inv[id]) delete S.inv[id]; salva(); avvisa(); return true; },
     compra(id) { const a = B.ARREDI.find(x => x.id === id); if (!a || !Eco.spendi(a.prezzo)) return false; S.inv[id] = (S.inv[id] || 0) + 1; salva(); avvisa(); return true; },
     COSTI_AMPL: [400, 900, 1800],
     get liv() { return S.liv; },

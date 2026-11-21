@@ -214,6 +214,11 @@
       else if (s.lavoro) { const o = A.oggetti.get(s.lavoro.id); if (o) e.yaw = Math.atan2(o.d.x - e.x, o.d.z - e.z); }
       // il pavimento non e' tutto alla stessa altezza (palco, gradini): si sta sopra, come il giocatore
       const st = e.st, ty = st.alt ? st.alt(e.x, e.z) : 0; e.y = e.y == null ? ty : e.y + (ty - e.y) * Math.min(1, dt * 14);
+      // seduto su un mobile della piazza (una poltrona regalata, un divano...): si mette sul cuscino, rivolto in avanti
+      const sd = sedile(s, e);
+      if (sd) { e.x = sd.x; e.z = sd.z; e.y = sd.y; e.yaw = sd.yaw; e.vx = e.vz = 0; e.seduto = sd; }
+      else if (e.seduto) { const q = libera(e.seduto.fx, e.seduto.fz, e.st); e.x = q.x; e.z = q.z; e.seduto = null; e.via = null; }   // alzandosi si scende davanti al mobile
+      e.av.sedT = sd ? 1 : 0;
       e.av.root.position.set(e.x, e.y, e.z); e.av.root.rotation.y = e.yaw;
       // i piani della torre senza negozio condividono lo stesso gruppo: si vede solo chi e' al tuo piano
       e.av.root.visible = !app.gioco() || qui(s) || e.st.gruppo !== app.stanza().gruppo;
@@ -228,6 +233,59 @@
     });
   }
 
+  function sedile(s, e) {
+    const L = s.lavoro; if (!L || L.tipo !== 'usa' || !L.oggetto) return null;
+    const o = A.oggetti.get(L.id), a = o && o.d.modello && B.ARREDI && B.ARREDI.find(q => q.id === o.d.modello);
+    if (!a || !a.sedute) return null;
+    const q = a.sedute[Math.min(L.posto || 0, a.sedute.length - 1)], r = (o.d.rot || 0) * PI / 180, c = Math.cos(r), sn = Math.sin(r);
+    const x = o.d.x + q.x * c + q.z * sn, z = o.d.z - q.x * sn + q.z * c;
+    if (!e.seduto && Math.hypot(e.x - x, e.z - z) > 4) return null;   // e' ancora per strada: ci arriva camminando
+    return { x, z, y: (o.d.y || 0) + q.y, yaw: r, fx: o.d.x + Math.sin(r) * (o.d.p / 2 + 0.6), fz: o.d.z + Math.cos(r) * (o.d.p / 2 + 0.6) };
+  }
+
+  /* ---------- regalare un mobile a un abitante: lo posi in piazza davanti a te ed e' suo ---------- */
+  const REGALABILI = ['poltrona', 'divano', 'sedia', 'pouf', 'cassapanca', 'tavolino', 'tavolo', 'libreria', 'acquario', 'arcade', 'vaso', 'pianta', 'lampada', 'tappeto', 'fontana'];
+  function mobiliDaRegalare() { return B.Eco && B.ARREDI ? B.ARREDI.filter(a => REGALABILI.includes(a.id) && B.Eco.liberi(a.id) > 0) : []; }
+  function mostraRegali() {
+    const box = A.scheda && A.scheda.querySelector('.ag-voci'); if (!box) return;
+    A.voci = null;
+    const nome = (A.dati.agenti.find(a => a.id === A.scheda.dataset.id) || {}).nome || '';
+    if (doveIo()) { box.innerHTML = '<div style="margin-top:8px">I mobili si regalano in piazza: esci e riprova.</div>'; return; }
+    const l = mobiliDaRegalare();
+    if (!l.length) { box.innerHTML = '<div style="margin-top:8px">Non hai mobili liberi da regalare: comprali da “Arredamenti” in piazza (quelli posati in casa non contano).</div>'; return; }
+    box.innerHTML = `<div style="margin-top:8px;background:#1f1729;border-radius:10px;padding:8px 10px"><div style="margin-bottom:6px">Mettiti dove vuoi il mobile e scegli: lo poso <b>davanti a te</b>, girato verso di te. Diventa di ${esc(nome)} (esce dal tuo zaino). Al massimo 3 tuoi regali in piazza.</div>` +
+      l.map(a => `<button data-m="${a.id}" style="margin:3px 4px 3px 0;padding:7px 10px;border-radius:10px;border:0;background:#3d3355;color:#ffe9c4;font-size:14px;cursor:pointer">${esc(a.nome)} <small style="opacity:.7">x${B.Eco.liberi(a.id)}</small></button>`).join('') +
+      '<div class="ag-reg-nota" style="font-size:12px;margin-top:6px;opacity:.9"></div></div>';
+    box.querySelectorAll('button[data-m]').forEach(b => b.addEventListener('click', () => regala(b.dataset.m)));
+    try { box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { /* vecchi browser */ }
+  }
+  async function regala(id) {
+    const el = A.scheda; if (!el) return;
+    const nota = el.querySelector('.ag-reg-nota'), a = B.ARREDI.find(q => q.id === id), ag = el.dataset.id;
+    const dire = t => { if (nota) nota.textContent = t; };
+    if (!mioNick()) return dire('Prima scegli il tuo nome nel gioco.');
+    if (doveIo()) return dire('Devi essere in piazza.');
+    if (!a || B.Eco.liberi(id) <= 0) return dire('Non ce l\'hai più nello zaino.');
+    // davanti a te, a qualche passo, girato verso di te
+    const yaw = app.io.yaw || 0, k = Math.max(a.w, a.d) / 2 + 1.2, x = app.io.x + Math.sin(yaw) * k, z = app.io.z + Math.cos(yaw) * k, rot = (yaw + PI) * 180 / PI;
+    // non sopra edifici, panchine, alberi o altri oggetti: si prova il posto (centro e angoli) con gli stessi ostacoli del giocatore
+    const r = (yaw + PI), c = Math.cos(r), sn = Math.sin(r), pz = app.stanze.piazza;
+    const punti = [[0, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]].map(p => [x + p[0] * a.w * 0.45 * c + p[1] * a.d * 0.45 * sn, z - p[0] * a.w * 0.45 * sn + p[1] * a.d * 0.45 * c]);
+    if (!punti.every(p => app.libero(pz, p[0], p[1], 0.05))) return dire('Davanti a te non c\'è abbastanza spazio libero: girati o spostati un po\'.');
+    dire('Lo poso...');
+    try {
+      const rr = await fetch(A.url + '/regala', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nick: mioNick(), a: ag, mobile: id, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, rot: Math.round(rot) }) });
+      const j = await rr.json().catch(() => ({}));
+      if (!j.ok) return dire(j.motivo || 'Non sono riuscito, riprova.');
+      B.Eco.togli(id);
+      const nome = (A.dati.agenti.find(q => q.id === ag) || {}).nome || '';
+      G.emetti('toast', '🎁 Hai regalato ' + a.nome + ' a ' + nome + '!');
+      dire('Fatto! ' + nome + ' lo scoprirà al prossimo pensiero.');
+      setTimeout(chiedi, 300);
+      setTimeout(() => { if (A.scheda && A.scheda.dataset.id === ag) mostraRegali(); }, 1500);
+    } catch (e) { dire('Il borgo degli agenti non risponde, riprova tra poco.'); }
+  }
+
   /* ---------- le cose costruite ---------- */
   function geometria(f) {
     if (f === 'cilindro') return new T.CylinderGeometry(0.5, 0.5, 1, 18);
@@ -236,7 +294,9 @@
     if (f === 'piramide') { const g = new T.ConeGeometry(Math.SQRT1_2, 1, 4); g.rotateY(PI / 4); return g; }
     return new T.BoxGeometry(1, 1, 1);
   }
-  const firma = o => [o.forma, o.x, o.z, o.y, o.l, o.h, o.p, o.rot, o.colore, o.pronto, o.scritta, o.nome].join('|');
+  const firma = o => [o.forma, o.x, o.z, o.y, o.l, o.h, o.p, o.rot, o.colore, o.pronto, o.scritta, o.nome, o.modello].join('|');
+  // i mobili del Mercatino e i regali dei giocatori: si disegnano con il modello vero, come in casa
+  const modello = d => d.modello && B.creaMobile && B.ARREDI && B.ARREDI.find(a => a.id === d.modello) ? B.creaMobile(d.modello) : null;
   function togli(o) {
     gruppo.remove(o.g);
     o.g.traverse(q => { if (q.geometry) q.geometry.dispose(); if (q.material) { if (q.material.map) q.material.map.dispose(); q.material.dispose(); } });
@@ -248,9 +308,14 @@
       const vecchio = A.oggetti.get(d.id), f = firma(d);
       if (vecchio && vecchio.f === f) { vecchio.d = d; return; }
       if (vecchio) togli(vecchio);
-      const g = new T.Group(), mat = new T.MeshToonMaterial({ color: d.colore, transparent: !d.pronto, opacity: d.pronto ? 1 : 0.5 });
-      const mesh = new T.Mesh(geometria(d.forma), mat);
-      mesh.scale.set(d.l, d.h, d.p); mesh.position.y = d.y + d.h / 2; mesh.castShadow = d.pronto; mesh.receiveShadow = true;
+      const g = new T.Group(), vero = d.pronto && modello(d);
+      let mesh;
+      if (vero) { mesh = vero; mesh.position.y = d.y; }
+      else {
+        const mat = new T.MeshToonMaterial({ color: d.colore, transparent: !d.pronto, opacity: d.pronto ? 1 : 0.5 });
+        mesh = new T.Mesh(geometria(d.forma), mat);
+        mesh.scale.set(d.l, d.h, d.p); mesh.position.y = d.y + d.h / 2; mesh.castShadow = d.pronto; mesh.receiveShadow = true;
+      }
       g.add(mesh); g.position.set(d.x, 0, d.z); g.rotation.y = (d.rot || 0) * PI / 180;
       if (d.scritta) { const e = B.etichetta(d.scritta, { sfondo: '#fbf3dc', colore: '#3a2216', altezza: 0.32 }); e.position.y = d.y + d.h + 0.35; g.add(e); }
       gruppo.add(g);
@@ -265,7 +330,7 @@
     const l = app.piazza.ostacoli;
     for (let i = l.length - 1; i >= 0; i--) if (l[i].agenteIA) l.splice(i, 1);
     A.oggetti.forEach(o => {
-      const d = o.d; if (!d.pronto || d.y > 1.2 || Math.max(d.l, d.p) < 0.3) return;
+      const d = o.d; if (!d.pronto || d.y > 1.2 || Math.max(d.l, d.p) < 0.3 || d.h < 0.3) return;   // i tappeti si calpestano
       const a = (d.rot || 0) * PI / 180, c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a));
       const hx = (d.l * c + d.p * s) / 2, hz = (d.l * s + d.p * c) / 2;
       const ob = { t: 'b', x0: d.x - hx, x1: d.x + hx, z0: d.z - hz, z1: d.z + hz, agenteIA: true };
@@ -386,7 +451,7 @@
     box.innerHTML = '<div style="margin-top:8px;max-height:38vh;overflow:auto;background:#1f1729;border-radius:10px;padding:6px 10px">' + A.voci.slice().reverse().map(v => {
       const g = giorno(v.t), h = new Date(v.t).toTimeString().slice(0, 5), testa = g !== ultimo ? `<div style="margin:8px 0 2px;font-size:11px;opacity:.6;text-transform:uppercase">${esc(g)}</div>` : ''; ultimo = g;
       const chi = `<b>${esc(v.chi)}</b>${v.vero ? '' : ' 🤖'}`;
-      const cosa = v.tipo === 'parla' ? `: “${esc(v.testo)}”` : v.tipo === 'costruisce' ? ` inizia a costruire <i>${esc(v.testo)}</i>` : v.tipo === 'finito' ? ` ha finito <i>${esc(v.testo)}</i>` : v.tipo === 'rimosso' ? ` ha smontato <i>${esc(v.testo)}</i>` : v.tipo === 'proposta' ? ` propone per il gioco 💡 “${esc(v.testo)}”` : v.tipo === 'entra' ? ` entra in <i>${esc(v.testo)}</i>` : v.tipo === 'esce' ? ` esce da <i>${esc(v.testo)}</i>` : v.tipo === 'scrivi' ? ` scrive da lontano a <b>${esc(v.a)}</b> ✉️ “${esc(v.testo)}”` : v.tipo === 'usa' ? ` usa <i>${esc(v.testo)}</i>` : v.tipo === 'usato' ? `: ${esc(v.testo)}` : ` ha spostato <i>${esc(v.testo)}</i>`;
+      const cosa = v.tipo === 'regalo' ? ` regala <i>${esc(v.testo)}</i> a <b>${esc(v.a)}</b> 🎁` : v.tipo === 'parla' ? `: “${esc(v.testo)}”` : v.tipo === 'costruisce' ? ` inizia a costruire <i>${esc(v.testo)}</i>` : v.tipo === 'finito' ? ` ha finito <i>${esc(v.testo)}</i>` : v.tipo === 'rimosso' ? ` ha smontato <i>${esc(v.testo)}</i>` : v.tipo === 'proposta' ? ` propone per il gioco 💡 “${esc(v.testo)}”` : v.tipo === 'entra' ? ` entra in <i>${esc(v.testo)}</i>` : v.tipo === 'esce' ? ` esce da <i>${esc(v.testo)}</i>` : v.tipo === 'scrivi' ? ` scrive da lontano a <b>${esc(v.a)}</b> ✉️ “${esc(v.testo)}”` : v.tipo === 'usa' ? ` usa <i>${esc(v.testo)}</i>` : v.tipo === 'usato' ? `: ${esc(v.testo)}` : ` ha spostato <i>${esc(v.testo)}</i>`;
       return testa + `<div style="margin:3px 0"><span style="opacity:.6;font-size:12px">${h} · ${esc(v.luogo)}</span><br>${chi}${cosa}</div>`;
     }).join('') + '</div>';
   }
@@ -407,6 +472,7 @@
     el.style.cssText = 'position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(92vw,420px);max-height:60vh;overflow:auto;z-index:60;background:#2a1f36;color:#ffe9c4;border:2px solid #f2c76e;border-radius:16px;padding:14px 16px;font-family:sans-serif;font-size:14px;line-height:1.35;box-shadow:0 8px 30px rgba(0,0,0,.45)';
     el.innerHTML = '<button aria-label="Chiudi" style="position:absolute;right:8px;top:6px;background:none;border:0;color:#ffe9c4;font-size:22px;cursor:pointer">×</button><div class="ag-info"></div>' +
       '<button class="ag-cronaca" style="margin-top:10px;width:100%;padding:9px;border-radius:10px;border:0;background:#f2c76e;color:#2a1a2e;font-weight:700;font-size:14px;cursor:pointer">📜 Cronaca del borgo: cosa si sono detti e fatti</button>' +
+      '<button class="ag-regala" style="margin-top:8px;width:100%;padding:9px;border-radius:10px;border:2px solid #f2c76e;background:none;color:#ffe9c4;font-weight:700;font-size:14px;cursor:pointer">🎁 Regalagli un mobile</button>' +
       '<button class="ag-proposte" style="margin-top:8px;width:100%;padding:9px;border-radius:10px;border:2px solid #f2c76e;background:none;color:#ffe9c4;font-weight:700;font-size:14px;cursor:pointer">💡 Proposte per migliorare il gioco</button>' +
       '<div style="margin-top:10px;font-weight:700">✉️ Scrivigli da lontano</div><div class="ag-conv" style="max-height:22vh;overflow:auto"></div>' +
       '<div style="display:flex;gap:6px;margin-top:6px"><input class="ag-testo" maxlength="300" placeholder="Ti legge ovunque sia..." style="flex:1;min-width:0;padding:8px 10px;border-radius:10px;border:0;font-size:16px"><button class="ag-invia" style="padding:8px 12px;border-radius:10px;border:0;background:#f2c76e;color:#2a1a2e;font-weight:700">Invia</button></div>' +
@@ -414,6 +480,7 @@
       '<div class="ag-voci"></div><div style="margin-top:10px;font-size:12px;opacity:.75">Puoi anche parlargli in chat quando sei vicino a lui (ti sente entro ' + VISTA + ' metri, nello stesso posto). Ogni risposta gli costa un po\' di budget.</div>';
     el.querySelector('.ag-cronaca').addEventListener('click', mostraCronaca);
     el.querySelector('.ag-proposte').addEventListener('click', mostraProposte);
+    el.querySelector('.ag-regala').addEventListener('click', mostraRegali);
     el.querySelector('.ag-invia').addEventListener('click', scriviDaLontano);
     const inp = el.querySelector('.ag-testo');
     ['keydown', 'keyup', 'keypress'].forEach(ev => inp.addEventListener(ev, e => { e.stopPropagation(); if (ev === 'keydown' && e.key === 'Enter') scriviDaLontano(); }));

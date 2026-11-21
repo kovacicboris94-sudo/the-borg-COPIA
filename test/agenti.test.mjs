@@ -1,7 +1,7 @@
 // Prove del motore degli agenti (agenti/motore.mjs), senza chiave e senza spendere niente.
 //   node test/agenti.test.mjs
 import assert from 'node:assert/strict';
-import { nuovoStato, passo, budget, percezione, giocatoreParla, vistaPubblica, normalizzaAzione, leggiRisposta, costoDi, meseDi, REGOLE, SCHEMA, proposte, giocatoreArriva, promptDiSistema } from '../agenti/motore.mjs';
+import { nuovoStato, passo, budget, percezione, giocatoreParla, vistaPubblica, normalizzaAzione, leggiRisposta, costoDi, meseDi, REGOLE, SCHEMA, proposte, giocatoreArriva, promptDiSistema, giocatoreRegala } from '../agenti/motore.mjs';
 
 const T0 = Date.UTC(2026, 10, 20, 12, 0, 0);   // 20 novembre 2026, 13:00 a Roma
 let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -361,6 +361,46 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   t = await scorri(s, t, 12, c);
   ok(ada.starlight === prima + 2 || ada.starlight === prima + 10, 'giocando si guadagna');
   ok(vistaPubblica(s, t).agenti.find(a => a.id === 'ada').starlight === ada.starlight, 'il gioco vede gli Starlight');
+}
+
+// 19) regali dei giocatori: un mobile posato in piazza diventa dell'agente, lui lo sa, ci si siede, smontato torna nel suo zaino
+{
+  const s = nuovoStato(T0); Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; a.prossimoPensiero = T0 + 1e12; });
+  const ada = s.agenti.ada, teo = s.agenti.teo, c = finto(risp([]));
+  ok(!giocatoreRegala(s, 'Boris', { a: 'ada', mobile: 'statua', x: -8, z: 19 }, T0).ok, 'solo i mobili del Mercatino');
+  ok(!giocatoreRegala(s, 'Boris', { a: 'nessuno', mobile: 'poltrona', x: -8, z: 19 }, T0).ok, 'solo agli abitanti');
+  ok(/troppo vicino/.test(giocatoreRegala(s, 'Boris', { a: 'ada', mobile: 'poltrona', x: 1, z: 30 }, T0).motivo), 'non sulla fontana');
+  ok(/fuori/.test(giocatoreRegala(s, 'Boris', { a: 'ada', mobile: 'poltrona', x: 200, z: 30 }, T0).motivo), 'non fuori dalla piazza');
+  const r = giocatoreRegala(s, 'Boris', { a: 'ada', mobile: 'poltrona', x: -8, z: 19, rot: 180 }, T0);
+  const o = s.oggetti.find(q => q.id === r.id);
+  ok(r.ok && o.autore === 'ada' && o.donatore === 'g:Boris' && o.modello === 'poltrona' && o.rot === 180 && o.pronto, 'la poltrona e\' di Ada ' + JSON.stringify(r));
+  ok(/gia' "Poltrona"/.test(giocatoreRegala(s, 'Boris', { a: 'ada', mobile: 'sedia', x: -8.2, z: 19.3 }, T0).motivo), 'non sopra un altro mobile');
+  ok(giocatoreRegala(s, 'Boris', { a: 'teo', mobile: 'sedia', x: -12, z: 19 }, T0).ok && giocatoreRegala(s, 'Boris', { a: 'teo', mobile: 'pouf', x: -14, z: 19 }, T0).ok, 'altri due regali');
+  ok(/gia' 3 tuoi regali/.test(giocatoreRegala(s, 'Boris', { a: 'teo', mobile: 'vaso', x: -16, z: 19 }, T0).motivo), 'al massimo 3 regali a persona');
+  ada.x = ada.tx = 10; ada.z = ada.tz = 50; ada.stanza = null;   // lontana: il regalo lo sa lo stesso
+  const pe = percezione(s, ada, T0 + 1000);
+  ok(/Boris \(persona vera\) ti ha regalato "Poltrona"/.test(pe) && /mi ha regalato "Poltrona"/.test(pe) && ada.prossimoPensiero <= T0 + 4 * 60000, 'Ada sa del regalo e si sveglia ' + pe.slice(-900));
+  ok(normalizzaAzione({ tipo: 'usa', nome: o.id }).oggetto === o.id && normalizzaAzione({ tipo: 'usa', nome: 'Poltrona' }).oggetto === 'Poltrona' && normalizzaAzione({ tipo: 'usa', nome: 'Panchina' }).cosa === 'panchina', 'usa un mobile per id o per nome');
+  ada.prossimoPensiero = T0 + 1e12;
+  ada.coda = [normalizzaAzione({ tipo: 'usa', nome: o.id })];
+  let t = await scorri(s, T0, 1, c);
+  t = await scorri(s, t, 1, c);
+  ok(ada.lavoro && ada.lavoro.oggetto && ada.lavoro.id === o.id && Math.abs(ada.z - 17.75) < 0.3, 'Ada va davanti alla poltrona e si siede ' + JSON.stringify([ada.x, ada.z, ada.esiti]));
+  const v = vistaPubblica(s, t).agenti.find(a => a.id === 'ada');
+  ok(v.lavoro.oggetto && v.lavoro.posto === 0 && /regalo di Boris/.test(v.lavoro.nome), 'il gioco sa che e\' seduta');
+  teo.x = teo.tx = -8; teo.z = teo.tz = 16; teo.stanza = null;
+  teo.coda = [normalizzaAzione({ tipo: 'usa', nome: o.id })]; t = await scorri(s, t, 1, c);
+  ok(/gia' occupato/.test(teo.esiti.join()), 'una poltrona, un posto');
+  teo.x = teo.tx = -8; teo.z = teo.tz = 16; teo.coda = [normalizzaAzione({ tipo: 'rimuovi', id: o.id })]; t = await scorri(s, t, 0.5, c);
+  ok(/c'e' seduto qualcuno/.test(teo.esiti.join()), 'non si smonta con qualcuno seduto sopra');
+  t = await scorri(s, t, 11, c);
+  ok(!ada.lavoro && /ti sei alzato/.test(ada.esiti.join()), 'dopo 10 minuti si alza');
+  teo.x = teo.tx = -8; teo.z = teo.tz = 16; teo.coda = [normalizzaAzione({ tipo: 'rimuovi', id: o.id })]; t = await scorri(s, t, 6, c);
+  ok(!s.oggetti.includes(o) && ada.zaino.Poltrona === 1, 'smontata torna nello zaino di Ada');
+  ada.x = ada.tx = -8; ada.z = ada.tz = 16;
+  ada.coda = [normalizzaAzione({ tipo: 'metti', nome: 'Poltrona', x: -8, z: 19 })]; t = await scorri(s, t, 1, c);
+  ok(s.oggetti.some(q => q.nome === 'Poltrona' && q.modello === 'poltrona' && q.autore === 'ada'), 'Ada la rimette, con il modello vero');
+  ok(/regala <i>|regalo/.test(JSON.stringify(s.cronaca.filter(e => e.tipo === 'regalo'))), 'il regalo e\' nella cronaca');
 }
 
 // 9) pezzi piccoli
