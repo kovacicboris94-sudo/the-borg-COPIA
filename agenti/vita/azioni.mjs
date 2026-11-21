@@ -12,9 +12,10 @@ import { mangia as mangiaCorpo, bevi as beviCorpo, ammala, MET } from './corpo.m
 import { COLTURE, pesca as pescaNelLago, casuale, tempoAdesso } from './natura.mjs';
 import { UMIDITA_MAX_ESCA, UMIDITA_MAX_FUOCO } from './fisica.mjs';
 import { POSTI, REGOLE_VITA, nuovaCosa, registra, legnaNelFuoco } from './mondo.mjs';
-import { LISTINO, prezzoDi, prezzoAcquisto } from './economia.mjs';
+import { LISTINO, prezzoDi, prezzoAcquisto, limiteAcquisto } from './economia.mjs';
 import { MESTIERI, cercaMestiere, pagaOraria, ORE_MAX_GIORNO, descriviMestieri, competenza } from './mestieri.mjs';
 import { BAGNI, rendimento, soddisfa } from './umano.mjs';
+import { casaDi, aCasa, fornelloDi, doccia, CASA } from './casa.mjs';
 
 const r3 = v => Math.round(v * 1000) / 1000;
 const num = (v, d) => (typeof v === 'number' && isFinite(v) ? v : (typeof v === 'string' && v.trim() !== '' && isFinite(+v) ? +v : d));
@@ -24,7 +25,7 @@ const oraRoma = ms => +new Date(ms).toLocaleString('en-GB', { timeZone: 'Europe/
 
 // ---- descrizione per il prompt degli agenti ----
 export const TIPI_VITA = ['bevi', 'mangia', 'raccogli', 'pesca', 'accendi', 'alimenta', 'metti_sul_fuoco', 'togli_dal_fuoco', 'riempi', 'aggiungi', 'impasta', 'modella', 'dormi', 'riposa', 'semina', 'annaffia', 'prendi', 'lascia', 'dai',
-  'compra', 'vendi', 'lavora', 'lavati', 'bagno', 'svago', 'chiacchiera', 'butta'];
+  'compra', 'vendi', 'lavora', 'lavati', 'bagno', 'svago', 'chiacchiera', 'butta', 'casa', 'spegni', 'termostato'];
 // durante un turno di lavoro si puo' fare una pausa per queste (senza lasciare il turno)
 const IN_PAUSA = ['mangia', 'bevi', 'bagno'];
 export function promptAzioniVita() {
@@ -52,7 +53,8 @@ AZIONI DEL CORPO (vanno nella stessa lista delle altre; se il posto e' lontano c
 SOLDI E LAVORO: il cibo, la legna e gli attrezzi arrivano da fuori ogni mattina al Mercatino (x=0 z=8) e si pagano in Starlight. Le scorte sono limitate: se finiscono, il prezzo sale.
 - {"tipo":"compra","nome":"pane","x":0.5}: compri x kg (o pezzi per gli attrezzi) al Mercatino. {"tipo":"vendi","nome":"pesce","x":1}: vendi al Mercatino quello che hai prodotto (te lo paga meta' del suo prezzo).
 - {"tipo":"lavora","nome":"barista","x":4}: fai un turno di x ore (massimo ${ORE_MAX_GIORNO} al giorno, solo negli orari della bottega, posti limitati). Mestieri: ${descriviMestieri()}. Con l'esperienza la paga sale fino al 40% in piu'. Durante il turno puoi solo mangiare, bere e andare in bagno. Oppure lavori in proprio: pesca, coltiva, fai pentole o pane e vendi.
-CORPO E TESTA: {"tipo":"bagno"} (in un edificio: Biblioteca, Sala Giochi, Casa degli Scacchi, Negozio TCG, Laugh Tale, Torre); {"tipo":"lavati"} (in un edificio con acqua calda, o alla Fontana con acqua gelata); {"tipo":"svago","luogo":"Belvedere","x":1} (x ore di riposo e divertimento: passa la noia); {"tipo":"chiacchiera","id":"teo","x":20} (x minuti con chi ti sta vicino: passa la solitudine a tutti e due).`;
+CASA: hai una casetta tua in piazza. {"tipo":"casa"} ci torni. Dentro: fornello a gas ({"tipo":"accendi"}, poi metti_sul_fuoco / togli_dal_fuoco, poi {"tipo":"spegni"}), frigo a 4 gradi (il cibo che lasci a casa va in frigo e dura molto di piu'; {"tipo":"prendi"} per riprenderlo), bagno con doccia calda, letto con il piumone, riscaldamento ({"tipo":"termostato","x":19}). Gas, luce e acqua si pagano a fine giornata in Starlight: se non paghi per troppo tempo staccano gas e luce.
+CORPO E TESTA: {"tipo":"bagno"} (a casa o in un edificio: Biblioteca, Sala Giochi, Casa degli Scacchi, Negozio TCG, Laugh Tale, Torre); {"tipo":"lavati"} (in un edificio con acqua calda, o alla Fontana con acqua gelata); {"tipo":"svago","luogo":"Belvedere","x":1} (x ore di riposo e divertimento: passa la noia); {"tipo":"chiacchiera","id":"teo","x":20} (x minuti con chi ti sta vicino: passa la solitudine a tutti e due).`;
 }
 
 // ---- zaino ----
@@ -95,10 +97,10 @@ function postoDa(nome) {
   return null;
 }
 // il fuoco piu' vicino entro r metri (prima quelli accesi)
-const fuocoVicino = (mondo, c, r = 3) => mondo.fuochi.filter(f => !c.stanza && dist(f, c) <= r).sort((a, b) => (b.acceso ? 1 : 0) - (a.acceso ? 1 : 0) || dist(a, c) - dist(b, c))[0] || null;
+const fuocoVicino = (mondo, c, r = 3) => mondo.fuochi.filter(f => (f.stanza ? f.stanza === c.stanza : !c.stanza && dist(f, c) <= r)).sort((a, b) => (b.acceso ? 1 : 0) - (a.acceso ? 1 : 0) || dist(a, c) - dist(b, c))[0] || null;
 const pentolaDi = (mondo, c) => c.zaino.find(q => q.cosa === 'pentola') || (fuocoVicino(mondo, c) || { sopra: [] }).sopra.find(q => q.cosa === 'pentola') || null;
 const dispensaQui = c => nelPosto(c, POSTI.dispensa);
-const coseVicine = (mondo, c) => mondo.cose.filter(q => (q.dove === 'dispensa' && dispensaQui(c)) || (q.dove === 'terra' && (q.stanza || null) === (c.stanza || null) && dist(q, c) <= REGOLE_VITA.portataMani));
+const coseVicine = (mondo, c) => mondo.cose.filter(q => (q.dove === 'frigo' && aCasa(mondo, c) && q.casa === c.id) || (q.dove === 'dispensa' && dispensaQui(c)) || (q.dove === 'terra' && (q.stanza || null) === (c.stanza || null) && dist(q, c) <= REGOLE_VITA.portataMani));
 
 // ---- normalizzazione (da quello che scrive il modello a un'azione pulita) ----
 export function normalizzaAzioneVita(a) {
@@ -125,6 +127,15 @@ export function eseguiAzioneVita(mondo, id, a, t) {
   return r;
 }
 const no = esito => ({ ok: false, esito });
+// la strada di casa: si va alla porta della casetta e si entra
+const vaiACasa = (mondo, c, motivo) => { const k = casaDi(mondo, c); return k ? { vai: { x: k.porta.x, z: k.porta.z, nome: k.nome, entra: k.stanza }, esito: motivo } : null; };
+// il bagno piu' vicino: a casa o in un edificio pubblico
+const bagnoQui = (mondo, c) => (c.stanza && BAGNI.includes(c.stanza)) || aCasa(mondo, c);
+function versoUnBagno(mondo, c, motivo) {
+  const k = casaDi(mondo, c), bib = { x: -27.7, z: -3.5 };
+  if (k && (Math.hypot(k.porta.x - c.x, k.porta.z - c.z) <= Math.hypot(bib.x - c.x, bib.z - c.z) + 10 || c.stanza)) return vaiACasa(mondo, c, motivo + ' a casa');
+  return { vai: { x: bib.x, z: bib.z, nome: 'Biblioteca', entra: 'biblioteca' }, esito: motivo + ' in Biblioteca' };
+}
 const lavoro = (c, t, tipo, minuti, attivita, dati = {}) => { c.lavoro = Object.assign({ tipo, inizio: t, fine: t + minuti * 60000, attivita }, dati); c.attivita = attivita; return { ok: true, esito: `${tipo}: iniziato, ci vorranno circa ${Math.round(minuti)} minuti`, minuti }; };
 
 const AZIONI = {
@@ -216,6 +227,12 @@ const AZIONI = {
   },
 
   accendi(mondo, c, a, t) {
+    if (aCasa(mondo, c)) {
+      const k = casaDi(mondo, c), f = fornelloDi(mondo, k);
+      if (k.staccato) return no('il gas e\' staccato: ci sono bollette da pagare');
+      if (f.acceso) return { ok: true, esito: 'il fornello e\' gia\' acceso' };
+      f.acceso = true; return { ok: true, esito: 'fornello a gas acceso (ricordati di spegnerlo: il gas si paga)' };
+    }
     if (c.stanza) return no('dentro gli edifici non si accendono fuochi');
     const forno = /forno/i.test(a.luogo || a.nome || '');
     if (forno && !nelPosto(c, POSTI.forno)) return vaiA(POSTI.forno, 'vado al Forno');
@@ -248,10 +265,11 @@ const AZIONI = {
     const pezzo = preleva(mondo, c.zaino, a.cosa, lim(a.quanto ?? 99, 0.05, 99));
     if (!pezzo) return no(`non hai ${nomeDi(a.cosa)} con te`);
     const argilla = OGGETTI[a.cosa] && OGGETTI[a.cosa].materiale === 'argilla';
-    pezzo.modo = a.cosa === 'pentola' ? 'pentola' : argilla ? 'fiamme' : f.struttura === 'forno_pane' ? 'forno' : 'brace';
+    if (argilla && f.gas) { deponi(c.zaino, pezzo); return no('sul fornello di casa l\'argilla non cuoce: servono 550 gradi per un\'ora, ci vuole un fuoco vero o una fornace'); }
+    pezzo.modo = a.cosa === 'pentola' ? 'pentola' : argilla ? 'fiamme' : f.struttura === 'forno_pane' ? 'forno' : 'brace';   // sul fornello 'brace' = in padella
     pezzo.T = pezzo.T ?? (c.ambiente ? c.ambiente.tAria : 15);
     f.sopra.push(pezzo);
-    return { ok: true, esito: `${nomeDi(a.cosa)} ${pezzo.modo === 'fiamme' ? 'nelle fiamme' : pezzo.modo === 'forno' ? 'nel forno' : 'sul fuoco'}` + (f.acceso ? '' : ' (il fuoco pero\' e\' spento)') };
+    return { ok: true, esito: `${nomeDi(a.cosa)} ${pezzo.modo === 'fiamme' ? 'nelle fiamme' : pezzo.modo === 'forno' ? 'nel forno' : f.gas ? (a.cosa === 'pentola' ? 'sul fornello' : 'in padella sul fornello') : 'sul fuoco'}` + (f.acceso ? '' : ' (il fuoco pero\' e\' spento)') };
   },
 
   togli_dal_fuoco(mondo, c, a, t) {
@@ -335,7 +353,7 @@ const AZIONI = {
     const ore = lim(a.quanto ?? 8, 0.3, 12);
     c.addormentato = true;
     lavoro(c, t, 'dormi', ore * 60, 'dormire');
-    return { ok: true, esito: `ti addormenti${c.stanza ? ' al chiuso' : ' all\'aperto'}` };
+    return { ok: true, esito: `ti addormenti${aCasa(mondo, c) ? ' nel tuo letto' : c.stanza ? ' al chiuso' : ' all\'aperto'}` };
   },
 
   riposa(mondo, c, a, t) { return lavoro(c, t, 'riposa', lim(a.quanto ?? 20, 5, 240), 'riposare'); },
@@ -387,9 +405,28 @@ const AZIONI = {
     if (!a.cosa) return no('cosa lasci?');
     const p = preleva(mondo, c.zaino, a.cosa, OGGETTI[a.cosa] ? 1 : lim(a.quanto ?? 99, 0.01, 99));
     if (!p) return no(`non hai ${nomeDi(a.cosa)}`);
-    if (dispensaQui(c)) { p.dove = 'dispensa'; } else { p.dove = 'terra'; p.x = c.x; p.z = c.z; if (c.stanza) p.stanza = c.stanza; }
+    if (aCasa(mondo, c) && (/frigo/i.test(a.luogo || '') || (MATERIALI[a.cosa] && MATERIALI[a.cosa].dura20))) { p.dove = 'frigo'; p.casa = c.id; }
+    else if (dispensaQui(c)) { p.dove = 'dispensa'; } else { p.dove = 'terra'; p.x = c.x; p.z = c.z; if (c.stanza) p.stanza = c.stanza; }
     mondo.cose.push(p);
-    return { ok: true, esito: `lasciato ${OGGETTI[a.cosa] ? '' : p.kg.toFixed(2) + ' kg di '}${nomeDi(a.cosa)} ${p.dove === 'dispensa' ? 'in Dispensa' : 'a terra'}` };
+    return { ok: true, esito: `lasciato ${OGGETTI[a.cosa] ? '' : p.kg.toFixed(2) + ' kg di '}${nomeDi(a.cosa)} ${p.dove === 'frigo' ? 'in frigo' : p.dove === 'dispensa' ? 'in Dispensa' : aCasa(mondo, c) ? 'in casa' : 'a terra'}` };
+  },
+
+  casa(mondo, c, a, t) {
+    if (aCasa(mondo, c)) return { ok: true, esito: 'sei gia\' a casa' };
+    return vaiACasa(mondo, c, 'torno a casa') || no('non hai una casa');
+  },
+
+  spegni(mondo, c, a, t) {
+    const f = aCasa(mondo, c) ? fornelloDi(mondo, casaDi(mondo, c)) : fuocoVicino(mondo, c);
+    if (!f || !f.acceso) return no('non c\'e\' niente di acceso qui');
+    if (!f.gas) { f.legna = []; f.acceso = false; return { ok: true, esito: 'hai spento il fuoco (la legna rimasta e\' bruciacchiata, non serve piu\')' }; }
+    f.acceso = false; return { ok: true, esito: 'fornello spento' };
+  },
+
+  termostato(mondo, c, a, t) {
+    if (!aCasa(mondo, c)) return no('il termostato e\' a casa tua');
+    const k = casaDi(mondo, c); k.termostato = lim(a.quanto ?? 19, 10, 24);
+    return { ok: true, esito: `termostato a ${k.termostato} gradi (adesso in casa ce ne sono ${k.T.toFixed(0)}). Ogni grado in piu' costa circa il 7% di gas in piu'` };
   },
 
   butta(mondo, c, a, t) {
@@ -422,11 +459,11 @@ const AZIONI = {
   vendi(mondo, c, a, t) {
     const m = mondo.mercato; if (!m) return no('non c\'e\' un mercato');
     if (!a.cosa) return no('cosa vendi?');
-    const limite = (LISTINO[a.cosa] || [])[2] || 0;
-    if (!limite) return no(`il Mercatino non compra ${nomeDi(a.cosa)}`);
+    if (!((LISTINO[a.cosa] || [])[2])) return no(`il Mercatino non compra ${nomeDi(a.cosa)}`);
+    const limite = limiteAcquisto(mondo.mercato, a.cosa) + (m.vendutoOggi[a.cosa] || 0);
     if (!nelPosto(c, POSTI.dispensa)) return vaiA(POSTI.dispensa, 'vado al Mercatino a vendere');
     const resta = limite - (m.vendutoOggi[a.cosa] || 0);
-    if (resta <= 0.001) return no(`oggi il Mercatino ha gia' comprato abbastanza ${nomeDi(a.cosa)}: torna domani`);
+    if (resta <= 0.001) return no(`oggi il Mercatino ha gia' abbastanza ${nomeDi(a.cosa)} per i suoi clienti: torna domani`);
     const pezzi = !!OGGETTI[a.cosa];
     const p = preleva(mondo, c.zaino, a.cosa, pezzi ? 1 : Math.min(resta, lim(a.quanto ?? 99, 0.05, 99)));
     if (!p) return no(`non hai ${nomeDi(a.cosa)}`);
@@ -457,14 +494,20 @@ const AZIONI = {
   bagno(mondo, c, a, t) {
     // al lavoro c'e' il bagno del personale
     if (c.lavoro && c.lavoro.tipo === 'lavora') { c.umano.vescica = 0; return { ok: true, esito: 'pausa: sei andato nel bagno del personale' }; }
-    if (!c.stanza || !BAGNI.includes(c.stanza)) return { vai: { x: -27.7, z: -3.5, nome: 'Biblioteca', entra: 'biblioteca' }, esito: 'vado al bagno della Biblioteca' };
+    if (!bagnoQui(mondo, c)) return versoUnBagno(mondo, c, 'vado in bagno');
     c.umano.vescica = 0;
+    if (aCasa(mondo, c)) casaDi(mondo, c).acquaL += 6;   // lo sciacquone: ~6 litri
     return { ok: true, esito: 'sei andato in bagno' };
   },
 
   lavati(mondo, c, a, t) {
+    if (aCasa(mondo, c)) {
+      const d = doccia(casaDi(mondo, c));
+      c.umano.igiene = d.calda ? 1 : 0.9; lavoro(c, t, 'lavati', 15, 'lavarsi');
+      return { ok: true, esito: d.calda ? `doccia calda a casa (${d.litri} litri d'acqua a ${CASA.docciaT} gradi): sei pulito` : 'il gas e\' staccato: doccia gelata. Pulito, ma che freddo' };
+    }
     if (c.stanza && BAGNI.includes(c.stanza)) { c.umano.igiene = 1; return lavoro(c, t, 'lavati', 15, 'lavarsi'), { ok: true, esito: 'ti lavi con l\'acqua calda: sei pulito' }; }
-    if (!nelPosto(c, POSTI.fontana)) return { vai: { x: -27.7, z: -3.5, nome: 'Biblioteca', entra: 'biblioteca' }, esito: 'vado a lavarmi in Biblioteca' };
+    if (!nelPosto(c, POSTI.fontana)) return versoUnBagno(mondo, c, 'vado a lavarmi');
     // alla fontana: acqua fredda, ci si bagna (e d'inverno si gela)
     c.umano.igiene = Math.max(c.umano.igiene, 0.8); c.bagnato = Math.max(c.bagnato || 0, 0.5);
     lavoro(c, t, 'lavati', 6, 'lavarsi');

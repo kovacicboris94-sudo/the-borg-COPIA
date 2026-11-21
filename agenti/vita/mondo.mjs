@@ -12,6 +12,7 @@ import { MATERIALI, OGGETTI } from './materiali.mjs';
 import { nuovoCorpo, viviCorpo, bilancioTermico } from './corpo.mjs';
 import { nuovoMercato, chiudiGiornataMercato, STARLIGHT_INIZIALI } from './economia.mjs';
 import { nuovoUmano, viviUmano } from './umano.mjs';
+import { nuoveCase, fornelloNuovo, viviCasa, bollettaDelGiorno, raffreddaInFrigo, temperaturaFrigo, CASA } from './casa.mjs';
 import { tempoAdesso, crescePianta, crescePesci, cresconoAlberi, invecchia, casuale } from './natura.mjs';
 import { completaLavoro } from './azioni.mjs';
 
@@ -84,11 +85,14 @@ export function nuovoMondo({ adesso, seme = 12345, abitanti = ['ada', 'teo'], po
     mondo.corpi[id] = Object.assign(nuovoCorpo(CORPI_ABITANTI[id] || {}), { id, x: p.x, z: p.z, stanza: null, zaino: [], lavoro: null, abilita: { pesca: 0, fuoco: 0, argilla: 0, cucina: 0 },
       starlight: STARLIGHT_INIZIALI, umano: nuovoUmano(), esperienza: {}, oreLavoroOggi: 0, cloBase: null });
   }
+  // ognuno ha la sua casetta, con il fornello a gas in cucina
+  mondo.case = nuoveCase(abitanti);
+  for (const k of Object.values(mondo.case)) mondo.fuochi.push(fornelloNuovo(k));
   return mondo;
 }
 
-export const TMAX_STRUTTURA = { aperto: TEMPERATURA_MAX.aperto, forno_pane: 450, fornace: TEMPERATURA_MAX.pietra };
-const REND = { aperto: RENDIMENTO.aperto, forno_pane: RENDIMENTO.pietra, fornace: RENDIMENTO.pietra };
+export const TMAX_STRUTTURA = { aperto: TEMPERATURA_MAX.aperto, forno_pane: 450, fornace: TEMPERATURA_MAX.pietra, fornello: 260 };   // fornello: il fondo della padella
+const REND = { aperto: RENDIMENTO.aperto, forno_pane: RENDIMENTO.pietra, fornace: RENDIMENTO.pietra, fornello: 0.45 };   // un fornello a gas porta ~45% del calore nella pentola
 
 export function registra(mondo, e) {
   mondo.registro.push(Object.assign({ t: mondo.t }, e));
@@ -100,6 +104,7 @@ export function registra(mondo, e) {
 /* ------------------------------------------------------------------ */
 export function legnaNelFuoco(f) { return f.legna.reduce((s, l) => s + l.kg, 0); }
 function potenzaFuoco(f) {
+  if (f.gas) return { W: f.acceso ? CASA.fornelloW : 0, kgOra: 0, umid: 0 };
   const kg = legnaNelFuoco(f); if (!kg || !f.acceso) return { W: 0, kgOra: 0 };
   const umid = f.legna.reduce((s, l) => s + l.kg * l.umid, 0) / kg;
   const kgOra = consumoFuoco(kg, umid);
@@ -110,6 +115,14 @@ function viviFuoco(mondo, f, dt, tempo) {
   const tAria = tempo.tAria;
   if (f.T == null) f.T = tAria;
   const p = potenzaFuoco(f);
+  if (f.gas) {
+    // fornello a metano: se hanno staccato il gas si spegne; altrimenti va a potenza fissa (il consumo lo conta la casa)
+    const k = mondo.case && mondo.case[f.casa]; if (f.acceso && k && k.staccato) f.acceso = false;
+    const Tob = f.acceso ? tAria + (TMAX_STRUTTURA.fornello - tAria) * 0.8 : (k ? k.T : tAria);
+    f.T += (Tob - f.T) * (1 - Math.exp(-dt / 120));
+    for (const s of f.sopra) scaldaSulFuoco(mondo, f, s, potenzaFuoco(f).W, dt, k ? k.T : tAria);
+    return;
+  }
   if (f.acceso) {
     // legna troppo bagnata o finita: il fuoco muore
     if (!legnaNelFuoco(f) || p.umid > UMIDITA_MAX_FUOCO) { f.acceso = false; registra(mondo, { tipo: 'fuoco_spento', fuoco: f.id, motivo: !legnaNelFuoco(f) ? 'legna finita' : 'legna bagnata' }); }
@@ -248,18 +261,24 @@ function passoBreve(mondo, dt, regole, eventi) {
   for (const f of mondo.fuochi) viviFuoco(mondo, f, dt, tempo);
   mondo.fuochi = mondo.fuochi.filter(f => f.fisso || f.acceso || f.sopra.length || (f.T - tempo.tAria) > 5);
   // le cose invecchiano (a terra sotto la pioggia si bagnano; in dispensa e nello zaino no)
-  const vicinoFuoco = c => mondo.fuochi.some(f => f.acceso && Math.hypot(f.x - c.x, f.z - c.z) < 2);
-  for (const c of mondo.cose) { invecchia(c, ore, tempo.tAria, c.dove === 'terra' && tempo.piove && !c.stanza, c.dove === 'terra' && vicinoFuoco(c), c.stanza ? 50 : tempo.umidita); if (c.T != null) c.T = versoAria(c.T, tempo.tAria, c.kg, (MATERIALI[c.cosa] || {}).c || 1000, dt); }
+  const vicinoFuoco = c => mondo.fuochi.some(f => f.acceso && !f.stanza && Math.hypot(f.x - c.x, f.z - c.z) < 2);
+  // le case: temperatura, caldaia, consumi
+  if (mondo.case) for (const k of Object.values(mondo.case)) viviCasa(mondo, k, dt, tempo.tAria, Object.values(mondo.corpi).filter(c => c.stanza === k.stanza && !c.morto).length);
+  // cibo in frigo: sta a 4 gradi (se c'e' la luce) e va a male molto piu' piano
+  for (const q of mondo.cose) if (q.dove === 'frigo') { const k = mondo.case[q.casa]; raffreddaInFrigo(q, k, dt); invecchia(q, ore, q.T ?? temperaturaFrigo(k), false, false, 50); }
+  for (const c of mondo.cose.filter(q => q.dove !== 'frigo')) { invecchia(c, ore, tempo.tAria, c.dove === 'terra' && tempo.piove && !c.stanza, c.dove === 'terra' && vicinoFuoco(c), c.stanza ? 50 : tempo.umidita); if (c.T != null) c.T = versoAria(c.T, tempo.tAria, c.kg, (MATERIALI[c.cosa] || {}).c || 1000, dt); }
   for (const f of mondo.fuochi) for (const s of f.sopra) { invecchia(s, ore, s.T ?? tempo.tAria, false, true); for (const q of s.contenuto || []) invecchia(q, ore, q.T ?? tempo.tAria, false, false); }
   // i corpi
   for (const c of Object.values(mondo.corpi)) {
     for (const q of c.zaino) { invecchia(q, ore, q.T ?? tempo.tAria, tempo.piove && !c.stanza ? 0.3 : 0, false, c.stanza ? 50 : tempo.umidita); if (q.T != null) q.T = versoAria(q.T, tempo.tAria, q.kg, (MATERIALI[q.cosa] || {}).c || 1000, dt); for (const w of q.contenuto || []) { invecchia(w, ore, w.T ?? tempo.tAria, false, false); if (w.T != null) w.T = q.T; } }
-    const fuoco = mondo.fuochi.filter(f => f.acceso && !c.stanza).map(f => ({ f, d: Math.hypot(f.x - c.x, f.z - c.z) })).filter(o => o.d < 4).sort((a, b) => a.d - b.d)[0];
+    const casa = mondo.case && Object.values(mondo.case).find(k => k.stanza === c.stanza);
+    const fuoco = mondo.fuochi.filter(f => f.acceso && !c.stanza && !f.stanza).map(f => ({ f, d: Math.hypot(f.x - c.x, f.z - c.z) })).filter(o => o.d < 4).sort((a, b) => a.d - b.d)[0];
     const amb = {
       tAria: tempo.tAria, vento: c.stanza ? 0.1 : tempo.vento, riparo: !!c.stanza,
       bagnato: c.stanza ? 0 : (tempo.piove ? Math.min(1, (c.bagnato || 0) + ore * 2) : Math.max(0, (c.bagnato || 0) - ore / 2)),
       fuoco: fuoco ? potenzaFuoco(fuoco.f).W / (4 * Math.PI * Math.max(1, fuoco.d) ** 2) * 0.5 : 0,
-      coperta: c.zaino.some(q => q.cosa === 'coperta') ? OGGETTI.coperta.clo : 0
+      coperta: casa && c.addormentato ? CASA.piumoneClo : c.zaino.some(q => q.cosa === 'coperta') ? OGGETTI.coperta.clo : 0,
+      tInterno: casa ? casa.T : undefined
     };
     // il cappotto si porta addosso quando si e' fuori
     if (c.cloBase == null) c.cloBase = c.clo;
@@ -272,7 +291,9 @@ function passoBreve(mondo, dt, regole, eventi) {
     for (const e of viviUmano(c, dt, { altri, sole: tempo.sole.giorno && !c.stanza && tempo.nuvole < 0.7, svago: !!(c.lavoro && c.lavoro.tipo === 'svago') })) { const ev = Object.assign({ chi: c.id }, e); registra(mondo, ev); eventi.push(ev); }
   }
   // statistiche di fine giornata (per GOD e per capire se l'esperimento funziona)
-  if (giornoOra !== giornoPrima) { chiudiGiornata(mondo, giornoPrima); if (mondo.mercato) chiudiGiornataMercato(mondo.mercato); for (const c of Object.values(mondo.corpi)) c.oreLavoroOggi = 0; }
+  if (giornoOra !== giornoPrima) { chiudiGiornata(mondo, giornoPrima); if (mondo.mercato) chiudiGiornataMercato(mondo.mercato); for (const c of Object.values(mondo.corpi)) c.oreLavoroOggi = 0;
+    if (mondo.case) for (const k of Object.values(mondo.case)) { const c = mondo.corpi[k.id]; if (!c || c.morto) continue; const b = bollettaDelGiorno(k, c); if (b.cambiato) { const ev = { tipo: b.staccato ? 'gas_staccato' : 'gas_riallacciato', chi: k.id, debito: b.debito }; registra(mondo, ev); eventi.push(ev); } }
+  }
 }
 
 function chiudiGiornata(mondo, giorno) {

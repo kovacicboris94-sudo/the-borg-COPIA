@@ -52,6 +52,10 @@ export const REAZIONI = {
   combustione_carbone: {
     nome: 'combustione del carbone', reagenti: { C: 1, O2: 1 }, prodotti: { CO2: 1 }, dH: -393.5, tMin: 400, aria: true
   },
+  // metano del gas di casa (fornello, caldaia). dH col vapore acqueo (potere calorifico inferiore): 50 MJ/kg
+  combustione_metano: {
+    nome: 'combustione del metano', reagenti: { CH4: 1, O2: 2 }, prodotti: { CO2: 1, H2O: 2 }, dH: -802.3, tMin: 580, aria: true
+  },
   calcinazione: {
     nome: 'cottura del calcare (calce viva)', reagenti: { CaCO3: 1 }, prodotti: { CaO: 1, CO2: 1 }, dH: 178.3, tMin: 850, aria: null, ore: 24,
     nota: 'Serve una fornace chiusa: un fuoco all\'aperto non arriva a 850 gradi.'

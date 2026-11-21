@@ -69,7 +69,7 @@ export function bilancioTermico(c, amb) {
   const clo = (c.clo + (c.addormentato ? (amb.coperta || 0) : 0)) * (1 - 0.6 * (amb.bagnato || 0));   // i vestiti bagnati isolano molto meno
   const Icl = 0.155 * clo;                                 // m^2 K / W
   const Ia = 1 / (3.1 + 8.3 * Math.sqrt(Math.max(0.1, amb.vento || 0.2)) + 4.7);   // aria ferma ~0,1; col vento meno
-  const tAria = amb.riparo ? Math.max(amb.tAria, 20) : amb.tAria;                    // al chiuso negli edifici del borgo (riscaldati) fa 20 gradi
+  const tAria = amb.riparo ? (amb.tInterno ?? Math.max(amb.tAria, 20)) : amb.tAria;  // al chiuso: negli edifici pubblici (riscaldati) 20 gradi, a casa quello che dice il termostato
   // al freddo i vasi della pelle si stringono e la pelle si raffredda (fino a ~28 gradi): si disperde meno
   const pelle = tAria < 20 ? Math.max(28, SOGLIE.pelle - (20 - tAria) * 0.35) : SOGLIE.pelle;
   const perdita = (pelle - tAria) / (Icl + Ia) * SOGLIE.areaCorpo + 0.1 * metW;  // + respirazione ~10%

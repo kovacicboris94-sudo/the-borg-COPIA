@@ -15,10 +15,16 @@ import { POSTI } from './mondo.mjs';
 import { tempoAdesso } from './natura.mjs';
 import { MESTIERI, ORE_MAX_GIORNO } from './mestieri.mjs';
 import { prezzoDi } from './economia.mjs';
+import { casaDi, aCasa } from './casa.mjs';
 
 // il cibo che puzza non si conta: una persona lo annusa e lo butta
 const ha = (c, cosa, kg = 0.01) => c.zaino.filter(q => q.cosa === cosa && !q.rotta && (q.guasto || 0) < 0.9).reduce((s, q) => s + (q.kg || 1), 0) >= kg;
 const haAsciutto = (c, cosa, kg) => c.zaino.filter(q => q.cosa === cosa && (q.umid ?? 0) <= (cosa === 'erba_secca' ? 0.15 : 0.3)).reduce((s, q) => s + q.kg, 0) >= kg;
+const PRONTI = ['pane', 'pesce_cotto', 'fagioli_cotti', 'uova_cotte', 'mele', 'ciliegie', 'spinaci', 'fave'];
+const inFrigo = (mondo, c, cosa) => mondo.cose.filter(q => q.dove === 'frigo' && q.casa === c.id && (!cosa || q.cosa === cosa) && (q.guasto || 0) < 0.75);
+// calorie di scorta (con se' e in frigo): per decidere quando fare la spesa
+const kcalScorta = (mondo, c) => [...c.zaino, ...inFrigo(mondo, c)].filter(q => MATERIALI[q.cosa] && MATERIALI[q.cosa].tipo === 'cibo' && q.cosa !== 'olio' && q.cosa !== 'sale' && (q.guasto || 0) < 0.6).reduce((s, q) => s + q.kg * MATERIALI[q.cosa].kcal, 0);
+const aCasaSe = (mondo, c) => (aCasa(mondo, c) || !casaDi(mondo, c) ? [] : [{ tipo: 'casa' }]);
 const inDispensa = (mondo, cosa, kg = 0.01) => mondo.cose.filter(q => q.dove === 'dispensa' && q.cosa === cosa).reduce((s, q) => s + q.kg, 0) >= kg;
 const oraRoma = ms => +new Date(ms).toLocaleString('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false }) % 24;
 
@@ -30,32 +36,41 @@ export function decidiARegole(mondo, id, t) {
   const dis = (c.acquaNormale - c.acqua) / c.peso, h = oraRoma(t), tempo = tempoAdesso(mondo, t);
   // fame vera, oppure l'ora dei pasti (colazione, pranzo, cena) con lo stomaco vuoto
   const oraPasto = (h >= 7 && h < 9) || (h >= 12 && h < 14) || (h >= 19 && h < 21);
-  const fame = (c.glicogeno < 1250 && c.stomaco.kcal < 250) || (oraPasto && c.glicogeno < 1780 && c.stomaco.kcal < 100);
-  // cibo andato a male: si annusa e si butta
+  const fame = (c.glicogeno < 1250 && c.stomaco.kcal < 250) || (oraPasto && c.glicogeno < 1720 && c.stomaco.kcal < c.peso * 6);
+  // cibo andato a male: si annusa e si butta (anche quello in frigo, quando si e' a casa)
   const marcio = c.zaino.find(q => MATERIALI[q.cosa] && MATERIALI[q.cosa].tipo === 'cibo' && (q.guasto || 0) >= 0.75);
   if (marcio) return [{ tipo: 'butta', cosa: marcio.cosa, quanto: marcio.kg }];
+  const marcioFrigo = aCasa(mondo, c) && mondo.cose.find(q => q.dove === 'frigo' && q.casa === c.id && (q.guasto || 0) >= 0.75);
+  if (marcioFrigo) return [{ tipo: 'prendi', cosa: marcioFrigo.cosa, quanto: marcioFrigo.kg }, { tipo: 'butta', cosa: marcioFrigo.cosa, quanto: marcioFrigo.kg }];
   // 1) sete
   if (dis > 0.012) return [{ tipo: 'bevi', luogo: 'Fontana', quanto: Math.min(1, dis * c.peso * 0.8 + 0.2) }];
   // il bagno non aspetta
   if (c.umano && c.umano.vescica > 0.3) return [{ tipo: 'bagno' }];
-  // 2) sonno: di notte si dorme al chiuso (in Biblioteca, al caldo)
+  // 2) sonno: di notte si dorme a casa, nel proprio letto (chi non ha casa: in Biblioteca, al caldo)
   // se cucinare non e' riuscito da poco, si mangia quello che non ha bisogno del fuoco (olio, farina cruda)
   const fallito = c._fallito && t - c._fallito < 3 * 3600000;
-  if ((h >= 22 || h < 6 || c.sonno > 1.1) && c.sonno > 0.5 && (!fame || fallito || c.sonno > 1.3)) return [{ tipo: 'entra_biblioteca' }, { tipo: 'dormi', quanto: 9 }];
+  if ((h >= 22 || h < 6 || c.sonno > 1.1) && c.sonno > 0.5 && (!fame || fallito || c.sonno > 1.3)) return [...(casaDi(mondo, c) ? aCasaSe(mondo, c) : [{ tipo: 'entra_biblioteca' }]), { tipo: 'dormi', quanto: 9 }];
   // legna bagnata nello zaino: si lascia ad asciugare al coperto, in dispensa
   const bagnati = c.zaino.find(q => (q.cosa === 'rami' || q.cosa === 'legna' || q.cosa === 'erba_secca') && q.umid > 0.3);
   if (bagnati && !fame) return [{ tipo: 'lascia', cosa: bagnati.cosa, quanto: bagnati.kg }];
   // 3) fame: prima il cibo pronto che si ha con se'
   if (fame) {
     // prima quello che sta per andare a male
-    const pronti = c.zaino.filter(q => ['pane', 'pesce_cotto', 'fagioli_cotti', 'uova_cotte', 'mele', 'ciliegie', 'spinaci', 'fave'].includes(q.cosa) && q.kg >= 0.05 && (q.guasto || 0) < 0.75).sort((a, b) => (b.guasto || 0) - (a.guasto || 0));
-    if (pronti.length) { const cosa = pronti[0].cosa; return [{ tipo: 'mangia', nome: cosa, cosa, quanto: Math.min(0.6, c.peso * 12 / MATERIALI[cosa].kcal) }]; }   // un pasto: circa 12 kcal per kg di peso
+    const pasto = cosa => Math.min(0.6, c.peso * 12 / MATERIALI[cosa].kcal);   // un pasto: circa 12 kcal per kg di peso
+    const pronti = c.zaino.filter(q => PRONTI.includes(q.cosa) && q.kg >= 0.05 && (q.guasto || 0) < 0.75).sort((a, b) => (b.guasto || 0) - (a.guasto || 0));
+    if (pronti.length) { const cosa = pronti[0].cosa; return [{ tipo: 'mangia', nome: cosa, cosa, quanto: pasto(cosa) }]; }
+    // in frigo a casa: si torna a casa a mangiare
+    const fr = inFrigo(mondo, c).filter(q => PRONTI.includes(q.cosa) && q.kg >= 0.05).sort((a, b) => (b.guasto || 0) - (a.guasto || 0))[0];
+    if (fr) return [...aCasaSe(mondo, c), { tipo: 'prendi', cosa: fr.cosa, quanto: Math.min(fr.kg, pasto(fr.cosa)) }, { tipo: 'mangia', cosa: fr.cosa, quanto: pasto(fr.cosa) }];
+    // crudi in frigo (pesce, uova): si cucinano a casa
+    for (const cosa of ['pesce', 'uova', 'impasto']) { const q = inFrigo(mondo, c, cosa).find(x => x.kg >= 0.1); if (q && !ha(c, cosa, 0.1)) return [...aCasaSe(mondo, c), { tipo: 'prendi', cosa, quanto: Math.min(q.kg, cosa === 'uova' ? 0.18 : 0.7) }, ...pianoFuoco(mondo, c, cosa === 'impasto' ? [{ tipo: 'metti_sul_fuoco', cosa: 'impasto' }, { tipo: 'riposa', quanto: 25 }, { tipo: 'togli_dal_fuoco', cosa: 'impasto' }, { tipo: 'riposa', quanto: 15 }, { tipo: 'mangia', cosa: 'pane', quanto: 0.3 }] : cuoci(cosa, cosa === 'uova' ? 0.15 : 0.35))]; }
     if (fallito) {
       for (const cosa of ['olio', 'farina']) if (ha(c, cosa, 0.03)) return [{ tipo: 'mangia', cosa, quanto: cosa === 'olio' ? 0.05 : 0.2 }];
       if (inDispensa(mondo, 'olio', 0.05)) return [{ tipo: 'prendi', cosa: 'olio', quanto: 0.3 }, { tipo: 'mangia', cosa: 'olio', quanto: 0.05 }];
     }
     // pesce crudo: si cuoce sulla brace
-    if (ha(c, 'pesce', 0.1)) return pianoFuoco(mondo, c, [{ tipo: 'metti_sul_fuoco', cosa: 'pesce' }, { tipo: 'riposa', quanto: 15 }, { tipo: 'togli_dal_fuoco', cosa: 'pesce' }, { tipo: 'riposa', quanto: 15 }, { tipo: 'mangia', cosa: 'pesce_cotto', quanto: 0.4 }]);
+    if (ha(c, 'pesce', 0.1)) return pianoFuoco(mondo, c, cuoci('pesce', 0.4));
+    if (ha(c, 'uova', 0.1)) return pianoFuoco(mondo, c, cuoci('uova', 0.15));
     // impasto gia' pronto: si cuoce
     if (ha(c, 'impasto', 0.2)) return pianoFuoco(mondo, c, [{ tipo: 'metti_sul_fuoco', cosa: 'impasto', quanto: 0.7 }, { tipo: 'riposa', quanto: 25 }, { tipo: 'togli_dal_fuoco', cosa: 'impasto' }, { tipo: 'riposa', quanto: 20 }, { tipo: 'mangia', cosa: 'pane', quanto: 0.3 }]);
     // pane: farina dalla dispensa, impasto, focaccia sulla brace
@@ -71,15 +86,25 @@ export function decidiARegole(mondo, id, t) {
     if (m) for (const [cosa, kg, mangiaKg] of [['pane', 0.5, 0.3], ['uova', 0.3, 0.15], ['mele', 0.5, 0.3], ['fagioli_secchi', 0.3, 0]]) {
       if (mangiaKg && (m.scorte[cosa] || 0) >= kg && (c.starlight ?? 0) >= kg * prezzoDi(m, cosa)) {
         const piano2 = [{ tipo: 'compra', cosa, quanto: kg }];
-        return cosa === 'uova' ? pianoFuoco(mondo, c, [{ tipo: 'metti_sul_fuoco', cosa: 'uova' }, { tipo: 'riposa', quanto: 12 }, { tipo: 'togli_dal_fuoco', cosa: 'uova' }, { tipo: 'riposa', quanto: 10 }, { tipo: 'mangia', cosa: 'uova_cotte', quanto: mangiaKg }], piano2)
+        return cosa === 'uova' ? pianoFuoco(mondo, c, cuoci('uova', mangiaKg), piano2)
           : [...piano2, { tipo: 'mangia', cosa, quanto: mangiaKg }];
       }
     }
     if (ha(c, 'olio', 0.02)) return [{ tipo: 'mangia', cosa: 'olio', quanto: 0.05 }];
     if (inDispensa(mondo, 'olio', 0.05)) return [{ tipo: 'prendi', cosa: 'olio', quanto: 0.3 }, { tipo: 'mangia', cosa: 'olio', quanto: 0.05 }];
   }
-  // 4) la vita da persona: lavarsi, lavorare, stare con gli altri, svagarsi
+  // 4) la vita da persona: la spesa, lavarsi, lavorare, stare con gli altri, svagarsi
   const u = c.umano || {};
+  // a casa, la roba fresca va in frigo
+  const fresco = aCasa(mondo, c) && c.zaino.find(q => MATERIALI[q.cosa] && MATERIALI[q.cosa].dura20 && MATERIALI[q.cosa].tipo === 'cibo' && q.kg >= 0.05);
+  if (fresco) return [{ tipo: 'lascia', cosa: fresco.cosa, quanto: fresco.kg, luogo: 'frigo' }];
+  // la spesa: quando in casa resta cibo per meno di un giorno e mezzo, si va al Mercatino e si porta tutto a casa
+  if (casaDi(mondo, c) && mondo.mercato && h >= 7 && h < 19 && kcalScorta(mondo, c) < 3500 && (c.starlight ?? 0) >= 60) {
+    const m = mondo.mercato, lista = [['pane', 1], ['uova', 0.36], ['mele', 1], ['pesce', 0.4]].filter(([k, kg]) => (m.scorte[k] || 0) >= kg && prezzoDi(m, k) <= (k === 'pesce' ? 70 : 40));
+    let soldi = (c.starlight ?? 0) - 30; const presi = [];
+    for (const [k, kg] of lista) { const costo = kg * prezzoDi(m, k); if (costo <= soldi) { presi.push({ tipo: 'compra', cosa: k, quanto: kg }); soldi -= costo; } }
+    if (presi.length) return [...presi, { tipo: 'casa' }];
+  }
   if (u.igiene < 0.6 && h >= 6 && h < 22) return [{ tipo: 'lavati' }];
   // pesce in piu': si vende al Mercatino
   const pesce = c.zaino.filter(q => q.cosa === 'pesce' && (q.guasto || 0) < 0.6).reduce((a, q) => a + q.kg, 0);
@@ -95,7 +120,7 @@ export function decidiARegole(mondo, id, t) {
   if (!inDispensa(mondo, 'legna', 3) && mondo.mercato && (mondo.mercato.scorte.legna || 0) > 5 && (c.starlight ?? 0) > 60 && !haAsciutto(c, 'legna', 2)) return [{ tipo: 'compra', cosa: 'legna', quanto: 6 }, { tipo: 'lascia', cosa: 'legna', quanto: 6 }];
   // di giorno: procurarsi cibo e legna per dopo
   if (tempo.sole.giorno && c.sonno < 1) {
-    if (mondo.laghetto.pesci > 15 && (ha(c, 'lenza') || inDispensa(mondo, 'lenza')) && !ha(c, 'pesce', 0.5)) {
+    if (mondo.laghetto.pesci > 15 && (ha(c, 'lenza') || inDispensa(mondo, 'lenza')) && !ha(c, 'pesce', 0.5) && inFrigo(mondo, c, 'pesce').reduce((x, q) => x + q.kg, 0) < 0.8) {
       if (!ha(c, 'lenza')) piano.push({ tipo: 'prendi', cosa: 'lenza' });
       piano.push({ tipo: 'pesca', quanto: 2 });
       return piano;
@@ -121,7 +146,16 @@ function sceltaTurno(mondo, c, t) {
 }
 
 // Prima di cuocere serve un fuoco: se non ce n'e' uno acceso vicino, si prendono legna ed esca e lo si accende.
+// si cuoce solo la porzione: il resto va in frigo
+const cuoci = (cosa, kg) => [{ tipo: 'metti_sul_fuoco', cosa, quanto: cosa === 'pesce' ? kg * 1.25 : cosa === 'uova' ? kg * 1.05 : kg }, { tipo: 'riposa', quanto: cosa === 'uova' ? 12 : 15 }, { tipo: 'togli_dal_fuoco', cosa }, { tipo: 'riposa', quanto: 10 }, { tipo: 'mangia', cosa: cosa === 'pesce' ? 'pesce_cotto' : cosa === 'uova' ? 'uova_cotte' : cosa, quanto: kg }];
 function pianoFuoco(mondo, c, dopo, prima = []) {
+  // chi ha una casa con il gas cucina sul fornello: niente legna, niente esca, si spegne quando si toglie la padella
+  const k = casaDi(mondo, c);
+  if (k && !k.staccato) {
+    const i = dopo.findIndex(a => a.tipo === 'togli_dal_fuoco');
+    const d = [...dopo]; if (i >= 0) d.splice(i + 1, 0, { tipo: 'spegni' });
+    return [...prima, ...aCasaSe(mondo, c), { tipo: 'accendi' }, ...d];
+  }
   const acceso = mondo.fuochi.some(f => f.acceso && !f.fisso && Math.hypot(f.x - POSTI.fontana.x, f.z - POSTI.fontana.z) < 8 && f.legna.reduce((s, l) => s + l.kg, 0) > 0.8);
   const p = [...prima];
   if (!acceso) {

@@ -29,9 +29,14 @@ export function vistaGod(mondo) {
   righe.push(`CIBO IN DISPENSA: ${Math.round(kcal)} kcal (~${(kcal / 2100 / Math.max(1, Object.keys(mondo.corpi).length)).toFixed(1)} giorni per abitante)`);
   righe.push(`LAGHETTO: ${mondo.laghetto.pesci.toFixed(1)} kg di pesce su 45. RAMI SOTTO GLI ALBERI: ${mondo.alberi.reduce((s, a) => s + a.rami, 0).toFixed(0)} kg.`);
   righe.push('AIUOLE: ' + (mondo.aiuole.filter(a => a.coltura).map(a => `${a.id} ${statoPianta(a)}`).join('; ') || 'nessuna coltivata'));
+  if (mondo.case) for (const k of Object.values(mondo.case)) {
+    const frigo = mondo.cose.filter(q => q.dove === 'frigo' && q.casa === k.id).map(q => `${q.cosa} ${q.kg.toFixed(2)}${(q.guasto || 0) > 0.5 ? ' (vecchio)' : ''}`).join(', ') || 'vuoto';
+    const b = k.bollette.at(-1);
+    righe.push(`CASA ${k.id} (${k.stanza}): ${k.T.toFixed(1)} gradi (termostato ${k.termostato}), frigo: ${frigo}; ultima bolletta ${b ? `${b.importo} S (gas ${b.gasM3} m3, luce ${b.kWh} kWh, acqua ${b.acquaL} L)` : '-'}; debito ${k.debito}${k.staccato ? ', GAS E LUCE STACCATI' : ''}`);
+  }
   if (mondo.mercato) {
     const m = mondo.mercato;
-    righe.push(`MERCATINO: incassato ${Math.round(m.incasso)} S, pagato a chi vende ${Math.round(m.pagato)} S. Prezzi: ` + ['pane', 'farina', 'pesce', 'uova', 'mele', 'legna'].map(k => `${k} ${m.prezzi[k]} (${(m.scorte[k] || 0).toFixed(1)})`).join(', ') + `. Compost: ${(mondo.compost || 0).toFixed(1)} kg.`);
+    righe.push(`MERCATINO: incassato ${Math.round(m.incasso)} S, pagato a chi vende ${Math.round(m.pagato)} S. Prezzi: ` + ['pane', 'farina', 'pesce', 'uova', 'mele', 'legna'].map(k => `${k} ${m.prezzi[k]} (${(m.scorte[k] || 0).toFixed(1)})`).join(', ') + `. Compost: ${(mondo.compost || 0).toFixed(1)} kg.` + (m.demo ? ` Ieri i clienti demo hanno speso ${m.demo.speso} S (${Object.entries(m.demo.comprato).filter(([, q]) => q > 0).map(([k, q]) => k + ' ' + q).join(', ')}).` : ''));
   }
   righe.push('FUOCHI: ' + (mondo.fuochi.filter(f => f.acceso).map(f => `${f.id} ${Math.round(f.T)} gradi, ${f.legna.reduce((s, l) => s + l.kg, 0).toFixed(1)} kg`).join('; ') || 'nessuno acceso'));
   return righe.join('\n');

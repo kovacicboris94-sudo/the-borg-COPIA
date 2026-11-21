@@ -12,7 +12,7 @@ import { POSTI, REGOLE_VITA } from './mondo.mjs';
 import { pesoZaino } from './azioni.mjs';
 import { sensazioniUmane } from './umano.mjs';
 import { MESTIERI, ORE_MAX_GIORNO, competenza, pagaOraria } from './mestieri.mjs';
-import { LISTINO, prezzoDi, prezzoAcquisto } from './economia.mjs';
+import { LISTINO, prezzoDi, prezzoAcquisto, limiteAcquisto } from './economia.mjs';
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const ora = ms => new Date(ms).toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit' });
@@ -63,7 +63,7 @@ export function percezioneVita(mondo, id, adesso) {
     if (mondo.mercato && dist(POSTI.dispensa, c) <= VISTA) {
       const m = mondo.mercato, inVendita = Object.keys(LISTINO).filter(k => (m.scorte[k] || 0) > 0.01);
       intorno.push(`- il Mercatino oggi vende: ` + inVendita.map(k => OGGETTI[k] ? `${nomeDi(k)} ${prezzoDi(m, k)} al pezzo (${m.scorte[k]})` : `${nomeDi(k)} ${prezzoDi(m, k)}/kg (${m.scorte[k].toFixed(1)} kg)`).join(', ')
-        + `. Compra da chi vende: ` + Object.keys(LISTINO).filter(k => LISTINO[k][2] > (m.vendutoOggi[k] || 0)).map(k => `${nomeDi(k)} ${prezzoAcquisto(m, k)}`).join(', '));
+        + `. Compra da chi vende: ` + Object.keys(LISTINO).filter(k => LISTINO[k][2] && limiteAcquisto(m, k) > 0.05).map(k => `${nomeDi(k)} ${prezzoAcquisto(m, k)}`).join(', '));
     }
     const terra = mondo.cose.filter(q => q.dove === 'terra' && !q.stanza && dist(q, c) <= VISTA).slice(0, 8);
     terra.forEach(q => intorno.push(`- a terra a ${Math.round(dist(q, c))} m: ${descriviCosa(q)}`));

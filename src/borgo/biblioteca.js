@@ -143,7 +143,7 @@
       const ap = new T.Mesh(new T.PlaneGeometry(0.9, 0.34), new T.MeshBasicMaterial({ map: B.tex(cv), side: T.DoubleSide })); ap.position.set(0, 2.35, 0.02); g.add(ap);
       const mt = new T.Mesh(new T.PlaneGeometry(1.6, 0.9), new T.MeshToonMaterial({ map: B.texTappeto(), gradientMap: gm })); mt.rotation.x = -PI / 2; mt.position.set(0, 0.014, -0.5); g.add(mt);
     })();
-    porte.push({ id: 'porta-uscita', nome: 'Esci in piazza', x: 0, z: Z1 - 1.2, r: 1.3, verso: 'piazza', arrivo: { x: -22, z: 65.2, yaw: PI } });
+    porte.push({ id: 'porta-uscita', nome: 'Esci in piazza', x: 0, z: Z1 - 1.2, r: 1.3, verso: 'piazza', arrivo: { x: -27.7, z: -4.3, yaw: 0 } });   // davanti alla porta della Biblioteca (prima si usciva in fondo alla piazza)
 
     /* ---------- pareti che spariscono quando la camera e' dietro di loro ---------- */
     muri.forEach(m => {

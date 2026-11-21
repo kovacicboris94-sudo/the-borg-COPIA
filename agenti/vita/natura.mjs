@@ -141,7 +141,8 @@ export function invecchia(cosa, dtOre, tAria, bagnato, vicinoFuoco = false, umid
   if (!M) return;
   const T = cosa.T ?? tAria;
   if (M.dura20) {
-    const velocita = Math.pow(M.q10 || 2, (Math.max(-5, T) - 20) / 10);
+    // sopra i ~45 gradi i batteri non crescono (e sopra i 60 muoiono): il cibo caldo non va a male. La legge Q10 vale solo nel loro intervallo.
+    const velocita = T >= 45 ? 0 : Math.pow(M.q10 || 2, (Math.max(-5, T) - 20) / 10);
     cosa.guasto = (cosa.guasto || 0) + dtOre / M.dura20 * velocita;
   }
   if (cosa.umid != null) {

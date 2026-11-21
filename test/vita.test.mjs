@@ -183,7 +183,7 @@ ok(normalizzaAzioneVita({ tipo: 'mangia', nome: 'Pane' }).cosa === 'pane' && nor
   ok(/IL TUO CORPO/.test(p) && /IL TEMPO/.test(p) && !/kcal/.test(p), 'percezione a parole, senza numeri del corpo');
   ok(/Dispensa del Mercatino/.test(p), 'vede la dispensa vicina');
   ok(/kcal/.test(vistaGod(mondo)), 'GOD vede i numeri veri');
-  ok(promptAzioniVita().length < 6000, 'il prompt delle azioni resta corto');
+  ok(promptAzioniVita().length < 7000, 'il prompt delle azioni resta corto (~1.700 token, uguale a ogni pensiero: si mette in cache)');
 }
 
 // ---------- invenzioni ----------
@@ -274,7 +274,7 @@ ok(normalizzaAzioneVita({ tipo: 'mangia', nome: 'Pane' }).cosa === 'pane' && nor
   ok(vicino(ada.umano.vescica, 0.35, 0.05), 'la vescica si riempie di ~1,4 L al giorno');
   ok(/bagno/.test(sensazioniUmane(ada).join(' ')), 'si sente il bisogno del bagno');
   const r = eseguiAzioneVita(m, 'ada', { tipo: 'bagno' }, T0);
-  ok(r.vai && r.vai.entra === 'biblioteca', 'il bagno e\' in un edificio: si va in Biblioteca');
+  ok(r.vai && r.vai.entra === 'casa_ada', 'il bagno piu\' vicino e\' quello di casa');
   ada.stanza = 'biblioteca';
   ok(eseguiAzioneVita(m, 'ada', { tipo: 'bagno' }, T0).ok && ada.umano.vescica === 0, 'in Biblioteca si va in bagno');
   ada.umano.vescica = 0.59; const ev = viviUmano(ada, 1200, {});
@@ -318,7 +318,70 @@ ok(normalizzaAzioneVita({ tipo: 'mangia', nome: 'Pane' }).cosa === 'pane' && nor
   const r = azioneVita(st, st.agenti.ada, { tipo: 'compra', cosa: 'pane', quanto: 0.5 }, T0 + 60000);
   ok(r.ok && vicino(st.agenti.ada.starlight, 77 - 0.5 * st.vita.mercato.prezzi.pane, 0.01), 'la vita usa e aggiorna gli Starlight dell\'agente');
   st.agenti.ada.x = 10; st.agenti.ada.z = 30;
-  ok(azioneVita(st, st.agenti.ada, { tipo: 'bagno' }, T0 + 60000).cammina.entra === 'biblioteca', 'il motore sa in che edificio entrare');
+  ok(azioneVita(st, st.agenti.ada, { tipo: 'bagno' }, T0 + 60000).cammina.entra === 'casa_ada', 'il motore sa in che edificio entrare');
+}
+
+// ---------- la casa: riscaldamento, gas, doccia, frigo, fornello, bollette ----------
+{
+  const C = await import('../agenti/vita/casa.mjs');
+  ok(vicino(C.METANO_J_M3 / 1e6, 35.9, 0.1), 'metano: 35,9 MJ per metro cubo (dalla reazione CH4 + 2 O2)');
+  // un giorno a 5 gradi fuori con il termostato a 19: la caldaia brucia UA*dT*24h / rendimento
+  const m = nuovoMondo({ adesso: T0, seme: 8 }), k = m.case.ada;
+  for (let i = 0; i < 1440; i++) C.viviCasa(m, k, 60, 5, 0);
+  const atteso = C.CASA.UA * 14 * 86400 / C.CASA.rendCaldaia / C.METANO_J_M3;
+  ok(vicino(k.gasM3, atteso, 0.05) && vicino(k.T, 19, 0.1), `riscaldare un giorno a 5 gradi: ${k.gasM3.toFixed(2)} m3 di metano (realistico: 3-5)`);
+  const c = m.corpi.ada, s0 = c.starlight, b = C.bollettaDelGiorno(k, c);
+  ok(vicino(s0 - c.starlight, b.importo, 0.01) && b.importo > 20 && b.importo < 35, `bolletta del giorno: ${b.importo} Starlight`);
+  // caldaia spenta: la casa si raffredda verso fuori in circa un giorno e mezzo (costante di tempo C/UA)
+  k.staccato = true; k.T = 19; for (let i = 0; i < 30 * 60; i++) C.viviCasa(m, k, 60, 5, 0);
+  ok(k.T < 12 && k.T > 6, `senza riscaldamento in 30 ore la casa scende a ${k.T.toFixed(1)} gradi`);
+  k.staccato = false;
+  // doccia: 40 litri da 14 a 40 gradi = 4,4 MJ di calore (piu' le perdite della caldaia)
+  k.gasM3 = 0; const d = C.doccia(k);
+  ok(d.calda && vicino(k.gasM3, 40 * 4186 * 26 / 0.9 / C.METANO_J_M3, 0.001), 'doccia calda: l\'energia per scaldare l\'acqua la paga il gas');
+  // debiti: oltre la soglia staccano gas e luce; pagando si riallaccia
+  c.starlight = 0; k.debito = C.DEBITO_MAX; k.gasM3 = 2; C.bollettaDelGiorno(k, c);
+  ok(k.staccato, 'bollette non pagate: gas e luce staccati');
+  c.starlight = 500; C.bollettaDelGiorno(k, c);
+  ok(!k.staccato && k.debito === 0, 'pagato il debito, si riallaccia');
+}
+{
+  // in casa: bagno, fornello, frigo, letto
+  const m = nuovoMondo({ adesso: T0, seme: 9 }), c = m.corpi.ada; c.stanza = 'casa_ada';
+  c.umano.vescica = 0.4;
+  ok(eseguiAzioneVita(m, 'ada', { tipo: 'bagno' }, T0).ok && c.umano.vescica === 0, 'a casa c\'e\' il bagno');
+  ok(eseguiAzioneVita(m, 'ada', { tipo: 'accendi' }, T0).ok, 'fornello a gas acceso');
+  const p = nuovaCosa(m, 'pentola', 1.6, { T: 19, contenuto: [{ cosa: 'acqua', kg: 2, T: 14 }] }); p.cosa = 'pentola'; c.zaino.push(p);
+  ok(eseguiAzioneVita(m, 'ada', { tipo: 'metti_sul_fuoco', cosa: 'pentola' }, T0).ok, 'pentola sul fornello');
+  let t = T0, minuti = 0;
+  while (minuti < 40) { t += 60000; minuti++; passoMondo(m, t); const q = m.fuochi.find(f => f.id === 'fornello:ada').sopra[0]; if (q.T >= 99.9) break; }
+  ok(minuti >= 9 && minuti <= 20, `2 litri bollono sul fornello in ${minuti} minuti (realistico con una pentola di terracotta: 12-20)`);
+  ok(m.case.ada.gasM3 > 0.03, 'il fornello consuma metano');
+  // frigo: il pesce in frigo dura giorni, fuori meno di un giorno
+  c.zaino.push(nuovaCosa(m, 'pesce', 0.4, { T: 15 }));
+  ok(eseguiAzioneVita(m, 'ada', { tipo: 'lascia', cosa: 'pesce' }, t).esito.includes('frigo'), 'a casa il pesce va in frigo');
+  const fuori = nuovaCosa(m, 'pesce', 0.4, { T: 20, dove: 'terra', x: 0, z: 0 }); m.cose.push(fuori);
+  for (let i = 0; i < 48; i++) { t += 3600000; passoMondo(m, t); }
+  const inFrigo = m.cose.find(q => q.dove === 'frigo');
+  ok(inFrigo.guasto < 0.5 && inFrigo.guasto < fuori.guasto / 2, `in frigo a 4 gradi il pesce invecchia piu' piano: ${inFrigo.guasto.toFixed(2)} contro ${fuori.guasto.toFixed(2)} fuori (legge Q10)`);
+  // il cibo caldo non va a male
+  const caldo = nuovaCosa(m, 'pesce_cotto', 0.3, { T: 90, guasto: 0 });
+  const { invecchia } = await import('../agenti/vita/natura.mjs'); invecchia(caldo, 2, 20, false);
+  ok(caldo.guasto === 0, 'sopra i 45 gradi i batteri non crescono');
+}
+
+// ---------- i clienti demo consumano ----------
+{
+  const E = await import('../agenti/vita/economia.mjs');
+  const mk = E.nuovoMercato(); mk.scorte.pesce = 0; mk.scorte.pentola = 0;
+  ok(E.limiteAcquisto(mk, 'pesce') > 2, 'il Mercatino compra il pesce perche\' i clienti lo chiedono');
+  mk.scorte.pesce = 3; const p0 = mk.prezzi.pentola;
+  E.chiudiGiornataMercato(mk);
+  ok(mk.demo.comprato.pesce > 2 && mk.demo.speso > 0, 'i clienti demo comprano il pesce degli agenti');
+  ok(mk.prezzi.pentola > p0, 'nessuno porta pentole: il loro prezzo sale');
+  const tanta = E.nuovoMercato(); tanta.scorte.ciotola = 50; const pc = tanta.prezzi.ciotola;
+  E.chiudiGiornataMercato(tanta);
+  ok(tanta.prezzi.ciotola < pc && E.limiteAcquisto(tanta, 'ciotola') === 0, 'troppe ciotole: prezzo giu\' e il Mercatino non ne compra altre');
 }
 
 // ---------- tre mesi di vita con lavoro e Mercatino ----------

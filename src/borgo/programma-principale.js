@@ -42,9 +42,13 @@
       else { if (!condiviso) { const g = nuovoG(), m = B.costruisciPianoTorre(g, n, true); condiviso = { g, m }; piani.push(m); } pianiT[n] = condiviso; }
     }
   }
+  // le casette degli abitanti IA (src/borgo/casette-agenti.js): un gruppo per casa
+  const casette = {};
+  if (B.costruisciCasetta) for (const id of Object.keys(B.CASETTE_AGENTI || {})) { const g = new T.Group(); g.visible = false; scene.add(g); casette[id] = { g, m: B.costruisciCasetta(g, id) }; }
+  const gCasette = Object.values(casette).map(c => c.g);
   const PZ = CFG.plaza;
   // la scena e le stanze non si muovono mai: cosi' three.js puo' saltare i pezzi fermi e le stanze nascoste
-  const gruppiStanze = [gP, gC, gN, gS, gL, gT, gB, gK].concat(gTorre);
+  const gruppiStanze = [gP, gC, gN, gS, gL, gT, gB, gK].concat(gTorre, gCasette);
   [scene].concat(gruppiStanze).forEach(g => { g.updateMatrix(); g.matrixAutoUpdate = false; g.matrixWorldNeedsUpdate = true; });
   const stanze = {
     piazza: { id: 'piazza', nome: 'Piazza del Borgo', pubblica: true, gruppo: gP, m: piazza, ostacoli: piazza.ostacoli, porte: piazza.porte, sedili: piazza.sedili, toccabili: piazza.toccabili,
@@ -65,6 +69,8 @@
     sala: { id: 'sala', nome: 'Sala Giochi', pubblica: true, gruppo: gS, m: sala, ostacoli: sala.ostacoli, porte: sala.porte, sedili: sala.sedili, toccabili: sala.toccabili,
       area: sala.area, alt: () => 0, zoom: 0.8, spawn: { x: 0, z: 12.6, yaw: PI }, rect: { x0: -27, x1: 27, z0: -13, z1: 15 }, edifici: [], sfondo: '#241a40' }
   };
+  for (const [id, { g, m }] of Object.entries(casette)) stanze[id] = { id, nome: 'Casa di ' + B.CASETTE_AGENTI[id].chi, pubblica: true, gruppo: g, m, ostacoli: m.ostacoli, porte: m.porte, sedili: m.sedili, toccabili: m.toccabili,
+    area: m.area, alt: () => 0, zoom: 0.95, spawn: { x: 0, z: 2.4, yaw: PI }, rect: { x0: -4, x1: 4, z0: -3.5, z1: 3.5 }, edifici: [], sfondo: '#2a2040' };
   pianiT.forEach(({ g, m }, n) => {
     stanze['torre' + n] = { id: 'torre' + n, nome: B.nomePianoTorre ? B.nomePianoTorre(n) : m.nome, piano: n, pubblica: true, gruppo: g, m, ostacoli: m.ostacoli, porte: m.porte, sedili: m.sedili, toccabili: m.toccabili,
       area: m.area, alt: () => 0, zoom: m.zoom || 0.8, spawn: m.spawn, rect: m.rect, edifici: [], sfondo: '#2a2040' };
@@ -120,7 +126,7 @@
     B.finestreMat.forEach(m => { m.emissiveIntensity = a.finestre; });
     const k = clamp(a.lampioni / 1.6, 0, 1) * 0.95;
     piazza.aloni.forEach(s => { s.material.opacity = k; });
-    casa.atm(nome); if (stanze.ospite) stanze.ospite.m.atm(nome); negozio.atm(nome); sala.atm(nome); coll.atm(nome); tcgR.atm(nome); bib.atm(nome); scac.atm(nome); assegnaLuci();
+    casa.atm(nome); if (stanze.ospite) stanze.ospite.m.atm(nome); negozio.atm(nome); sala.atm(nome); coll.atm(nome); tcgR.atm(nome); bib.atm(nome); scac.atm(nome); Object.values(casette).forEach(c => c.m.atm(nome)); assegnaLuci();
     piani.forEach(m => m.atm(nome));
   }
 
@@ -287,7 +293,7 @@
   function entraStanza(id, arrivo) {
     stanza = stanze[id]; io.st = stanza; io.seduto = null; G.stato.stanzaId = id;
     if (stanza.m && stanza.m.alPiano && stanza.piano != null) stanza.m.alPiano(stanza.piano);   // piani della torre che condividono il gruppo
-    gP.visible = stanza.gruppo === gP; gTorre.forEach(g => { g.visible = stanza.gruppo === g; }); gC.visible = id === 'casa'; gN.visible = id === 'negozio'; gS.visible = id === 'sala'; gL.visible = id === 'collectibles'; gT.visible = id === 'tcg'; gB.visible = id === 'biblioteca'; gK.visible = id === 'scacchi'; gO.visible = id === 'ospite';
+    gP.visible = stanza.gruppo === gP; gTorre.forEach(g => { g.visible = stanza.gruppo === g; }); gC.visible = id === 'casa'; gN.visible = id === 'negozio'; gS.visible = id === 'sala'; gL.visible = id === 'collectibles'; gT.visible = id === 'tcg'; gB.visible = id === 'biblioteca'; gK.visible = id === 'scacchi'; gO.visible = id === 'ospite'; for (const [k, c] of Object.entries(casette)) c.g.visible = id === k;
     const sp = arrivo || stanza.spawn;
     io.x = sp.x; io.z = sp.z; io.vx = io.vz = 0; io.yaw = sp.yaw === undefined ? 0 : sp.yaw; io.y = stanza.alt(io.x, io.z);
     C.azT = C.az = stanza.az === undefined ? PI / 4 : stanza.az; impostaZoom(stanza.zoom); if (stanza.elev) { C.elev = stanza.elev; C.elevAuto = true; } else if (C.elevAuto) { C.elev = 28; C.elevAuto = false; } C.tx = io.x; C.tz = io.z; C.ty = 1.0 + io.y;

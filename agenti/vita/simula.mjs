@@ -41,7 +41,6 @@ export function simula({ giorni = 7, seme = 7, inizio = Date.UTC(2026, 10, 21, 7
         if (m.entra) c.stanza = m.entra;
       }
       if (!piani[id] || !piani[id].length) {
-        if (c.stanza) c.stanza = null;   // svegli: si esce
         piani[id] = decidiARegole(mondo, id, t);
       }
       const a = piani[id][0]; if (!a) continue;
