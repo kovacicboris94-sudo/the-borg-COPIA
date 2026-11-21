@@ -4,6 +4,8 @@
 // c = { ag, stato, adesso, momento, compagno, nomeDi, luogoVicino }.
 // Per insegnare una cosa nuova agli agenti basta aggiungerla qui.
 
+import { NEGOZI, prodottoDi, REGOLE_NEGOZI } from './negozi.mjs';
+
 const caso = l => l[Math.floor(Math.random() * l.length)];
 
 /* ---------- gli Starlight (la moneta del borgo) ---------- */
@@ -135,6 +137,22 @@ export const COSE = [
   { id: 'pacchetto', nome: 'Pacchetto Belinverse', dove: 'tcg', min: 2, icona: '🎁', posti: [{ x: 8, z: 11 }], riga: 'dal venditore della Sala TCG: 6 carte, uno al giorno gratis, poi 150 Starlight', fai: pacchetto }
 ];
 
+// comprare al bancone dei negozi (Caffetteria, Forno, Fioraio): prezzo di listino, va nello zaino.
+// Se al bancone c'e' qualcuno al lavoro, a lui va la sua parte, come per una vendita.
+function compraAlBancone(id) {
+  return c => {
+    const neg = NEGOZI.find(q => q.id === id), p = prodottoDi(neg, c.richiesta), ag = portafoglio(c.ag);
+    if (!p) return `Al bancone non hai detto cosa comprare (scrivilo in "testo"). Listino: ${neg.prodotti.map(q => q[0] + ' ' + q[1]).join(', ')}.`;
+    if (ag.starlight < p[1]) return `${p[0]} costa ${p[1]} Starlight ma ne hai solo ${ag.starlight}.`;
+    ag.starlight -= p[1]; const z = ag.zaino || (ag.zaino = {}); z[p[0]] = (z[p[0]] || 0) + 1;
+    const t = Object.entries(c.stato.turni || {}).find(([, q]) => q.negozio === id), v = t && c.stato.agenti[t[0]];
+    if (v && v !== ag) { const g = Math.max(1, Math.round(p[1] * REGOLE_NEGOZI.quota)); portafoglio(v).starlight += g; t[1].vendite = (t[1].vendite || 0) + 1; t[1].guadagno = (t[1].guadagno || 0) + g; }
+    return `Hai comprato ${p[0]} per ${p[1]} Starlight (te ne restano ${ag.starlight}). E' nello zaino.`;
+  };
+}
+NEGOZI.forEach(n => COSE.push({ id: n.id, nome: n.nome, dove: null, min: 1, icona: n.id === 'fioraio' ? '💐' : n.id === 'forno' ? '🥖' : '☕', posti: [n.cliente],
+  riga: `bancone, compri: ${n.prodotti.map(p => p[0] + ' ' + p[1]).join(', ')} (nome in "testo")`, fai: compraAlBancone(n.id) }));
+
 export const cosaDi = nome => {
   const n = String(nome || '').toLowerCase().trim(); if (!n) return null;
   return COSE.find(c => c.nome.toLowerCase() === n || c.id === n) || COSE.find(c => n.includes(c.id) || n.includes(c.nome.toLowerCase()) || c.nome.toLowerCase().includes(n)) || null;
@@ -149,6 +167,7 @@ ${COSE.map(c => `  ${c.nome}${c.min ? ` (${c.min} min)` : ''}: ${c.riga}`).join(
   Mobili usati: ${MERCE.usato.map(m => m[0] + ' ' + m[1]).join(', ')}
   Luci e decorazioni: ${MERCE.luci.map(m => m[0] + ' ' + m[1]).join(', ')}
 - {"tipo":"metti","nome":"Poltrona","x":..,"z":..}: posi in piazza, entro 8 m da te, una cosa comprata (subito, senza costruire). Diventa un oggetto come gli altri: chi la smonta la rimette nello zaino di chi l'aveva comprata.
+- MESTIERI: ai banconi di ${NEGOZI.map(n => n.nome).join(', ')} puoi fare un turno da venditore: {"tipo":"lavora","nome":"Forno","minuti":60} (da 15 a ${REGOLE_NEGOZI.turnoMaxMin}; ci vai da solo e resti al bancone; "nome":"smetti" per finire prima, e finisce anche se te ne vai). Un bancone, un venditore. Mentre lavori arrivano i clienti: abitanti del borgo, ognuno con il suo carattere, i suoi gusti e pochi soldi in tasca. Non comprano da soli: li devi convincere con {"tipo":"vendi","nome":"<prodotto>","prezzo":<Starlight>,"testo":"quello che gli dici"}. Conta cosa proponi, il prezzo (puoi alzarlo o scontarlo) e come glielo dici, secondo il carattere; ti ascoltano al massimo ${REGOLE_NEGOZI.tentativi} volte, poi se ne vanno. A te va meta' del prezzo. Capire chi compra cosa sta a te: ricordatelo.
 - SEDERSI: sui mobili posati in piazza da cui ci si siede (Poltrona, Divano, Sedia, Pouf, Cassapanca) ti siedi con {"tipo":"usa","nome":"<id dell'oggetto>"} (es. "o12"): ci vai da solo e resti seduto 10 minuti.
 - REGALI: le persone vere possono regalarti un mobile: lo posano in piazza ed e' tuo, come se l'avessi comprato (se qualcuno lo smonta torna nel tuo zaino).
 - Le persone vere (giocatori) per ora sono poche: compra, arreda e gioca anche per conto tuo. I 15 piani della Torre sono ancora vuoti, in attesa di negozi.
