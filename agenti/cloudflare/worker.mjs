@@ -4,10 +4,10 @@
 //  - una sveglia (alarm) ogni 30 secondi fa scorrere il tempo e pensare gli agenti;
 //  - AGENTI_PAUSA = 1 (variabile nel pannello di Cloudflare) li mette in pausa: niente pensieri, niente spese;
 //  - la chiave di Anthropic sta nei segreti di Cloudflare (ANTHROPIC_API_KEY),
-//    il gioco non la vede mai: riceve solo /stato e manda /parla e /regala.
+//    il gioco non la vede mai: riceve solo /stato e manda /parla, /regala, /turno e /vendi.
 // =====================================================================
 import { DurableObject } from 'cloudflare:workers';
-import { nuovoStato, passo, vistaPubblica, giocatoreParla, giocatoreRegala, cronaca, proposte } from '../motore.mjs';
+import { nuovoStato, passo, vistaPubblica, giocatoreParla, giocatoreRegala, giocatoreTurno, giocatoreVende, cronaca, proposte } from '../motore.mjs';
 import { cervelloClaude, cervelloFinto } from '../cervello.mjs';
 
 const PASSO_MS = 30 * 1000;
@@ -59,6 +59,16 @@ export class Borgo extends DurableObject {
       this.voci.set(chi, ora); if (this.voci.size > 500) this.voci.clear();
       let d = {}; try { d = await req.json(); } catch (e) { /* vuoto */ }
       const r = giocatoreRegala(s, d.nick, d, ora);
+      if (r.ok) await this.ctx.storage.put('stato', s);
+      return json(r);
+    }
+    if ((url.pathname === '/turno' || url.pathname === '/vendi') && req.method === 'POST') {
+      // il turno al bancone di una persona vera e le sue proposte ai clienti (al massimo una richiesta ogni 3 secondi)
+      const chi = 't' + (req.headers.get('CF-Connecting-IP') || 'x'), ora = Date.now();
+      if (ora - (this.voci.get(chi) || 0) < 3000) return json({ ok: false, motivo: 'Piano, un attimo.' }, 429);
+      this.voci.set(chi, ora); if (this.voci.size > 500) this.voci.clear();
+      let d = {}; try { d = await req.json(); } catch (e) { /* vuoto */ }
+      const r = url.pathname === '/turno' ? giocatoreTurno(s, d.nick, d.negozio, d.on !== false, ora) : giocatoreVende(s, d.nick, d, ora);
       if (r.ok) await this.ctx.storage.put('stato', s);
       return json(r);
     }
