@@ -22,6 +22,7 @@ jobs:
       - run: node test/scacchi.test.mjs
       - run: node test/sito.test.mjs
       - run: node test/agenti.test.mjs
+      - run: node test/vita.test.mjs
       - run: bash server/test/produzione.test.sh
       - name: Controlla la configurazione del server online
         run: |

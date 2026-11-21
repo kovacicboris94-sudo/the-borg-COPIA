@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="6a359b6eded3">
+  <meta name="versione" content="7a54187b36d9">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -7458,11 +7458,13 @@ window.CONFIG = {
       { x: -51.1, z: 4, rot: PI / 2, w: 4.6, d: 5, muro: '#c9a77c', muroSopra: '#ecd9b4', tetto: '#6a3d2a', nome: 'Arredamenti', tendaA: '#f4ead6', tendaB: '#b0703c', porta: 0, persiane: '#3f6a8a', tendaLarg: 3.6 },
       // la Casa degli Scacchi (src/borgo/casa-scacchi.js): bianca e nera, al centro della fila nord
       { x: 3, z: -9.1, rot: 0, w: 6.2, d: 5, muro: '#ece4d4', muroSopra: '#f6f0e4', tetto: '#24222c', nome: 'Casa degli Scacchi', insegnaScacchi: true, tendaA: '#f6f0e4', tendaB: '#2a2733', porta: 0, persiane: '#2a2733', tendaLarg: 4.6 },
+      // le casette degli abitanti IA (src/borgo/casette-agenti.js), sul lato sud: la porta guarda la fontana
+      ...Object.entries(B.CASETTE_AGENTI || {}).map(([id, c]) => ({ x: c.x, z: c.z, rot: Math.PI, w: 4.6, d: 5, muro: c.muro, muroSopra: c.muroSopra, tetto: c.tetto, nome: 'Casa di ' + c.chi, casetta: id, tendaA: '#f6e8cc', tendaB: c.tendaB, porta: 0, persiane: c.persiane, tendaLarg: 3.0 })),
       { x: -40, z: -9.1, rot: 0, w: 7.6, d: 5, muro: '#3b2f5c', muroSopra: '#51427a', tetto: '#1d1a3a', nome: 'Laugh Tale Collectibles', tendaA: '#f4ead6', tendaB: '#7a2fd6', porta: 0, persiane: '#e0b040', tendaLarg: 6.4, insegnaLtc: true }
     ];
-    defs.forEach(d => aggiungi(d, edificio(d), d.nome, d.nome === 'Casa' ? 'casa' : d.nome === 'Negozio TCG' ? 'negozio' : d.nome === 'Sala Giochi' ? 'sala' : d.insegnaLtc ? 'collectibles' : d.nome === 'Biblioteca' ? 'biblioteca' : d.insegnaScacchi ? 'scacchi' : null));
+    defs.forEach(d => aggiungi(d, edificio(d), d.nome, d.nome === 'Casa' ? 'casa' : d.nome === 'Negozio TCG' ? 'negozio' : d.nome === 'Sala Giochi' ? 'sala' : d.insegnaLtc ? 'collectibles' : d.nome === 'Biblioteca' ? 'biblioteca' : d.insegnaScacchi ? 'scacchi' : d.casetta || null));
     porte.forEach(p => { if (p.id === 'porta-Arredamenti') { p.arredi = true; p.testo = 'Entra nel negozio di arredi'; } });
-    porte.forEach(p => { if (p.verso === 'sala') p.arrivo = { x: 0, z: 12.6, yaw: PI }; if (p.verso === 'negozio') p.arrivo = { x: 0, z: 6.2, yaw: PI }; if (p.verso === 'collectibles') p.arrivo = { x: 0, z: 13.5, yaw: PI }; if (p.verso === 'biblioteca') p.arrivo = { x: 0, z: 6.0, yaw: PI }; if (p.verso === 'scacchi') { p.arrivo = { x: 0, z: 7.0, yaw: PI }; p.testo = 'Entra nella Casa degli Scacchi'; } });
+    porte.forEach(p => { if (p.verso === 'sala') p.arrivo = { x: 0, z: 12.6, yaw: PI }; if (p.verso === 'negozio') p.arrivo = { x: 0, z: 6.2, yaw: PI }; if (p.verso === 'collectibles') p.arrivo = { x: 0, z: 13.5, yaw: PI }; if (p.verso === 'biblioteca') p.arrivo = { x: 0, z: 6.0, yaw: PI }; if (p.verso === 'scacchi') { p.arrivo = { x: 0, z: 7.0, yaw: PI }; p.testo = 'Entra nella Casa degli Scacchi'; } if (B.CASETTE_AGENTI && B.CASETTE_AGENTI[p.verso]) { p.arrivo = { x: 0, z: 2.4, yaw: PI }; p.testo = 'Entra nella casa di ' + B.CASETTE_AGENTI[p.verso].chi; } });
     if (B.CasaScacchi) B.CasaScacchi.decoraPiazza(scene, { ostCer });
     // la Torre della Cometa, al posto della Torre dell'Orologio: piani da esplorare e il telescopio in cima (js/torre.js)
     if (B.costruisciTorreEsterna) B.costruisciTorreEsterna(scene, { anim, lancette, ostacoli, porte, edifici });
@@ -9848,7 +9850,7 @@ window.B3_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAC3CAIAAABl
       const ap = new T.Mesh(new T.PlaneGeometry(0.9, 0.34), new T.MeshBasicMaterial({ map: B.tex(cv), side: T.DoubleSide })); ap.position.set(0, 2.35, 0.02); g.add(ap);
       const mt = new T.Mesh(new T.PlaneGeometry(1.6, 0.9), new T.MeshToonMaterial({ map: B.texTappeto(), gradientMap: gm })); mt.rotation.x = -PI / 2; mt.position.set(0, 0.014, -0.5); g.add(mt);
     })();
-    porte.push({ id: 'porta-uscita', nome: 'Esci in piazza', x: 0, z: Z1 - 1.2, r: 1.3, verso: 'piazza', arrivo: { x: -22, z: 65.2, yaw: PI } });
+    porte.push({ id: 'porta-uscita', nome: 'Esci in piazza', x: 0, z: Z1 - 1.2, r: 1.3, verso: 'piazza', arrivo: { x: -27.7, z: -4.3, yaw: 0 } });   // davanti alla porta della Biblioteca (prima si usciva in fondo alla piazza)
 
     /* ---------- pareti che spariscono quando la camera e' dietro di loro ---------- */
     muri.forEach(m => {
@@ -9883,6 +9885,194 @@ window.B3_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAC3CAIAAABl
   }
 
   B.costruisciBiblioteca = costruisciBiblioteca;
+})();
+/* =====================================================================
+   THE BORG 3D - LE CASETTE DEGLI ABITANTI IA (Ada e Teo), interno.
+   Ogni abitante IA ha una casetta sua sul lato sud della piazza (fuori, in
+   piazza.js, c'e' l'edificio con la porta). Dentro (8 x 7 m) c'e' quello che
+   la "vita vera" (agenti/vita/casa.mjs) usa davvero: cucina con il fornello
+   a gas e il frigo, tavolo, letto con il piumone, bagno con water, lavandino
+   e doccia, termosifone. Le stesse coordinate stanno in agenti/vita/casa.mjs.
+   Le pareti davanti alla camera diventano trasparenti, come in Biblioteca.
+   ===================================================================== */
+(function () {
+  'use strict';
+  const B = window.B3, T = B.T, M = B.M, mesh = B.mesh;
+  const PI = Math.PI;
+
+  // dove stanno in piazza (centro dell'edificio; la porta guarda a nord, verso la fontana)
+  const CASETTE = {
+    casa_ada: { chi: 'Ada', x: -22, z: 63, muro: '#e6c9a8', muroSopra: '#f2e2c8', tetto: '#7a3a4a', persiane: '#4f8a3a', tendaB: '#c8553d', piumone: '#e07a9a' },
+    casa_teo: { chi: 'Teo', x: 22, z: 63, muro: '#c9d6c0', muroSopra: '#e6eedc', tetto: '#2f4a6a', persiane: '#7a3f6a', tendaB: '#3f6a8a', piumone: '#4f8ab8' }
+  };
+  B.CASETTE_AGENTI = CASETTE;
+
+  const X = 4, Z0 = -3.5, Z1 = 3.5;
+  const AREA = { x0: -X + 0.5, x1: X - 0.5, z0: Z0 + 0.6, z1: Z1 - 0.5 };
+
+  function costruisciCasetta(scena, id) {
+    const def = CASETTE[id];
+    const sedili = [], ostacoli = [], anim = [], porte = [], toccabili = [], lampade = [], vetri = [], muri = [];
+    const gm = M('#fff').gradientMap;
+    const ostBox = (cx, cz, w, d) => ostacoli.push({ t: 'b', x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2 });
+    const scatola = (g, w, h, d, col, x, y, z, lb) => { const m = mesh(new T.BoxGeometry(w, h, d), typeof col === 'string' ? M(col) : col, { x, y, z, lb: lb === undefined ? 0.02 : lb }); g.add(m); return m; };
+    const cil = (g, r1, r2, h, col, x, y, z, seg, l) => { const m = mesh(new T.CylinderGeometry(r1, r2, h, seg || 12), M(col), { x, y, z, l: l === undefined ? 0.018 : l }); g.add(m); return m; };
+    const siedi = (x, z, yaw, y, dorme) => { const st = { x, z, y: y || 0.08, yt: 0, yaw }; if (dorme) { st.dorme = true; st.r = 1.6; } st.azione = { sedile: st, nome: dorme ? 'Vai a dormire' : 'Siediti', testo: dorme ? 'Vai a dormire' : 'Siediti' }; sedili.push(st); };
+    const legno = '#a96f44', legnoS = '#6b4326', bianco = '#f4f1ea', acciaio = '#c8ccd2';
+
+    /* ---------- base e pavimento ---------- */
+    scena.add(mesh(new T.BoxGeometry(2 * X + 0.4, 0.9, Z1 - Z0 + 0.4), M('#6f6485'), { y: -0.46, z: 0, lb: 0.05 }));
+    const tPar = B.texParquet(); tPar.repeat.set(2 * X / 4, (Z1 - Z0) / 4);
+    const pav = new T.Mesh(new T.PlaneGeometry(2 * X, Z1 - Z0), new T.MeshToonMaterial({ map: tPar, gradientMap: gm, color: new T.Color('#e0c8a8') })); pav.rotation.x = -PI / 2; pav.position.set(0, 0.002, 0); pav.receiveShadow = true; scena.add(pav);
+    // piastrelle del bagno
+    const pb = new T.Mesh(new T.PlaneGeometry(2.4, 2.7), new T.MeshToonMaterial({ color: new T.Color('#cfe3e8'), gradientMap: gm })); pb.rotation.x = -PI / 2; pb.position.set(2.8, 0.004, 2.15); scena.add(pb);
+
+    /* ---------- pareti ---------- */
+    const matVetro = () => { const m = new T.MeshToonMaterial({ color: new T.Color('#bfe3f2'), gradientMap: gm, emissive: new T.Color('#bfe3f2'), emissiveIntensity: 0.6 }); vetri.push(m); return m; };
+    function finestra(g, x, y, w, h) {
+      scatola(g, w + 0.3, h + 0.3, 0.12, bianco, x, y, 0.03);
+      const v = new T.Mesh(new T.PlaneGeometry(w, h), matVetro()); v.position.set(x, y, 0.1); g.add(v);
+      scatola(g, 0.06, h, 0.05, bianco, x, y, 0.13, 0); scatola(g, w + 0.5, 0.1, 0.3, '#e8dcc8', x, y - h / 2 - 0.18, 0.15, 0.012);
+    }
+    function parete(len, col, wx, wz, rotY, out, contenuto) {
+      const g = new T.Group(); g.position.set(wx, 0, wz); g.rotation.y = rotY; scena.add(g);
+      const corpo = mesh(new T.BoxGeometry(len, 3.2, 0.3), M(col), { y: 1.6, z: -0.15, lb: 0.03 }); corpo.castShadow = false; g.add(corpo);
+      scatola(g, len, 0.25, 0.08, legnoS, 0, 0.12, 0.04, 0.012);
+      contenuto(g);
+      muri.push({ g, out, mats: [], lines: [], q: 1, ap: 1 });
+    }
+    parete(2 * X + 0.6, def.muro, 0, Z0, 0, [0, -1], g => {
+      finestra(g, 2.6, 2.1, 1.1, 1.0);
+      // il nome sulla parete: "Casa di Ada"
+      const [cv, x] = B.tela(512, 128); B.rr(x, 4, 4, 504, 120, 22); x.fillStyle = '#2a1f33'; x.fill(); x.lineWidth = 8; x.strokeStyle = '#ffd36a'; x.stroke();
+      x.font = 'bold 66px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#fff4dc'; x.fillText('Casa di ' + def.chi, 256, 66);
+      const ins = new T.Mesh(new T.PlaneGeometry(2.0, 0.5), new T.MeshBasicMaterial({ map: B.tex(cv) })); ins.position.set(0.2, 2.75, 0.1); g.add(ins);
+    });
+    parete(Z1 - Z0 + 0.3, def.muroSopra, -X, 0, PI / 2, [-1, 0], g => { finestra(g, 0.6, 2.0, 1.1, 1.0); });
+    parete(Z1 - Z0 + 0.3, def.muroSopra, X, 0, -PI / 2, [1, 0], g => { finestra(g, 1.6, 2.0, 1.0, 1.0); });
+
+    /* ---------- cucina: piano di lavoro, lavello, fornello a gas, frigo ---------- */
+    (function () {
+      const g = new T.Group(); g.position.set(-2.1, 0, Z0 + 0.4); scena.add(g);
+      scatola(g, 3.0, 0.9, 0.6, '#f0e6d6', 0, 0.45, 0, 0.015);                 // mobili bassi
+      scatola(g, 3.1, 0.06, 0.66, '#5a5560', 0, 0.93, 0, 0.012);              // piano
+      for (let i = 0; i < 4; i++) scatola(g, 0.7, 0.8, 0.02, '#e6dccb', -1.1 + i * 0.73, 0.45, 0.31, 0.008);
+      scatola(g, 0.6, 0.05, 0.45, acciaio, -1.0, 0.965, 0, 0.008);            // lavello
+      cil(g, 0.025, 0.025, 0.35, acciaio, -1.0, 1.1, -0.2, 8, 0);
+      // fornello a 4 fuochi: si accendono (fiammella blu) quando qualcuno cucina
+      scatola(g, 0.62, 0.03, 0.55, '#2a2830', 0.6, 0.96, 0, 0.008);
+      const fiamme = [];
+      [[-0.15, -0.13], [0.15, -0.13], [-0.15, 0.13], [0.15, 0.13]].forEach(p => {
+        cil(g, 0.08, 0.08, 0.02, '#1a1a1e', 0.6 + p[0], 0.98, p[1], 14, 0.006);
+        const f = new T.Mesh(new T.TorusGeometry(0.06, 0.012, 6, 16), new T.MeshBasicMaterial({ color: 0x4a8cff })); f.rotation.x = PI / 2; f.position.set(0.6 + p[0], 1.0, p[1]); f.visible = false; g.add(f); fiamme.push(f);
+      });
+      const pentola = cil(g, 0.11, 0.1, 0.14, '#8a8f98', 0.45, 1.06, -0.13, 14, 0.01); void pentola;
+      anim.push(t => { const on = !!(B.vitaCasa && B.vitaCasa[id] && B.vitaCasa[id].fornello); fiamme.forEach((f, i) => { f.visible = on && i === 0; f.scale.setScalar(1 + Math.sin(t * 20) * 0.06); }); });
+      scatola(g, 3.0, 0.7, 0.35, '#f0e6d6', 0, 2.25, -0.12, 0.015);           // pensili
+      ostBox(-2.1, Z0 + 0.4, 3.2, 0.8);
+      // frigo
+      const fr = new T.Group(); fr.position.set(-0.15, 0, Z0 + 0.45); scena.add(fr);
+      scatola(fr, 0.7, 1.85, 0.66, bianco, 0, 0.925, 0, 0.02); scatola(fr, 0.7, 0.02, 0.02, '#bdb6aa', 0, 1.2, 0.34, 0); scatola(fr, 0.04, 0.5, 0.04, acciaio, 0.28, 1.5, 0.35, 0);
+      ostBox(-0.15, Z0 + 0.45, 0.8, 0.8);
+      const prF = new T.Mesh(new T.BoxGeometry(4, 2, 1.4), new T.MeshBasicMaterial()); prF.position.set(-1.6, 1, Z0 + 0.7); prF.visible = false; scena.add(prF);
+      toccabili.push({ obj: prF, tipo: 'azione', testo: 'La cucina di ' + def.chi + ': fornello a gas e frigo a 4 gradi' });
+    })();
+
+    /* ---------- tavolo con due sedie ---------- */
+    (function () {
+      const x = -2.0, z = -0.6, g = new T.Group(); g.position.set(x, 0, z); scena.add(g);
+      scatola(g, 1.3, 0.08, 0.85, legno, 0, 0.76, 0, 0.014);
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(p => scatola(g, 0.07, 0.72, 0.07, legnoS, p[0] * 0.56, 0.36, p[1] * 0.34, 0.008));
+      cil(g, 0.09, 0.07, 0.12, '#e07a5f', 0, 0.86, 0, 10, 0.008);
+      ostBox(x, z, 1.4, 0.95);
+      [-1, 1].forEach(s => { const sx = x + s * 1.0, sz = z; scatola(scena, 0.42, 0.06, 0.42, legno, sx, 0.46, sz, 0.01); scatola(scena, 0.06, 0.5, 0.42, legno, sx + s * 0.2, 0.72, sz, 0.008); ostacoli.push({ t: 'c', x: sx, z: sz, r: 0.28 }); siedi(sx, sz, s > 0 ? -PI / 2 : PI / 2); });
+    })();
+
+    /* ---------- letto con il piumone ---------- */
+    (function () {
+      const x = 2.6, z = -2.1, g = new T.Group(); g.position.set(x, 0, z); scena.add(g);
+      scatola(g, 1.6, 0.35, 2.1, legno, 0, 0.18, 0, 0.015);
+      scatola(g, 1.5, 0.2, 2.0, bianco, 0, 0.45, 0, 0.012);
+      scatola(g, 1.52, 0.12, 1.4, def.piumone, 0, 0.6, 0.3, 0.012);
+      [-0.38, 0.38].forEach(s => scatola(g, 0.6, 0.14, 0.38, '#fffaf0', s, 0.62, -0.75, 0.01));
+      scatola(g, 1.6, 0.9, 0.08, legnoS, 0, 0.6, -1.06, 0.012);
+      scatola(scena, 0.45, 0.5, 0.4, legnoS, x - 1.1, 0.25, z - 0.75, 0.01);   // comodino
+      const lp = new T.Mesh(new T.SphereGeometry(0.1, 8, 6), B.Mluce('#ffd9a0', 0.9)); lp.position.set(x - 1.1, 0.65, z - 0.75); scena.add(lp);
+      ostBox(x, z, 1.7, 2.2);
+      siedi(x, z + 0.2, PI, 0.62, true);
+    })();
+
+    /* ---------- bagno: tramezzo, water, lavandino, doccia ---------- */
+    (function () {
+      const bx0 = 1.6, bz0 = 0.8;
+      scatola(scena, 0.12, 2.3, Z1 - bz0, '#e9eef0', bx0, 1.15, (bz0 + Z1) / 2 + 0.4, 0.015);   // tramezzo (con il passaggio verso la stanza)
+      ostBox(bx0, (bz0 + Z1) / 2 + 0.4, 0.2, Z1 - bz0 - 0.8);
+      scatola(scena, X - bx0 - 1.0, 2.3, 0.12, '#e9eef0', bx0 + (X - bx0 - 1.0) / 2 + 1.0, 1.15, bz0, 0.015);
+      ostBox(bx0 + (X - bx0 - 1.0) / 2 + 1.0, bz0, X - bx0 - 1.0, 0.2);
+      // water
+      cil(scena, 0.2, 0.16, 0.42, bianco, X - 0.45, 0.21, 2.0, 14, 0.012); scatola(scena, 0.4, 0.4, 0.18, bianco, X - 0.25, 0.6, 2.0, 0.01);
+      ostacoli.push({ t: 'c', x: X - 0.4, z: 2.0, r: 0.3 });
+      // lavandino con specchio
+      scatola(scena, 0.5, 0.12, 0.4, bianco, X - 0.3, 0.85, 1.2, 0.01); cil(scena, 0.05, 0.07, 0.8, bianco, X - 0.3, 0.4, 1.2, 8, 0.008);
+      const sp = new T.Mesh(new T.PlaneGeometry(0.5, 0.6), matVetro()); sp.position.set(X - 0.16, 1.55, 1.2); sp.rotation.y = -PI / 2; scena.add(sp);
+      // doccia con il vetro
+      scatola(scena, 0.9, 0.06, 0.9, '#f4f8fa', 2.15, 0.03, Z1 - 0.55, 0.008);
+      const vt = new T.Mesh(new T.BoxGeometry(0.04, 1.9, 0.9), new T.MeshBasicMaterial({ color: 0xbfe3f2, transparent: true, opacity: 0.35 })); vt.position.set(2.6, 0.98, Z1 - 0.55); scena.add(vt);
+      cil(scena, 0.12, 0.12, 0.03, acciaio, 2.15, 2.0, Z1 - 0.3, 12, 0);
+      ostBox(2.15, Z1 - 0.55, 1.0, 1.0);
+      const prB = new T.Mesh(new T.BoxGeometry(2.4, 2, 2.6), new T.MeshBasicMaterial()); prB.position.set(2.8, 1, 2.15); prB.visible = false; scena.add(prB);
+      toccabili.push({ obj: prB, tipo: 'azione', testo: 'Il bagno: doccia calda con la caldaia a gas' });
+    })();
+
+    /* ---------- angolo con poltrona e termosifone ---------- */
+    scatola(scena, 0.9, 0.45, 0.85, '#7a5a9a', -3.1, 0.23, 2.3, 0.015); scatola(scena, 0.9, 0.6, 0.18, '#6a4a8a', -3.1, 0.7, 2.75, 0.012);
+    ostBox(-3.1, 2.4, 1.0, 1.0); siedi(-3.1, 2.25, PI);
+    for (let i = 0; i < 8; i++) scatola(scena, 0.08, 0.6, 0.1, bianco, -X + 0.12, 0.6, -0.9 + i * 0.12, 0.006);   // termosifone sotto la finestra
+    const tap = new T.Mesh(new T.PlaneGeometry(2.4, 1.6), new T.MeshToonMaterial({ map: B.texTappeto(), gradientMap: gm, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); tap.rotation.x = -PI / 2; tap.position.set(-0.8, 0.012, 1.4); scena.add(tap);
+
+    /* ---------- luci e uscita ---------- */
+    const lampa = B.Mluce('#ffd9a0', 0.9);
+    [[-1.8, -1.2], [1.2, -1.2], [2.8, 2.2], [-1.6, 2.0]].forEach(p => {
+      const bu = new T.Mesh(new T.SphereGeometry(0.13, 8, 6), lampa); bu.position.set(p[0], 3.0, p[1]); scena.add(bu);
+      lampade.push({ x: p[0], y: 2.6, z: p[1] });
+    });
+    const usc = new T.Group(); usc.position.set(0, 0, Z1 + 0.3); scena.add(usc);
+    [-1, 1].forEach(s => scatola(usc, 0.16, 2.6, 0.2, legnoS, s * 0.75, 1.3, 0, 0.015)); scatola(usc, 1.66, 0.18, 0.2, legnoS, 0, 2.6, 0, 0.015);
+    const mt = new T.Mesh(new T.PlaneGeometry(1.4, 0.8), new T.MeshToonMaterial({ map: B.texTappeto(), gradientMap: gm })); mt.rotation.x = -PI / 2; mt.position.set(0, 0.014, Z1 - 0.6); scena.add(mt);
+    porte.push({ id: 'porta-uscita', nome: 'Esci in piazza', x: 0, z: Z1 - 0.9, r: 1.1, verso: 'piazza', arrivo: { x: def.x, z: def.z - 4.4, yaw: 0 } });
+
+    /* ---------- pareti che spariscono quando la camera e' dietro di loro ---------- */
+    muri.forEach(m => {
+      m.g.traverse(c => {
+        if (!c.isMesh) return;
+        const mm = c.material;
+        if (mm.isShaderMaterial || (mm.isMeshBasicMaterial && mm.side === T.BackSide)) { m.lines.push(c); return; }
+        const nuovo = mm.clone(), j = vetri.indexOf(mm); if (j >= 0) vetri[j] = nuovo;
+        c.material = nuovo; m.mats.push(nuovo);
+      });
+    });
+    function aggiornaMuri(az, dt) {
+      const cx = Math.sin(az), cz = Math.cos(az);
+      muri.forEach(m => {
+        const fuori = m.out[0] * cx + m.out[1] * cz > 0.2, target = fuori ? 0.0 : 1;
+        m.q += (target - m.q) * Math.min(1, dt * 9);
+        const q = Math.abs(m.q - target) < 0.02 ? target : m.q;
+        if (q === m.ap) return; m.ap = q;
+        m.mats.forEach(mm => { const tr = q < 0.99; if (mm.transparent !== tr) { mm.transparent = tr; mm.needsUpdate = true; } mm.opacity = q; mm.depthWrite = !tr; });
+        m.g.visible = q > 0.02;
+        m.lines.forEach(l => { l.visible = q >= 0.99; });
+      });
+    }
+    const COLORI = { giorno: ['#bfe3f2', 0.6], tramonto: ['#ffb878', 0.55], notte: ['#2c3a78', 0.5] };
+    function atm(nome) {
+      const c = COLORI[nome] || COLORI.giorno;
+      vetri.forEach(v => { v.color.set(c[0]); v.emissive.set(nome === 'notte' ? '#3a4a9a' : c[0]); v.emissiveIntensity = c[1]; });
+    }
+    const area = (x, z) => x > AREA.x0 && x < AREA.x1 && z > AREA.z0 && z < AREA.z1;
+    return { sedili, anim, ostacoli, porte, toccabili, lampade, area, aggiornaMuri, atm, limiti: AREA };
+  }
+
+  B.costruisciCasetta = costruisciCasetta;
 })();
 
 </script>
@@ -29872,9 +30062,13 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
       else { if (!condiviso) { const g = nuovoG(), m = B.costruisciPianoTorre(g, n, true); condiviso = { g, m }; piani.push(m); } pianiT[n] = condiviso; }
     }
   }
+  // le casette degli abitanti IA (src/borgo/casette-agenti.js): un gruppo per casa
+  const casette = {};
+  if (B.costruisciCasetta) for (const id of Object.keys(B.CASETTE_AGENTI || {})) { const g = new T.Group(); g.visible = false; scene.add(g); casette[id] = { g, m: B.costruisciCasetta(g, id) }; }
+  const gCasette = Object.values(casette).map(c => c.g);
   const PZ = CFG.plaza;
   // la scena e le stanze non si muovono mai: cosi' three.js puo' saltare i pezzi fermi e le stanze nascoste
-  const gruppiStanze = [gP, gC, gN, gS, gL, gT, gB, gK].concat(gTorre);
+  const gruppiStanze = [gP, gC, gN, gS, gL, gT, gB, gK].concat(gTorre, gCasette);
   [scene].concat(gruppiStanze).forEach(g => { g.updateMatrix(); g.matrixAutoUpdate = false; g.matrixWorldNeedsUpdate = true; });
   const stanze = {
     piazza: { id: 'piazza', nome: 'Piazza del Borgo', pubblica: true, gruppo: gP, m: piazza, ostacoli: piazza.ostacoli, porte: piazza.porte, sedili: piazza.sedili, toccabili: piazza.toccabili,
@@ -29895,6 +30089,8 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
     sala: { id: 'sala', nome: 'Sala Giochi', pubblica: true, gruppo: gS, m: sala, ostacoli: sala.ostacoli, porte: sala.porte, sedili: sala.sedili, toccabili: sala.toccabili,
       area: sala.area, alt: () => 0, zoom: 0.8, spawn: { x: 0, z: 12.6, yaw: PI }, rect: { x0: -27, x1: 27, z0: -13, z1: 15 }, edifici: [], sfondo: '#241a40' }
   };
+  for (const [id, { g, m }] of Object.entries(casette)) stanze[id] = { id, nome: 'Casa di ' + B.CASETTE_AGENTI[id].chi, pubblica: true, gruppo: g, m, ostacoli: m.ostacoli, porte: m.porte, sedili: m.sedili, toccabili: m.toccabili,
+    area: m.area, alt: () => 0, zoom: 0.95, spawn: { x: 0, z: 2.4, yaw: PI }, rect: { x0: -4, x1: 4, z0: -3.5, z1: 3.5 }, edifici: [], sfondo: '#2a2040' };
   pianiT.forEach(({ g, m }, n) => {
     stanze['torre' + n] = { id: 'torre' + n, nome: B.nomePianoTorre ? B.nomePianoTorre(n) : m.nome, piano: n, pubblica: true, gruppo: g, m, ostacoli: m.ostacoli, porte: m.porte, sedili: m.sedili, toccabili: m.toccabili,
       area: m.area, alt: () => 0, zoom: m.zoom || 0.8, spawn: m.spawn, rect: m.rect, edifici: [], sfondo: '#2a2040' };
@@ -29950,7 +30146,7 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
     B.finestreMat.forEach(m => { m.emissiveIntensity = a.finestre; });
     const k = clamp(a.lampioni / 1.6, 0, 1) * 0.95;
     piazza.aloni.forEach(s => { s.material.opacity = k; });
-    casa.atm(nome); if (stanze.ospite) stanze.ospite.m.atm(nome); negozio.atm(nome); sala.atm(nome); coll.atm(nome); tcgR.atm(nome); bib.atm(nome); scac.atm(nome); assegnaLuci();
+    casa.atm(nome); if (stanze.ospite) stanze.ospite.m.atm(nome); negozio.atm(nome); sala.atm(nome); coll.atm(nome); tcgR.atm(nome); bib.atm(nome); scac.atm(nome); Object.values(casette).forEach(c => c.m.atm(nome)); assegnaLuci();
     piani.forEach(m => m.atm(nome));
   }
 
@@ -30117,7 +30313,7 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
   function entraStanza(id, arrivo) {
     stanza = stanze[id]; io.st = stanza; io.seduto = null; G.stato.stanzaId = id;
     if (stanza.m && stanza.m.alPiano && stanza.piano != null) stanza.m.alPiano(stanza.piano);   // piani della torre che condividono il gruppo
-    gP.visible = stanza.gruppo === gP; gTorre.forEach(g => { g.visible = stanza.gruppo === g; }); gC.visible = id === 'casa'; gN.visible = id === 'negozio'; gS.visible = id === 'sala'; gL.visible = id === 'collectibles'; gT.visible = id === 'tcg'; gB.visible = id === 'biblioteca'; gK.visible = id === 'scacchi'; gO.visible = id === 'ospite';
+    gP.visible = stanza.gruppo === gP; gTorre.forEach(g => { g.visible = stanza.gruppo === g; }); gC.visible = id === 'casa'; gN.visible = id === 'negozio'; gS.visible = id === 'sala'; gL.visible = id === 'collectibles'; gT.visible = id === 'tcg'; gB.visible = id === 'biblioteca'; gK.visible = id === 'scacchi'; gO.visible = id === 'ospite'; for (const [k, c] of Object.entries(casette)) c.g.visible = id === k;
     const sp = arrivo || stanza.spawn;
     io.x = sp.x; io.z = sp.z; io.vx = io.vz = 0; io.yaw = sp.yaw === undefined ? 0 : sp.yaw; io.y = stanza.alt(io.x, io.z);
     C.azT = C.az = stanza.az === undefined ? PI / 4 : stanza.az; impostaZoom(stanza.zoom); if (stanza.elev) { C.elev = stanza.elev; C.elevAuto = true; } else if (C.elevAuto) { C.elev = 28; C.elevAuto = false; } C.tx = io.x; C.tz = io.z; C.ty = 1.0 + io.y;
@@ -31578,6 +31774,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
   function applica(d) {
     if (!d || !Array.isArray(d.agenti)) return;
     A.dati = d; A.scarto = d.ora - Date.now();
+    B.vitaCasa = (d.vita && d.vita.case) || null;   // le casette: fornello acceso, temperatura (src/borgo/casette-agenti.js)
     if (!gruppo) { gruppo = new T.Group(); app.gP.add(gruppo); }
     const visti = new Set();
     d.agenti.forEach(s => { visti.add(s.id); aggiornaAgente(s); });
@@ -32062,14 +32259,27 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
   /* ---------- scheda dell'agente (tocco sull'avatar) ---------- */
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const euro = v => v.toFixed(v < 0.1 ? 4 : 2).replace('.', ',') + ' $';
+  const FA = { dormi: 'Dorme 😴', svenuto: 'È svenuto', riposa: 'Si riposa', pesca: 'Pesca al Laghetto 🎣', lavora: 'Fa un turno di lavoro', mangia: 'Mangia', svago: 'Si svaga', chiacchiera: 'Chiacchiera', lavati: 'Si lava', raccogli: 'Raccoglie', modella: 'Modella l\'argilla', semina: 'Semina' };
   function cosaFa(s) {
+    if (s.morto) return 'È morto' + (s.morto.causa ? ' (' + s.morto.causa + ')' : '') + '. La morte nel borgo è vera.';
     if (A.dati && A.dati.pausa) return 'In pausa: è fermo, non pensa e non spende nulla';
+    const v = A.dati && A.dati.vita && A.dati.vita.corpi[s.id];
+    if (v && v.fa && v.fa !== 'morto') return FA[v.fa] || v.fa;
     if (s.modo === 'automatico') return s.motivo === 'budget-finito' ? 'Ha finito il budget del mese: vive in automatico fino al mese prossimo' : 'Vive in automatico (il cervello non è collegato)';
     if (s.lavoro && s.lavoro.tipo === 'usa') return 'Sta usando: ' + s.lavoro.nome + ' ' + (s.lavoro.icona || '');
     if (s.lavoro) { const o = A.oggetti.get(s.lavoro.id); return (s.lavoro.tipo === 'costruisci' ? 'Sta costruendo ' : 'Sta smontando ') + (o ? '"' + o.d.nome + '"' : ''); }
     if (Math.hypot(s.tx - s.x, s.tz - s.z) > 0.5) return 'Sta camminando';
     const m = Math.max(0, Math.round((s.prossimo - ora()) / 60000));
     return m < 1 ? 'Sta per pensare' : 'Ripenserà tra ' + (m < 60 ? m + ' min' : Math.round(m / 60) + ' h');
+  }
+  // il corpo (vita vera): salute, fame, sete, sonno, e la casa
+  const barra = (n, v, col) => `<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin:2px 0"><span style="width:52px">${n}</span><div style="flex:1;height:7px;border-radius:4px;background:#3d3355;overflow:hidden"><div style="height:100%;width:${Math.round(Math.max(0, Math.min(1, v)) * 100)}%;background:${col}"></div></div></div>`;
+  function corpo(s) {
+    const vv = A.dati && A.dati.vita, v = vv && vv.corpi[s.id]; if (!v || s.morto) return '';
+    const casa = vv.case && vv.case['casa_' + s.id];
+    return `<div style="margin:8px 0 4px"><b>Corpo:</b> salute ${v.salute}/100 · ${v.peso} kg · ${v.temperatura} °C${v.malato && v.malato.length ? ' · malato' : ''}</div>` +
+      barra('Fame', v.fame, '#e8873a') + barra('Sete', v.sete, '#7ec8e3') + barra('Sonno', v.sonno, '#7a4fb8') +
+      (casa ? `<div style="font-size:12px;opacity:.85;margin-top:3px">Casa: ${casa.T} °C${casa.fornello ? ' · fornello acceso 🔥' : ''}${casa.bolletta != null ? ' · ultima bolletta ' + casa.bolletta + ' Starlight' : ''}${casa.staccato ? ' · gas e luce staccati!' : ''}</div>` : '');
   }
   function disegnaScheda() {
     const el = A.scheda; if (!el) return;
@@ -32081,6 +32291,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
        <div style="opacity:.75;font-size:12px;margin-bottom:8px">Agente IA libero · ${esc(A.dati.modello || '')}</div>
        <div style="margin:6px 0"><b>Adesso:</b> ${esc(cosaFa(s))}</div>
        <div style="margin:6px 0"><b>Dove:</b> ${esc(s.stanza === 'tetto' ? 'sul tetto della Torre della Cometa' : s.stanza ? 'dentro ' + ({ negozio: 'Negozio TCG', tcg: 'Sala TCG' }[s.stanza] || (app.stanze[s.stanza] || {}).nome || s.stanza) : 'in piazza')}</div>
+       ${corpo(s)}
        ${s.starlight != null ? `<div style="margin:8px 0 4px"><b>Starlight:</b> ${s.starlight}${Object.keys(s.zaino || {}).length ? ' · zaino: ' + esc(Object.keys(s.zaino).join(', ')) : ''}</div>` : ''}
        <div style="margin:8px 0 4px"><b>Budget del mese:</b> ${euro(b.spesi)} su ${euro(b.tetto)} · ${b.pensieri} pensieri · restano ${b.giorni} giorni</div>
        <div style="height:10px;border-radius:5px;background:#3d3355;overflow:hidden"><div style="height:100%;width:${pc.toFixed(1)}%;background:${pc > 85 ? '#e0675c' : '#7ec8e3'}"></div></div>
