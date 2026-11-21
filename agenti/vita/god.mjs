@@ -20,6 +20,7 @@ export function vistaGod(mondo) {
   for (const c of Object.values(mondo.corpi)) {
     const dis = (c.acquaNormale - c.acqua) / c.peso * 100;
     righe.push(`${c.id}: salute ${Math.round(c.salute)}, peso ${c.peso.toFixed(1)} kg, glicogeno ${Math.round(c.glicogeno)} kcal, grasso ${Math.round(c.grasso / 7700 * 10) / 10} kg, disidratazione ${dis.toFixed(1)}%, sonno ${c.sonno.toFixed(2)}, temp ${c.temperatura.toFixed(1)}, ` +
+      `Starlight ${Math.round(c.starlight ?? 0)}, ` + (c.umano ? `umore ${c.umano.umore.toFixed(2)}, vescica ${c.umano.vescica.toFixed(2)} L, igiene ${c.umano.igiene.toFixed(2)}, solitudine ${c.umano.solitudine.toFixed(2)}, noia ${c.umano.noia.toFixed(2)}, ` : '') +
       `${c.morto ? 'MORTO' : c.svenuto ? 'svenuto' : c.addormentato ? 'dorme' : c.lavoro ? c.lavoro.tipo : 'libero'}${c.malattie.length ? ', malato: ' + c.malattie.map(m => m.tipo).join(',') : ''}; zaino ${c.zaino.map(q => nomeDi(q.cosa) + (OGGETTI[q.cosa] ? '' : ' ' + q.kg.toFixed(2))).join(', ') || 'vuoto'}`);
   }
   const disp = {}; mondo.cose.filter(q => q.dove === 'dispensa').forEach(q => { disp[q.cosa] = (disp[q.cosa] || 0) + (OGGETTI[q.cosa] ? 1 : q.kg); });
@@ -27,7 +28,11 @@ export function vistaGod(mondo) {
   const kcal = Object.entries(disp).reduce((s, [k, v]) => s + (MATERIALI[k] && MATERIALI[k].tipo === 'cibo' ? v * MATERIALI[k].kcal : 0), 0);
   righe.push(`CIBO IN DISPENSA: ${Math.round(kcal)} kcal (~${(kcal / 2100 / Math.max(1, Object.keys(mondo.corpi).length)).toFixed(1)} giorni per abitante)`);
   righe.push(`LAGHETTO: ${mondo.laghetto.pesci.toFixed(1)} kg di pesce su 45. RAMI SOTTO GLI ALBERI: ${mondo.alberi.reduce((s, a) => s + a.rami, 0).toFixed(0)} kg.`);
-  righe.push('AIUOLE: ' + mondo.aiuole.filter(a => a.coltura).map(a => `${a.id} ${statoPianta(a)}`).join('; ') || 'nessuna coltivata');
+  righe.push('AIUOLE: ' + (mondo.aiuole.filter(a => a.coltura).map(a => `${a.id} ${statoPianta(a)}`).join('; ') || 'nessuna coltivata'));
+  if (mondo.mercato) {
+    const m = mondo.mercato;
+    righe.push(`MERCATINO: incassato ${Math.round(m.incasso)} S, pagato a chi vende ${Math.round(m.pagato)} S. Prezzi: ` + ['pane', 'farina', 'pesce', 'uova', 'mele', 'legna'].map(k => `${k} ${m.prezzi[k]} (${(m.scorte[k] || 0).toFixed(1)})`).join(', ') + `. Compost: ${(mondo.compost || 0).toFixed(1)} kg.`);
+  }
   righe.push('FUOCHI: ' + (mondo.fuochi.filter(f => f.acceso).map(f => `${f.id} ${Math.round(f.T)} gradi, ${f.legna.reduce((s, l) => s + l.kg, 0).toFixed(1)} kg`).join('; ') || 'nessuno acceso'));
   return righe.join('\n');
 }

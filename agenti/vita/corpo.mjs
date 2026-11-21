@@ -16,8 +16,11 @@ import { KCAL } from './fisica.mjs';
 // Quanto "costa" ogni attivita' rispetto al riposo (MET, Compendium of Physical Activities).
 export const MET = {
   dormire: 0.95, riposare: 1.3, parlare: 1.5, mangiare: 1.5, cucinare: 2.0, camminare: 3.5,
-  pescare: 2.5, raccogliere: 3.0, accendere: 3.0, frizione: 6.0, modellare: 2.5, seminare: 4.0, costruire: 4.5, spaccare: 6.0
+  pescare: 2.5, raccogliere: 3.0, svago: 1.6, lavarsi: 2.0, lavorare: 2.5, accendere: 3.0, frizione: 6.0, modellare: 2.5, seminare: 4.0, costruire: 4.5, spaccare: 6.0
 };
+
+// MET di quello che si sta facendo (un turno di lavoro ha il suo)
+export const metDi = c => (c.attivita === 'lavorare' && c.lavoro && c.lavoro.met) || MET[c.attivita] || 1.3;
 
 export const SOGLIE = {
   glicogenoMax: 1800,       // kcal tra fegato e muscoli
@@ -62,7 +65,7 @@ export function metabolismoBasale(c) {
 // Calore che il corpo perde verso l'ambiente (W) e capacita' di compensare.
 // amb: { tAria, vento (m/s), bagnato (0..1), fuoco (W/m^2 di calore radiante ricevuto), riparo (bool), coperta (clo in piu') }
 export function bilancioTermico(c, amb) {
-  const metW = metabolismoBasale(c) / 24 * (MET[c.attivita] || 1.3) * KCAL / 3600;   // W prodotti
+  const metW = metabolismoBasale(c) / 24 * metDi(c) * KCAL / 3600;   // W prodotti
   const clo = (c.clo + (c.addormentato ? (amb.coperta || 0) : 0)) * (1 - 0.6 * (amb.bagnato || 0));   // i vestiti bagnati isolano molto meno
   const Icl = 0.155 * clo;                                 // m^2 K / W
   const Ia = 1 / (3.1 + 8.3 * Math.sqrt(Math.max(0.1, amb.vento || 0.2)) + 4.7);   // aria ferma ~0,1; col vento meno
@@ -86,7 +89,7 @@ export function viviCorpo(c, dt, amb, adesso, regole = {}) {
   // --- energia ---
   const bmrOra = metabolismoBasale(c) / 24;
   const malato = c.malattie.length > 0;
-  let consumo = bmrOra * (MET[c.attivita] || 1.3) * ore;
+  let consumo = bmrOra * metDi(c) * ore;
   // tremare per il freddo brucia energia (fino a 3-4 volte il basale)
   const term = bilancioTermico(c, amb);
   const brividi = term.netto < -60 ? Math.min(bmrOra * 3 * ore, (-term.netto - 60) * dt / KCAL) : 0;
@@ -119,7 +122,7 @@ export function viviCorpo(c, dt, amb, adesso, regole = {}) {
   // --- acqua ---
   // perdite di base (urina, respiro, pelle) ~2,2 L/giorno; sudore con caldo e fatica; diarrea se malati
   const caldo = Math.max(0, term.netto) / 2426000 * 3600;            // L/h di sudore per smaltire il calore in piu' (2,43 MJ per litro evaporato)
-  const sforzo = Math.max(0, (MET[c.attivita] || 1.3) - 2) * 0.08;   // L/h
+  const sforzo = Math.max(0, metDi(c) - 2) * 0.08;   // L/h
   const diarrea = c.malattie.some(m => m.tipo === 'gastroenterite' || m.tipo === 'fitoemoagglutinina') ? 0.08 : 0;
   const perse = (2.2 / 24 + Math.min(1.5, caldo + sforzo) + diarrea) * ore;
   c.acqua -= perse;

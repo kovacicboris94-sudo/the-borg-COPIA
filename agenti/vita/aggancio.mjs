@@ -11,6 +11,11 @@
 //   promptBase():   + promptVita()
 //   percezione():   + percezioneAgente(stato, ag, adesso)
 //   SCHEMA:         aggiungere i TIPI_VITA all'enum di "tipo"
+//   cammina.entra:  se azioneVita restituisce { cammina: { entra } }, all'arrivo il motore fa entrare
+//                   l'agente in quell'edificio (come l'azione 'entra' che esiste gia').
+//
+//  I soldi sono uno solo: gli Starlight del gioco (ag.starlight). La vita li
+//  legge prima di ogni passo e li riscrive dopo (paghe, acquisti, vendite).
 // =====================================================================
 import { nuovoMondo, passoMondo, REGOLE_VITA } from './mondo.mjs';
 import { eseguiAzioneVita, normalizzaAzioneVita, promptAzioniVita, TIPI_VITA } from './azioni.mjs';
@@ -33,7 +38,9 @@ export function assicuraVita(stato, adesso) {
 export function passoVita(stato, adesso, regole = REGOLE_VITA) {
   const mondo = assicuraVita(stato, adesso);
   const posizioni = Object.fromEntries(Object.values(stato.agenti).map(a => [a.id, { x: a.x, z: a.z, stanza: a.stanza || null }]));
+  portafogli(stato, mondo, 'dentro');
   const eventi = passoMondo(mondo, adesso, regole, posizioni);
+  portafogli(stato, mondo, 'fuori');
   for (const e of eventi) {
     const ag = stato.agenti[e.chi]; if (!ag) continue;
     // svenuto senza morte: viene portato al chiuso (in Biblioteca). Il motore lo sposta davvero.
@@ -41,6 +48,14 @@ export function passoVita(stato, adesso, regole = REGOLE_VITA) {
     if (['svenuto', 'morte', 'lavoro_finito', 'crollo_sonno', 'rinviene'].includes(e.tipo)) ag.diario && ag.diario.push({ t: adesso, s: testoEvento(e) });
   }
   return eventi;
+}
+// Un solo portafoglio: quello del gioco. 'dentro' copia ag.starlight nel corpo, 'fuori' lo riporta indietro.
+function portafogli(stato, mondo, verso) {
+  for (const ag of Object.values(stato.agenti)) {
+    const c = mondo.corpi[ag.id]; if (!c) continue;
+    if (verso === 'dentro') { if (typeof ag.starlight === 'number') c.starlight = ag.starlight; }
+    else if (typeof c.starlight === 'number') ag.starlight = c.starlight;
+  }
 }
 function testoEvento(e) {
   return { svenuto: `Sono svenuto (${e.causa}). Mi sono risvegliato al chiuso.`, morte: `(morto per ${e.causa})`, crollo_sonno: 'Sono crollato dal sonno.', rinviene: 'Mi sono ripreso.', lavoro_finito: e.esito }[e.tipo] || e.tipo;
@@ -50,9 +65,10 @@ function testoEvento(e) {
 // il motore mette un "vai" in testa alla coda e ripete l'azione all'arrivo.
 export function azioneVita(stato, ag, a, adesso) {
   const mondo = assicuraVita(stato, adesso);
-  const c = mondo.corpi[ag.id]; if (c) { c.x = ag.x; c.z = ag.z; c.stanza = ag.stanza || null; }
+  const c = mondo.corpi[ag.id]; if (c) { c.x = ag.x; c.z = ag.z; c.stanza = ag.stanza || null; if (typeof ag.starlight === 'number') c.starlight = ag.starlight; }
   const r = eseguiAzioneVita(mondo, ag.id, a, adesso);
-  if (r.vai) return { cammina: { x: r.vai.x, z: r.vai.z, dove: r.vai.nome }, esito: r.esito };
+  if (c && typeof c.starlight === 'number') ag.starlight = c.starlight;
+  if (r.vai) return { cammina: { x: r.vai.x, z: r.vai.z, dove: r.vai.nome, entra: r.vai.entra || null }, esito: r.esito };
   return r;
 }
 

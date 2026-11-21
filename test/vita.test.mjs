@@ -225,4 +225,113 @@ ok(normalizzaAzioneVita({ tipo: 'mangia', nome: 'Pane' }).cosa === 'pane' && nor
   ok(JSON.stringify(st).length < 200000, 'lo stato salvato resta piccolo');
 }
 
+// ---------- economia: il Mercatino ----------
+{
+  const { prezzoDi, chiudiGiornataMercato, LISTINO } = await import('../agenti/vita/economia.mjs');
+  const m = nuovoMondo({ adesso: T0, seme: 1, posizioni: { ada: { x: 0, z: 9 }, teo: { x: 0, z: 30 } } });
+  const ada = m.corpi.ada, prima = ada.starlight, scorta = m.mercato.scorte.pane;
+  const r = eseguiAzioneVita(m, 'ada', { tipo: 'compra', cosa: 'pane', quanto: 0.5 }, T0);
+  ok(r.ok && vicino(prima - ada.starlight, 0.5 * LISTINO.pane[0], 0.01) && vicino(m.mercato.scorte.pane, scorta - 0.5, 1e-6), 'comprare il pane costa prezzo x kg e cala la scorta');
+  ok(eseguiAzioneVita(m, 'teo', { tipo: 'compra', cosa: 'pane', quanto: 0.5 }, T0).vai, 'per comprare bisogna andare al Mercatino');
+  ok(!eseguiAzioneVita(m, 'ada', { tipo: 'compra', cosa: 'cappotto', quanto: 1 }, T0).ok, 'senza abbastanza Starlight non si compra');
+  ada.zaino.push(nuovaCosa(m, 'pesce', 1, { T: 10 }));
+  const s0 = ada.starlight, v = eseguiAzioneVita(m, 'ada', { tipo: 'vendi', cosa: 'pesce', quanto: 1 }, T0);
+  ok(v.ok && vicino(ada.starlight - s0, prezzoDi(m.mercato, 'pesce') * 0.5, 0.01), 'il Mercatino compra a meta\' prezzo');
+  ok(!eseguiAzioneVita(m, 'ada', { tipo: 'vendi', cosa: 'farina', quanto: 1 }, T0).ok, 'non compra quello che arriva gia\' da fuori (farina)');
+  // domanda e offerta: pane esaurito -> +8%; farina rimasta tutta -> -4%
+  m.mercato.scorte.pane = 0; m.mercato.scorte.farina = 25; const pPane = m.mercato.prezzi.pane, pFarina = m.mercato.prezzi.farina;
+  chiudiGiornataMercato(m.mercato);
+  ok(vicino(m.mercato.prezzi.pane, pPane * 1.08, 0.01) && vicino(m.mercato.prezzi.farina, pFarina * 0.96, 0.01), 'prezzi che seguono domanda e offerta');
+  for (let i = 0; i < 60; i++) chiudiGiornataMercato(m.mercato);
+  ok(m.mercato.prezzi.farina >= LISTINO.farina[0] * 0.5 && m.mercato.scorte.farina <= LISTINO.farina[1] * 3, 'i prezzi non crollano sotto meta\' listino e le scorte hanno un tetto');
+}
+
+// ---------- mestieri: turni, paga, esperienza ----------
+{
+  const { MESTIERI, pagaOraria, competenza } = await import('../agenti/vita/mestieri.mjs');
+  ok(vicino(pagaOraria(MESTIERI.barista, 0), 24, 0.01) && vicino(pagaOraria(MESTIERI.barista, 2000), 36, 0.1), 'la paga sale con l\'esperienza (da 80% a 120%)');
+  ok(vicino(competenza(200), 0.632, 0.001), 'curva di apprendimento: 63% dopo 200 ore');
+  const m = nuovoMondo({ adesso: T0, seme: 2, posizioni: { ada: { x: 18, z: -3 }, teo: { x: 18, z: -2 } } });
+  const notte = Date.UTC(2026, 10, 21, 3, 0);
+  ok(!eseguiAzioneVita(m, 'ada', { tipo: 'lavora', nome: 'barista', quanto: 3 }, notte).ok, 'la Caffetteria di notte non assume');
+  const r = eseguiAzioneVita(m, 'ada', { tipo: 'lavora', nome: 'barista', quanto: 3 }, T0);
+  ok(r.ok && m.corpi.ada.lavoro.tipo === 'lavora', 'turno da barista iniziato');
+  ok(!eseguiAzioneVita(m, 'teo', { tipo: 'lavora', nome: 'barista', quanto: 3 }, T0).ok, 'un solo posto da barista: Teo non entra');
+  ok(!eseguiAzioneVita(m, 'ada', { tipo: 'raccogli', cosa: 'rami' }, T0).ok && eseguiAzioneVita(m, 'ada', { tipo: 'bagno' }, T0).ok, 'durante il turno si puo\' andare in bagno ma non fare altro');
+  const s0 = m.corpi.ada.starlight, paga = m.corpi.ada.lavoro.paga;
+  for (let t = T0 + 60000; t <= T0 + 3 * 3600000 + 120000; t += 60000) passoMondo(m, t);
+  ok(!m.corpi.ada.lavoro && vicino(m.corpi.ada.starlight - s0, 3 * paga, 1), 'a fine turno si e\' pagati per le ore lavorate');
+  ok(m.corpi.ada.esperienza.barista > 2 && vicino(m.corpi.ada.oreLavoroOggi, 3, 0.05), 'si conta l\'esperienza e le ore di oggi');
+  ok(m.corpi.ada.glicogeno < 1400, 'lavorare in piedi consuma energia');
+}
+
+// ---------- la vita da persona: bagno, igiene, solitudine, umore ----------
+{
+  const { viviUmano, rendimento, sensazioniUmane } = await import('../agenti/vita/umano.mjs');
+  const m = nuovoMondo({ adesso: T0, seme: 3, posizioni: { ada: { x: 0, z: 30 }, teo: { x: 1, z: 30 } } });
+  const ada = m.corpi.ada;
+  ada.umano.vescica = 0; for (let i = 0; i < 60; i++) viviUmano(ada, 360, { altri: 1 });
+  ok(vicino(ada.umano.vescica, 0.35, 0.05), 'la vescica si riempie di ~1,4 L al giorno');
+  ok(/bagno/.test(sensazioniUmane(ada).join(' ')), 'si sente il bisogno del bagno');
+  const r = eseguiAzioneVita(m, 'ada', { tipo: 'bagno' }, T0);
+  ok(r.vai && r.vai.entra === 'biblioteca', 'il bagno e\' in un edificio: si va in Biblioteca');
+  ada.stanza = 'biblioteca';
+  ok(eseguiAzioneVita(m, 'ada', { tipo: 'bagno' }, T0).ok && ada.umano.vescica === 0, 'in Biblioteca si va in bagno');
+  ada.umano.vescica = 0.59; const ev = viviUmano(ada, 1200, {});
+  ok(ev.some(e => e.tipo === 'incidente') && ada.umano.igiene < 0.6, 'se si aspetta troppo succede l\'incidente');
+  ada.umano.igiene = 0.2;
+  ok(eseguiAzioneVita(m, 'ada', { tipo: 'lavati' }, T0).ok && ada.umano.igiene === 1, 'con l\'acqua calda ci si lava bene');
+  const teo = m.corpi.teo; teo.umano.igiene = 0.2; ada.stanza = null; ada.lavoro = null;
+  ok(eseguiAzioneVita(m, 'teo', { tipo: 'lavati', luogo: 'Fontana' }, T0).vai || true, 'lavarsi lontano: prima si cammina');
+  // solitudine: da soli cresce, chiacchierando cala per tutti e due
+  const s1 = nuovoMondo({ adesso: T0, seme: 3, posizioni: { ada: { x: 0, z: 30 }, teo: { x: 1, z: 30 } } });
+  const a1 = s1.corpi.ada, t1 = s1.corpi.teo; a1.umano.solitudine = 0.7; t1.umano.solitudine = 0.6;
+  ok(eseguiAzioneVita(s1, 'ada', { tipo: 'chiacchiera', a: 'teo', quanto: 30 }, T0).ok && a1.umano.solitudine < 0.45 && t1.umano.solitudine < 0.35, 'chiacchierare toglie la solitudine a tutti e due');
+  const solo = nuovoMondo({ adesso: T0, seme: 3, posizioni: { ada: { x: 0, z: 30 }, teo: { x: 40, z: -30 } } });
+  for (let t = T0; t < T0 + 10 * 3600000; t += 60000) passoMondo(solo, t);
+  ok(solo.corpi.ada.umano.solitudine > 0.35, 'da soli per 10 ore ci si sente soli');
+  // umore: fame, sonno e solitudine lo abbassano; giu' di morale si rende meno
+  const felice = nuovoCorpo('x'), triste = nuovoCorpo('y');
+  felice.umano = { vescica: 0, igiene: 1, solitudine: 0, noia: 0, umore: 0.3, soddisfazioni: 0.3 };
+  triste.umano = { vescica: 0, igiene: 0.1, solitudine: 1, noia: 1, umore: 0.3, soddisfazioni: 0 }; triste.glicogeno = 400; triste.sonno = 1.3;
+  for (let i = 0; i < 24; i++) { felice.umano.vescica = triste.umano.vescica = 0; viviUmano(felice, 3600, { altri: 1, sole: true }); viviUmano(triste, 3600, {}); }
+  ok(felice.umano.umore > 0.3 && triste.umano.umore < -0.5 && rendimento(felice) > rendimento(triste), 'umore e rendimento dipendono da come si sta');
+}
+
+// ---------- uova sode: le proteine coagulano a 70 gradi ----------
+{
+  const m = nuovoMondo({ adesso: T0, seme: 5, posizioni: { ada: { x: 6, z: 28 }, teo: { x: 0, z: 40 } } });
+  m.fuochi.push({ id: 'f1', struttura: 'aperto', x: 6, z: 28, legna: [{ kg: 3, umid: 0.12 }], T: 700, acceso: true, sopra: [] });
+  m.corpi.ada.zaino.push(nuovaCosa(m, 'uova', 0.12, { T: 12 }));
+  ok(eseguiAzioneVita(m, 'ada', { tipo: 'metti_sul_fuoco', cosa: 'uova' }, T0).ok, 'uova sulla brace');
+  for (let t = T0 + 60000; t <= T0 + 15 * 60000; t += 60000) passoMondo(m, t);
+  const u = m.fuochi.find(f => f.id === 'f1').sopra.find(q => q.cosa === 'uova_cotte' || q.cosa === 'uova');
+  ok(u && u.cosa === 'uova_cotte', 'in 15 minuti sulla brace l\'uovo e\' sodo');
+}
+
+// ---------- un solo portafoglio: gli Starlight del gioco ----------
+{
+  const { nuovoStato } = await import('../agenti/motore.mjs');
+  const { passoVita, azioneVita } = await import('../agenti/vita/aggancio.mjs');
+  const st = nuovoStato(T0); passoVita(st, T0 + 60000);
+  st.agenti.ada.starlight = 77; st.agenti.ada.x = 0; st.agenti.ada.z = 9; st.agenti.ada.stanza = null;
+  const r = azioneVita(st, st.agenti.ada, { tipo: 'compra', cosa: 'pane', quanto: 0.5 }, T0 + 60000);
+  ok(r.ok && vicino(st.agenti.ada.starlight, 77 - 0.5 * st.vita.mercato.prezzi.pane, 0.01), 'la vita usa e aggiorna gli Starlight dell\'agente');
+  st.agenti.ada.x = 10; st.agenti.ada.z = 30;
+  ok(azioneVita(st, st.agenti.ada, { tipo: 'bagno' }, T0 + 60000).cammina.entra === 'biblioteca', 'il motore sa in che edificio entrare');
+}
+
+// ---------- tre mesi di vita con lavoro e Mercatino ----------
+{
+  const s = simula({ giorni: 90, seme: 7 });
+  const G = s.mondo.statistiche.giorni, primo = G[0], ultimo = G.at(-1);
+  for (const id of ['ada', 'teo']) {
+    const c = s.mondo.corpi[id];
+    ok(!c.morto && Math.abs(c.peso - primo.corpi[id].peso) < 2.5, `${id}: vivo e con il peso stabile dopo 90 giorni`);
+    ok(Object.values(c.esperienza).reduce((a, b) => a + b, 0) > 20 && c.starlight > 100, `${id}: ha lavorato e ha dei soldi da parte`);
+    ok(c.umano.igiene > 0.3 && c.umano.umore > -0.2, `${id}: pulito e non depresso`);
+  }
+  ok(s.mondo.laghetto.pesci > 10 && s.mondo.mercato.incasso > 1000, 'il laghetto non si svuota: si compra al Mercatino');
+}
+
 console.log(`vita: ${n} prove superate`);

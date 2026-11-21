@@ -12,14 +12,21 @@ import { mangia as mangiaCorpo, bevi as beviCorpo, ammala, MET } from './corpo.m
 import { COLTURE, pesca as pescaNelLago, casuale, tempoAdesso } from './natura.mjs';
 import { UMIDITA_MAX_ESCA, UMIDITA_MAX_FUOCO } from './fisica.mjs';
 import { POSTI, REGOLE_VITA, nuovaCosa, registra, legnaNelFuoco } from './mondo.mjs';
+import { LISTINO, prezzoDi, prezzoAcquisto } from './economia.mjs';
+import { MESTIERI, cercaMestiere, pagaOraria, ORE_MAX_GIORNO, descriviMestieri, competenza } from './mestieri.mjs';
+import { BAGNI, rendimento, soddisfa } from './umano.mjs';
 
 const r3 = v => Math.round(v * 1000) / 1000;
 const num = (v, d) => (typeof v === 'number' && isFinite(v) ? v : (typeof v === 'string' && v.trim() !== '' && isFinite(+v) ? +v : d));
 const lim = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+const oraRoma = ms => +new Date(ms).toLocaleString('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false }) % 24;
 
 // ---- descrizione per il prompt degli agenti ----
-export const TIPI_VITA = ['bevi', 'mangia', 'raccogli', 'pesca', 'accendi', 'alimenta', 'metti_sul_fuoco', 'togli_dal_fuoco', 'riempi', 'aggiungi', 'impasta', 'modella', 'dormi', 'riposa', 'semina', 'annaffia', 'prendi', 'lascia', 'dai'];
+export const TIPI_VITA = ['bevi', 'mangia', 'raccogli', 'pesca', 'accendi', 'alimenta', 'metti_sul_fuoco', 'togli_dal_fuoco', 'riempi', 'aggiungi', 'impasta', 'modella', 'dormi', 'riposa', 'semina', 'annaffia', 'prendi', 'lascia', 'dai',
+  'compra', 'vendi', 'lavora', 'lavati', 'bagno', 'svago', 'chiacchiera', 'butta'];
+// durante un turno di lavoro si puo' fare una pausa per queste (senza lasciare il turno)
+const IN_PAUSA = ['mangia', 'bevi', 'bagno'];
 export function promptAzioniVita() {
   return `IL TUO CORPO E' VERO (come una persona): hai fame, sete, sonno, caldo e freddo; mangiare, bere e dormire sono azioni. Il mondo segue le leggi della fisica e della chimica: il fuoco ha bisogno di legna asciutta e aria, l'acqua bolle a 100 gradi, la terracotta si cuoce sopra 550 gradi, il cibo crudo o vecchio puo' farti stare male, il cibo che c'e' finisce. Nessuno ti regala niente: le scorte della Dispensa del Mercatino (x=0 z=8) sono di tutti e non si ricaricano da sole.
 Il nome delle cose: farina, fagioli secchi, olio, sale, legna, rami, erba secca, pesce, pane, impasto, ciliegie, argilla, pentola, ciotola, mattone, acciarino, lenza, coperta, semi di grano, semi di fava, semi di spinaci...
@@ -40,8 +47,12 @@ AZIONI DEL CORPO (vanno nella stessa lista delle altre; se il posto e' lontano c
 - {"tipo":"riposa","x":20}: ti riposi x minuti.
 - {"tipo":"semina","nome":"grano"}: semini un'aiuola libera vicino a te (grano, fave o spinaci; servono i semi). Cresce col caldo e con l'acqua; il grano seminato ora si raccoglie a giugno.
 - {"tipo":"annaffia","x":2}: versi x litri della pentola sull'aiuola vicina.
-- {"tipo":"prendi","nome":"farina","x":1}: prendi x kg (o pezzi, per gli attrezzi) dalla Dispensa o da terra vicino a te. {"tipo":"lascia","nome":"...","x":..} li lasci (in Dispensa se ci sei, se no a terra).
-- {"tipo":"dai","nome":"pane","id":"teo","x":0.5}: dai x kg a chi ti sta vicino (id = il suo nome).`;
+- {"tipo":"prendi","nome":"farina","x":1}: prendi x kg (o pezzi, per gli attrezzi) dalla Dispensa o da terra vicino a te. {"tipo":"lascia","nome":"...","x":..} li lasci (in Dispensa se ci sei, se no a terra). {"tipo":"butta","nome":"pesce"}: butti nel compost il cibo andato a male (non si lascia per terra).
+- {"tipo":"dai","nome":"pane","id":"teo","x":0.5}: dai x kg a chi ti sta vicino (id = il suo nome).
+SOLDI E LAVORO: il cibo, la legna e gli attrezzi arrivano da fuori ogni mattina al Mercatino (x=0 z=8) e si pagano in Starlight. Le scorte sono limitate: se finiscono, il prezzo sale.
+- {"tipo":"compra","nome":"pane","x":0.5}: compri x kg (o pezzi per gli attrezzi) al Mercatino. {"tipo":"vendi","nome":"pesce","x":1}: vendi al Mercatino quello che hai prodotto (te lo paga meta' del suo prezzo).
+- {"tipo":"lavora","nome":"barista","x":4}: fai un turno di x ore (massimo ${ORE_MAX_GIORNO} al giorno, solo negli orari della bottega, posti limitati). Mestieri: ${descriviMestieri()}. Con l'esperienza la paga sale fino al 40% in piu'. Durante il turno puoi solo mangiare, bere e andare in bagno. Oppure lavori in proprio: pesca, coltiva, fai pentole o pane e vendi.
+CORPO E TESTA: {"tipo":"bagno"} (in un edificio: Biblioteca, Sala Giochi, Casa degli Scacchi, Negozio TCG, Laugh Tale, Torre); {"tipo":"lavati"} (in un edificio con acqua calda, o alla Fontana con acqua gelata); {"tipo":"svago","luogo":"Belvedere","x":1} (x ore di riposo e divertimento: passa la noia); {"tipo":"chiacchiera","id":"teo","x":20} (x minuti con chi ti sta vicino: passa la solitudine a tutti e due).`;
 }
 
 // ---- zaino ----
@@ -105,7 +116,7 @@ export function eseguiAzioneVita(mondo, id, a, t) {
   if (!c) return { ok: false, esito: 'non hai un corpo' };
   if (c.morto) return { ok: false, esito: 'sei morto' };
   if (c.svenuto) return { ok: false, esito: 'sei svenuto' };
-  if (c.lavoro && a.tipo !== 'dormi') return { ok: false, esito: `${a.tipo}: stai ancora facendo ${c.lavoro.tipo}` };
+  if (c.lavoro && a.tipo !== 'dormi' && !(c.lavoro.tipo === 'lavora' && IN_PAUSA.includes(a.tipo))) return { ok: false, esito: `${a.tipo}: stai ancora facendo ${c.lavoro.tipo}` };
   const f = AZIONI[a.tipo];
   if (!f) return { ok: false, esito: 'azione sconosciuta' };
   const r = f(mondo, c, a, t) || { ok: true };
@@ -126,6 +137,11 @@ const AZIONI = {
       const b = beviCorpo(c, Math.min(litri, acqua.kg), t); acqua.kg = r3(acqua.kg - b);
       if (!acqua.bollita && acqua.lago && casuale(mondo) < 1 - Math.pow(0.85, b)) ammala(c, 'gastroenterite', t);
       return { ok: true, esito: `bevuti ${b.toFixed(2)} litri dalla pentola` + (acqua.bollita ? ' (acqua bollita, sicura)' : '') };
+    }
+    // al lavoro (o in un edificio con il bagno) c'e' l'acqua del rubinetto
+    if ((c.lavoro && c.lavoro.tipo === 'lavora') || (c.stanza && BAGNI.includes(c.stanza))) {
+      const b = beviCorpo(c, litri, t); if (b <= 0) return no('non riesci a bere altro, hai lo stomaco pieno');
+      return { ok: true, esito: `bevuti ${b.toFixed(2)} litri d'acqua del rubinetto` };
     }
     const posto = postoDa(a.luogo) || (nelPosto(c, POSTI.laghetto) ? POSTI.laghetto : POSTI.fontana);
     if (!posto.acqua) return no('li\' non c\'e\' acqua');
@@ -157,7 +173,9 @@ const AZIONI = {
     else if ((pezzo.guasto || 0) > 0.75 && casuale(mondo) < 0.12) ammala(c, 'cibo_guasto', t);
     if ((pezzo.guasto || 0) >= 1) nota = ' (aveva un odore strano)';
     if (pezzo.bruciato) nota += ' (era bruciato)';
-    lavoro(c, t, 'mangiare', Math.max(3, presi * 20), 'mangiare');
+    if ((c.umano || {}).igiene < 0.3 && casuale(mondo) < 0.04) ammala(c, 'gastroenterite', t);   // mani sporche
+    if (!c.lavoro) lavoro(c, t, 'mangiare', Math.max(3, presi * 20), 'mangiare');
+    if (!pezzo.bruciato && (pezzo.guasto || 0) < 0.7 && presi > 0.15) soddisfa(c, 0.05);
     return { ok: true, esito: `mangiati ${presi.toFixed(2)} kg di ${nomeDi(a.cosa)}${nota}` };
   },
 
@@ -239,7 +257,7 @@ const AZIONI = {
   togli_dal_fuoco(mondo, c, a, t) {
     const f = fuocoVicino(mondo, c) || (nelPosto(c, POSTI.forno) ? mondo.fuochi.find(x => x.id === 'forno') : null);
     if (!f) return no('non c\'e\' un fuoco vicino a te');
-    const nomi = [a.cosa, a.cosa && a.cosa.replace(/_crud[ao]$/, ''), a.cosa === 'pesce' ? 'pesce_cotto' : null, a.cosa === 'impasto' ? 'pane' : null].filter(Boolean);
+    const nomi = [a.cosa, a.cosa && a.cosa.replace(/_crud[ao]$/, ''), a.cosa === 'pesce' ? 'pesce_cotto' : null, a.cosa === 'impasto' ? 'pane' : null, a.cosa === 'uova' ? 'uova_cotte' : null].filter(Boolean);
     const i = f.sopra.findIndex(q => nomi.includes(q.cosa)); if (i < 0) return no(`sul fuoco non c'e' ${nomeDi(a.cosa)}`);
     const q = f.sopra.splice(i, 1)[0]; delete q.modo;
     if (pesoZaino(c) + q.kg > REGOLE_VITA.caricoMax + 5) { mondo.cose.push(Object.assign(q, { dove: 'terra', x: c.x, z: c.z })); return { ok: true, esito: `${nomeDi(q.cosa)} tolto dal fuoco e posato a terra (porti troppo)` }; }
@@ -250,6 +268,11 @@ const AZIONI = {
 
   riempi(mondo, c, a, t) {
     const p = pentolaDi(mondo, c); if (!p) return no('ti serve una pentola');
+    // al lavoro (o in un edificio con il bagno) c'e' l'acqua del rubinetto
+    if ((c.lavoro && c.lavoro.tipo === 'lavora') || (c.stanza && BAGNI.includes(c.stanza))) {
+      const b = beviCorpo(c, litri, t); if (b <= 0) return no('non riesci a bere altro, hai lo stomaco pieno');
+      return { ok: true, esito: `bevuti ${b.toFixed(2)} litri d'acqua del rubinetto` };
+    }
     const posto = postoDa(a.luogo) || (nelPosto(c, POSTI.laghetto) ? POSTI.laghetto : POSTI.fontana);
     if (!posto.acqua) return no('li\' non c\'e\' acqua');
     if (!c.zaino.includes(p)) return no('prima togli la pentola dal fuoco');
@@ -369,6 +392,102 @@ const AZIONI = {
     return { ok: true, esito: `lasciato ${OGGETTI[a.cosa] ? '' : p.kg.toFixed(2) + ' kg di '}${nomeDi(a.cosa)} ${p.dove === 'dispensa' ? 'in Dispensa' : 'a terra'}` };
   },
 
+  butta(mondo, c, a, t) {
+    if (!a.cosa) return no('cosa butti?');
+    const p = preleva(mondo, c.zaino, a.cosa, OGGETTI[a.cosa] ? 1 : lim(a.quanto ?? 99, 0.01, 99));
+    if (!p) return no(`non hai ${nomeDi(a.cosa)}`);
+    mondo.compost = Math.round(((mondo.compost || 0) + p.kg) * 1000) / 1000;   // la massa non sparisce: diventa compost
+    return { ok: true, esito: `buttato nel compost: ${OGGETTI[a.cosa] ? nomeDi(a.cosa) : p.kg.toFixed(2) + ' kg di ' + nomeDi(a.cosa)}` };
+  },
+
+  compra(mondo, c, a, t) {
+    const m = mondo.mercato; if (!m) return no('non c\'e\' un mercato');
+    if (!a.cosa || !LISTINO[a.cosa]) return no(`al Mercatino non vendono ${a.nome || 'questo'}. Vendono: ${Object.keys(LISTINO).filter(k => m.scorte[k] > 0).map(nomeDi).join(', ')}`);
+    if (!nelPosto(c, POSTI.dispensa)) return vaiA(POSTI.dispensa, 'vado al Mercatino');
+    const pezzi = !!OGGETTI[a.cosa], q = pezzi ? Math.max(1, Math.round(a.quanto ?? 1)) : lim(a.quanto ?? 0.5, 0.05, 20);
+    const disp = m.scorte[a.cosa] || 0;
+    if (disp <= 0.001) return no(`${nomeDi(a.cosa)} oggi e' finito: ne arriva altro domattina`);
+    const quanti = Math.min(q, disp), costo = Math.round(quanti * prezzoDi(m, a.cosa) * 100) / 100;
+    if ((c.starlight ?? 0) < costo) return no(`costa ${costo} Starlight (${prezzoDi(m, a.cosa)} ${pezzi ? 'al pezzo' : 'al kg'}) e ne hai ${Math.floor(c.starlight ?? 0)}`);
+    const kg = pezzi ? OGGETTI[a.cosa].kg * quanti : quanti;
+    if (pesoZaino(c) + kg > REGOLE_VITA.caricoMax) return no('non riesci a portare tutto');
+    c.starlight = Math.round((c.starlight - costo) * 100) / 100; m.scorte[a.cosa] = Math.round((disp - quanti) * 1000) / 1000; m.incasso += costo;
+    m.compratoOggi[a.cosa] = (m.compratoOggi[a.cosa] || 0) + quanti;
+    const tempo = tempoAdesso(mondo, t);
+    if (pezzi) for (let i = 0; i < quanti; i++) c.zaino.push(nuovaCosa(mondo, a.cosa, OGGETTI[a.cosa].kg));
+    else deponi(c.zaino, nuovaCosa(mondo, a.cosa, quanti, { T: tempo.tAria, guasto: a.cosa === 'pesce' ? 0.15 : a.cosa === 'pane' ? 0.1 : undefined }));
+    return { ok: true, esito: `comprati ${pezzi ? quanti + ' ' + nomeDi(a.cosa) : quanti.toFixed(2) + ' kg di ' + nomeDi(a.cosa)} per ${costo} Starlight (ne restano ${Math.floor(c.starlight)})` };
+  },
+
+  vendi(mondo, c, a, t) {
+    const m = mondo.mercato; if (!m) return no('non c\'e\' un mercato');
+    if (!a.cosa) return no('cosa vendi?');
+    const limite = (LISTINO[a.cosa] || [])[2] || 0;
+    if (!limite) return no(`il Mercatino non compra ${nomeDi(a.cosa)}`);
+    if (!nelPosto(c, POSTI.dispensa)) return vaiA(POSTI.dispensa, 'vado al Mercatino a vendere');
+    const resta = limite - (m.vendutoOggi[a.cosa] || 0);
+    if (resta <= 0.001) return no(`oggi il Mercatino ha gia' comprato abbastanza ${nomeDi(a.cosa)}: torna domani`);
+    const pezzi = !!OGGETTI[a.cosa];
+    const p = preleva(mondo, c.zaino, a.cosa, pezzi ? 1 : Math.min(resta, lim(a.quanto ?? 99, 0.05, 99)));
+    if (!p) return no(`non hai ${nomeDi(a.cosa)}`);
+    if (p.rotta || p.bruciato || (p.guasto || 0) >= 0.8) { deponi(c.zaino, p); return no('cosi\' rovinato non lo compra nessuno'); }
+    const quanti = pezzi ? 1 : p.kg, ricavo = Math.round(quanti * prezzoAcquisto(m, a.cosa) * (p.guasto > 0.5 ? 0.6 : 1) * 100) / 100;
+    c.starlight = Math.round(((c.starlight ?? 0) + ricavo) * 100) / 100; m.pagato += ricavo;
+    m.vendutoOggi[a.cosa] = (m.vendutoOggi[a.cosa] || 0) + quanti; m.scorte[a.cosa] = (m.scorte[a.cosa] || 0) + quanti;
+    soddisfa(c, 0.08);
+    return { ok: true, esito: `venduti ${pezzi ? '1 ' + nomeDi(a.cosa) : quanti.toFixed(2) + ' kg di ' + nomeDi(a.cosa)} per ${ricavo} Starlight (ora ne hai ${Math.floor(c.starlight)})` };
+  },
+
+  lavora(mondo, c, a, t) {
+    const id = cercaMestiere(a.nome || a.luogo); if (!id) return no('che mestiere? ' + Object.keys(MESTIERI).join(', '));
+    const M = MESTIERI[id];
+    const posto = { nome: M.luogo, x: M.x, z: M.z, raggio: 5 };
+    if (!(M.alChiuso && c.stanza === 'biblioteca') && (c.stanza || Math.hypot(c.x - M.x, c.z - M.z) > 5)) return vaiA(posto, 'vado al lavoro: ' + M.luogo);
+    const h = oraRoma(t), oreMax = Math.min(lim(a.quanto ?? 4, 0.5, 10), M.alle - h - (new Date(t).getUTCMinutes() / 60), ORE_MAX_GIORNO - (c.oreLavoroOggi || 0));
+    if (h < M.dalle || h >= M.alle) return no(`${M.luogo} cerca un ${M.nome} solo dalle ${M.dalle} alle ${M.alle}`);
+    if (oreMax < 0.25) return no((c.oreLavoroOggi || 0) >= ORE_MAX_GIORNO ? `oggi hai gia' lavorato ${ORE_MAX_GIORNO} ore` : 'il turno sta finendo, non ha senso cominciare ora');
+    const occupati = Object.values(mondo.corpi).filter(o => o !== c && o.lavoro && o.lavoro.tipo === 'lavora' && o.lavoro.mestiere === id).length;
+    if (occupati >= M.posti) return no(`il posto di ${M.nome} e' gia' occupato`);
+    if (c.sonno > 1.4 || c.salute < 30) return no('non ce la fai a lavorare in queste condizioni');
+    if (M.alChiuso) c.stanza = 'biblioteca';
+    const r = lavoro(c, t, 'lavora', oreMax * 60, 'lavorare', { mestiere: id, met: M.met, paga: pagaOraria(M, (c.esperienza || {})[id]) });
+    return { ok: true, esito: `turno da ${M.nome} iniziato: ${oreMax.toFixed(1)} ore a ${r && c.lavoro.paga} Starlight l'ora`, minuti: oreMax * 60 };
+  },
+
+  bagno(mondo, c, a, t) {
+    // al lavoro c'e' il bagno del personale
+    if (c.lavoro && c.lavoro.tipo === 'lavora') { c.umano.vescica = 0; return { ok: true, esito: 'pausa: sei andato nel bagno del personale' }; }
+    if (!c.stanza || !BAGNI.includes(c.stanza)) return { vai: { x: -27.7, z: -3.5, nome: 'Biblioteca', entra: 'biblioteca' }, esito: 'vado al bagno della Biblioteca' };
+    c.umano.vescica = 0;
+    return { ok: true, esito: 'sei andato in bagno' };
+  },
+
+  lavati(mondo, c, a, t) {
+    if (c.stanza && BAGNI.includes(c.stanza)) { c.umano.igiene = 1; return lavoro(c, t, 'lavati', 15, 'lavarsi'), { ok: true, esito: 'ti lavi con l\'acqua calda: sei pulito' }; }
+    if (!nelPosto(c, POSTI.fontana)) return { vai: { x: -27.7, z: -3.5, nome: 'Biblioteca', entra: 'biblioteca' }, esito: 'vado a lavarmi in Biblioteca' };
+    // alla fontana: acqua fredda, ci si bagna (e d'inverno si gela)
+    c.umano.igiene = Math.max(c.umano.igiene, 0.8); c.bagnato = Math.max(c.bagnato || 0, 0.5);
+    lavoro(c, t, 'lavati', 6, 'lavarsi');
+    return { ok: true, esito: 'ti sei lavato alla fontana: pulito, ma bagnato e con l\'acqua gelata' };
+  },
+
+  svago(mondo, c, a, t) {
+    const ore = lim(a.quanto ?? 1, 0.25, 4);
+    return lavoro(c, t, 'svago', ore * 60, 'svago', { dove: a.luogo || null });
+  },
+
+  chiacchiera(mondo, c, a, t) {
+    const altro = mondo.corpi[String(a.a || '').toLowerCase()] || Object.values(mondo.corpi).find(o => o !== c && !o.morto && (o.stanza || null) === (c.stanza || null) && dist(o, c) <= 4);
+    if (!altro || altro === c || altro.morto) return no('non c\'e\' nessuno con cui parlare qui vicino');
+    if ((altro.stanza || null) !== (c.stanza || null) || dist(altro, c) > 4) return no(`${altro.id} e' troppo lontano per chiacchierare`);
+    if (altro.addormentato || altro.svenuto) return no(`${altro.id} dorme`);
+    const min = lim(a.quanto ?? 20, 5, 120);
+    for (const o of [c, altro]) { o.umano.solitudine = Math.max(0, o.umano.solitudine - min / 60 * 0.6); soddisfa(o, 0.05); }
+    if ((c.umano.igiene ?? 1) < 0.25) altro.umano.solitudine += 0.1;   // chi puzza si sta meno volentieri vicino
+    if (!altro.lavoro) lavoro(altro, t, 'chiacchiera', min, 'riposare');
+    return lavoro(c, t, 'chiacchiera', min, 'riposare', { con: altro.id });
+  },
+
   dai(mondo, c, a, t) {
     const altro = mondo.corpi[String(a.a || '').toLowerCase()];
     if (!altro || altro === c) return no('a chi? metti il suo nome in "id"');
@@ -446,6 +565,19 @@ export function completaLavoro(mondo, c, L, t) {
     Object.assign(aiu, { coltura: L.coltura, gdd: 0, pronta: false, morta: false, seminato: t, secco: 0, caldo: 0 });
     return `seminato ${COLTURE[L.coltura].nome} (${aiu.m2} m2)`;
   }
-  if (L.tipo === 'mangiare' || L.tipo === 'riposa') return null;
+  if (L.tipo === 'lavora') {
+    // si paga il tempo davvero lavorato; l'umore cambia quanto si rende (e quanto si impara)
+    const ore = (Math.min(t, L.fine) - L.inizio) / 3600000, M = MESTIERI[L.mestiere];
+    const paga = Math.round(ore * L.paga * 100) / 100;
+    c.starlight = Math.round(((c.starlight ?? 0) + paga) * 100) / 100;
+    c.esperienza = c.esperienza || {}; c.esperienza[L.mestiere] = (c.esperienza[L.mestiere] || 0) + ore * rendimento(c);
+    c.oreLavoroOggi = (c.oreLavoroOggi || 0) + ore;
+    if (M.alChiuso && c.stanza === 'biblioteca') c.stanza = null;
+    for (const [cosa, kg] of Object.entries(M.extra || {})) deponi(c.zaino, nuovaCosa(mondo, cosa, kg, { T: tempo.tAria, guasto: 0.1 }));
+    soddisfa(c, 0.12);
+    return `turno da ${M.nome} finito: ${ore.toFixed(1)} ore, pagati ${paga} Starlight (ora ne hai ${Math.floor(c.starlight)}). Esperienza da ${M.nome}: ${Math.round(competenza(c.esperienza[L.mestiere]) * 100)}%` + (M.extra ? ', e ti hanno dato il pane avanzato' : '');
+  }
+  if (L.tipo === 'svago') { c.umano.noia = Math.max(0, c.umano.noia - 0.3 * (L.fine - L.inizio) / 3600000); soddisfa(c, 0.1); return 'ti sei svagato, la testa e\' piu\' leggera'; }
+  if (L.tipo === 'mangiare' || L.tipo === 'riposa' || L.tipo === 'lavati' || L.tipo === 'chiacchiera') return null;
   return null;
 }

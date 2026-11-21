@@ -9,7 +9,9 @@
 import { TEMPERATURA_MAX, RENDIMENTO, consumoFuoco, pciLegno, scaldaAcqua, versoAria, UMIDITA_MAX_FUOCO, ACQUA } from './fisica.mjs';
 import { reagisci } from './chimica.mjs';
 import { MATERIALI, OGGETTI } from './materiali.mjs';
-import { nuovoCorpo, viviCorpo } from './corpo.mjs';
+import { nuovoCorpo, viviCorpo, bilancioTermico } from './corpo.mjs';
+import { nuovoMercato, chiudiGiornataMercato, STARLIGHT_INIZIALI } from './economia.mjs';
+import { nuovoUmano, viviUmano } from './umano.mjs';
 import { tempoAdesso, crescePianta, crescePesci, cresconoAlberi, invecchia, casuale } from './natura.mjs';
 import { completaLavoro } from './azioni.mjs';
 
@@ -68,7 +70,7 @@ export function nuovoMondo({ adesso, seme = 12345, abitanti = ['ada', 'teo'], po
   const mondo = {
     versione: 1, t: adesso, rng: seme >>> 0, prossimoId: 1, meteo: null,
     alberi: alberiDelBorgo(), aiuole: aiuoleDelBorgo(),
-    laghetto: { pesci: 45 }, erbaLaghetto: 2,
+    laghetto: { pesci: 45 }, erbaLaghetto: 2, mercato: nuovoMercato(),
     cose: [], fuochi: [], corpi: {}, registro: [], statistiche: { giorni: [] }
   };
   for (const [cosa, kg] of SCORTE_INIZIALI) {
@@ -79,7 +81,8 @@ export function nuovoMondo({ adesso, seme = 12345, abitanti = ['ada', 'teo'], po
   mondo.fuochi.push({ id: 'forno', nome: 'forno del Forno', fisso: true, struttura: 'forno_pane', x: POSTI.forno.x, z: POSTI.forno.z, legna: [], T: null, sopra: [] });
   for (const id of abitanti) {
     const p = posizioni[id] || { x: 0, z: 34 };
-    mondo.corpi[id] = Object.assign(nuovoCorpo(CORPI_ABITANTI[id] || {}), { id, x: p.x, z: p.z, stanza: null, zaino: [], lavoro: null, abilita: { pesca: 0, fuoco: 0, argilla: 0, cucina: 0 } });
+    mondo.corpi[id] = Object.assign(nuovoCorpo(CORPI_ABITANTI[id] || {}), { id, x: p.x, z: p.z, stanza: null, zaino: [], lavoro: null, abilita: { pesca: 0, fuoco: 0, argilla: 0, cucina: 0 },
+      starlight: STARLIGHT_INIZIALI, umano: nuovoUmano(), esperienza: {}, oreLavoroOggi: 0, cloBase: null });
   }
   return mondo;
 }
@@ -178,6 +181,13 @@ function cuociInAcqua(mondo, pentola, c, acqua, dt) {
     registra(mondo, { tipo: 'trasformazione', da, a: 'fagioli_cotti', kg: c.kg });
   }
   if (c.cosa === 'pesce' && c.T >= 63) { c.kg *= 0.8; c.cosa = 'pesce_cotto'; c.guasto = 0; registra(mondo, { tipo: 'trasformazione', da: 'pesce', a: 'pesce_cotto', kg: c.kg }); }
+  cuociUova(mondo, c, dt);
+}
+// Uova: le proteine dell'albume coagulano a ~63 gradi, il tuorlo a ~70. Il centro a 70 gradi per 5 minuti = uovo sodo.
+function cuociUova(mondo, s, dt) {
+  if (s.cosa !== 'uova') return;
+  if (s.T >= 70) s.minCaldo = (s.minCaldo || 0) + dt / 60;
+  if (s.minCaldo >= 5) { s.cosa = 'uova_cotte'; s.guasto = 0; s.minFatto = 0; registra(mondo, { tipo: 'trasformazione', da: 'uova', a: 'uova_cotte', kg: s.kg }); }
 }
 
 // Trasformazioni sulla brace, nel forno e nelle fiamme
@@ -185,6 +195,7 @@ function trasforma(mondo, f, s, dt) {
   const minuti = dt / 60;
   if (s.cosa === 'pesce' && s.T >= 63) { s.kg *= 0.8; s.cosa = 'pesce_cotto'; s.guasto = 0; s.minFatto = 0; registra(mondo, { tipo: 'trasformazione', da: 'pesce', a: 'pesce_cotto', kg: s.kg }); return; }
   if (s.cosa === 'impasto' && s.T >= 95) { s.kg *= 0.82; s.cosa = 'pane'; s.guasto = 0; s.minFatto = 0; registra(mondo, { tipo: 'trasformazione', da: 'impasto', a: 'pane', kg: s.kg }); return; }
+  cuociUova(mondo, s, dt);
   // cibo cotto lasciato troppo sul fuoco: si brucia (perde meta' delle calorie, diventa carbone)
   if ((s.cosa === 'pesce_cotto' || s.cosa === 'pane') && s.modo !== 'fiamme') { s.minFatto = (s.minFatto || 0) + minuti; if (s.minFatto > 25 && !s.bruciato) s.bruciato = true; }
   if (MATERIALI[s.cosa] && MATERIALI[s.cosa].tipo === 'cibo' && s.modo === 'fiamme' && s.T > 300) s.bruciato = true;
@@ -250,12 +261,18 @@ function passoBreve(mondo, dt, regole, eventi) {
       fuoco: fuoco ? potenzaFuoco(fuoco.f).W / (4 * Math.PI * Math.max(1, fuoco.d) ** 2) * 0.5 : 0,
       coperta: c.zaino.some(q => q.cosa === 'coperta') ? OGGETTI.coperta.clo : 0
     };
+    // il cappotto si porta addosso quando si e' fuori
+    if (c.cloBase == null) c.cloBase = c.clo;
+    c.clo = c.cloBase + (!c.stanza && c.zaino.some(q => q.cosa === 'cappotto') ? OGGETTI.cappotto.clo : 0);
     c.bagnato = amb.bagnato; c.ambiente = amb;
     finisciLavoro(mondo, c, t, eventi);
     for (const e of viviCorpo(c, dt, amb, t, regole)) { const ev = Object.assign({ chi: c.id }, e); registra(mondo, ev); eventi.push(ev); }
+    amb.freddo = bilancioTermico(c, amb).netto < -60;
+    const altri = Object.values(mondo.corpi).filter(o => o !== c && !o.morto && !o.addormentato && (o.stanza || null) === (c.stanza || null) && Math.hypot(o.x - c.x, o.z - c.z) < 10).length;
+    for (const e of viviUmano(c, dt, { altri, sole: tempo.sole.giorno && !c.stanza && tempo.nuvole < 0.7, svago: !!(c.lavoro && c.lavoro.tipo === 'svago') })) { const ev = Object.assign({ chi: c.id }, e); registra(mondo, ev); eventi.push(ev); }
   }
   // statistiche di fine giornata (per GOD e per capire se l'esperimento funziona)
-  if (giornoOra !== giornoPrima) chiudiGiornata(mondo, giornoPrima);
+  if (giornoOra !== giornoPrima) { chiudiGiornata(mondo, giornoPrima); if (mondo.mercato) chiudiGiornataMercato(mondo.mercato); for (const c of Object.values(mondo.corpi)) c.oreLavoroOggi = 0; }
 }
 
 function chiudiGiornata(mondo, giorno) {
@@ -268,6 +285,8 @@ function chiudiGiornata(mondo, giorno) {
   g.pesciLaghetto = Math.round(mondo.laghetto.pesci * 10) / 10;
   g.legnaDispensa = Math.round(mondo.cose.filter(c => c.dove === 'dispensa' && c.cosa === 'legna').reduce((s, c) => s + c.kg, 0) * 10) / 10;
   g.pioggiaMm = mondo.meteo ? Math.round(mondo.meteo.pioggiaMm * 10) / 10 : 0;
+  for (const c of Object.values(mondo.corpi)) Object.assign(g.corpi[c.id], { starlight: Math.round(c.starlight ?? 0), umore: Math.round(((c.umano || {}).umore ?? 0) * 100) / 100, lavorate: Math.round((c.oreLavoroOggi || 0) * 10) / 10 });
+  if (mondo.mercato) g.prezzoPane = mondo.mercato.prezzi.pane;
   mondo.statistiche.giorni.push(g);
   if (mondo.statistiche.giorni.length > 400) mondo.statistiche.giorni.shift();
 }

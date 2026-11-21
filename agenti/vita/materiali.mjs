@@ -33,6 +33,10 @@ export const MATERIALI = {
   impasto: { nome: 'impasto di pane', tipo: 'cibo', densita: 1100, c: 2800, kcal: 2180, acqua: 0.47, dura20: 18, q10: 2.5,
     crudo: { digeribile: 0.6, rischio: 0.02 } },
   pane: { nome: 'pane', tipo: 'cibo', densita: 250, c: 2700, kcal: 2650, acqua: 0.36, dura20: 24 * 4, q10: 2 },
+  uova: { nome: 'uova', tipo: 'cibo', densita: 1030, c: 3200, kcal: 1430, acqua: 0.76, dura20: 24 * 21, q10: 2,
+    crudo: { digeribile: 0.9, rischio: 0.01, malattia: 'gastroenterite', nota: 'crude c\'e\' un piccolo rischio di salmonella' } },
+  uova_cotte: { nome: 'uova sode', tipo: 'cibo', densita: 1030, c: 3200, kcal: 1430, acqua: 0.76, dura20: 24 * 5, q10: 2 },
+  mele: { nome: 'mele', tipo: 'cibo', densita: 800, c: 3600, kcal: 520, acqua: 0.86, dura20: 24 * 20, q10: 2 },
   spinaci: { nome: 'spinaci', tipo: 'cibo', densita: 300, c: 3900, kcal: 230, acqua: 0.91, dura20: 72, q10: 2.5 },
   fave: { nome: 'fave fresche', tipo: 'cibo', densita: 700, c: 3500, kcal: 880, acqua: 0.72, dura20: 96, q10: 2.5 },
   grano: { nome: 'chicchi di grano', tipo: 'cibo', densita: 780, c: 1600, kcal: 3390, acqua: 0.12, dura20: 24 * 365, q10: 2,
@@ -71,6 +75,7 @@ export const OGGETTI = {
   ciotola: { nome: 'ciotola di terracotta', materiale: 'terracotta', kg: 0.4, capacita: 0.6, c: 850 },
   mattone_crudo: { nome: 'mattone crudo', materiale: 'argilla', kg: 3.2, nota: 'si usa anche crudo (si secca al sole), ma la pioggia lo scioglie' },
   mattone: { nome: 'mattone cotto', materiale: 'terracotta', kg: 2.7 },
+  cappotto: { nome: 'cappotto di lana', kg: 1.8, clo: 0.8, nota: 'si porta addosso: d\'inverno fuori fa la differenza' },
   coperta: { nome: 'coperta di lana', kg: 1.5, clo: 1.5, nota: 'isola: dormire al freddo con una coperta e\' un\'altra cosa' }
 };
 
