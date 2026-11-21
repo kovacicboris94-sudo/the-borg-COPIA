@@ -465,4 +465,35 @@ ok(SCHEMA.properties.azioni.items.required.length === Object.keys(SCHEMA.propert
 const v = vistaPubblica(nuovoStato(T0), T0);
 ok(v.agenti.length === 2 && v.agenti[0].budget.tetto === 5 && !JSON.stringify(v).includes('spesa'), 'vista pubblica');
 
+// 10) la vita vera collegata: corpo, casa, bisogni urgenti, morte
+{
+  const s = nuovoStato(T0), ada = s.agenti.ada, teo = s.agenti.teo;
+  Object.values(s.agenti).forEach(a => { a.nato = T0 - 5 * 864e5; a.prossimoPensiero = T0 + 1e12; });
+  let t = await scorri(s, T0, 1, null);
+  ok(s.vita && s.vita.corpi.ada && s.vita.case.ada, 'il mondo della vita nasce dentro lo stato');
+  ok(SCHEMA.properties.azioni.items.properties.tipo.enum.includes('mangia') && normalizzaAzione({ tipo: 'dormi', x: 8 }).vita, 'le azioni del corpo sono nello schema');
+  ok(/IL TUO CORPO/.test(percezione(s, ada, t)) && /CASA: hai una casetta tua/.test(promptDiSistema(ada)), 'l\'agente sente il corpo e conosce la casa');
+  ok(/Casa di Ada/.test(promptDiSistema(ada)) && !/Casa di Teo/.test(promptDiSistema(ada)), 'nel prompt solo la propria casa');
+  // tornare a casa: si cammina fino alla porta e si entra
+  ada.coda = [normalizzaAzione({ tipo: 'casa' })]; t = await scorri(s, t, 2, null);
+  ada.modo = 'attivo'; ada.coda = [normalizzaAzione({ tipo: 'casa' })]; t = await scorri(s, t, 3, null);
+  ok(ada.stanza === 'casa_ada', 'Ada e\' entrata in casa sua ' + ada.stanza + ' ' + JSON.stringify(ada.esiti));
+  teo.coda = [normalizzaAzione({ tipo: 'entra', luogo: 'Casa di Ada' })]; t = await scorri(s, t, 0.5, null);
+  ok(teo.stanza !== 'casa_ada' && /casa privata/.test(teo.esiti.join()), 'nella casa di un altro non si entra');
+  // la sete forte: il corpo va a bere da solo, anche se l'agente pensa ad altro
+  const c = s.vita.corpi.teo; teo.modo = 'attivo'; teo.coda = []; c.acqua = c.acquaNormale - c.peso * 0.025;
+  t = await scorri(s, t, 15, null);
+  ok((c.acquaNormale - c.acqua) / c.peso < 0.015, 'la sete si spegne da sola ' + ((c.acquaNormale - c.acqua) / c.peso).toFixed(3));
+  // vista per il gioco
+  const vv = vistaPubblica(s, t).vita;
+  ok(vv.corpi.ada.salute === 100 && vv.case.casa_ada && typeof vv.case.casa_ada.fornello === 'boolean', 'il gioco vede corpo e casa');
+  // la morte e' vera: chi muore non pensa piu' e non si muove
+  const cc = finto(risp([{ tipo: 'di', testo: 'ci sono' }]));
+  s.vita.corpi.ada.grasso = 0; s.vita.corpi.ada.glicogeno = 0; s.vita.corpi.ada.salute = 1; s.vita.corpi.ada.acqua = s.vita.corpi.ada.acquaNormale * 0.8;
+  ada.prossimoPensiero = t + 1e12; t = await scorri(s, t, 30, cc);
+  ok(ada.morto && s.vita.corpi.ada.morto, 'Ada muore davvero ' + JSON.stringify(ada.morto));
+  ada.prossimoPensiero = t; t = await scorri(s, t, 2, cc);
+  ok(!cc.chiamate.some(q => q.agente === 'ada'), 'chi e\' morto non pensa');
+}
+
 console.log(`ok  agenti: ${n} controlli`);

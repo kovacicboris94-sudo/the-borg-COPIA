@@ -15,7 +15,7 @@ import { POSTI } from './mondo.mjs';
 import { tempoAdesso } from './natura.mjs';
 import { MESTIERI, ORE_MAX_GIORNO } from './mestieri.mjs';
 import { prezzoDi } from './economia.mjs';
-import { casaDi, aCasa } from './casa.mjs';
+import { casaDi, aCasa, fornelloDi } from './casa.mjs';
 
 // il cibo che puzza non si conta: una persona lo annusa e lo butta
 const ha = (c, cosa, kg = 0.01) => c.zaino.filter(q => q.cosa === cosa && !q.rotta && (q.guasto || 0) < 0.9).reduce((s, q) => s + (q.kg || 1), 0) >= kg;
@@ -42,6 +42,9 @@ export function decidiARegole(mondo, id, t) {
   if (marcio) return [{ tipo: 'butta', cosa: marcio.cosa, quanto: marcio.kg }];
   const marcioFrigo = aCasa(mondo, c) && mondo.cose.find(q => q.dove === 'frigo' && q.casa === c.id && (q.guasto || 0) >= 0.75);
   if (marcioFrigo) return [{ tipo: 'prendi', cosa: marcioFrigo.cosa, quanto: marcioFrigo.kg }, { tipo: 'butta', cosa: marcioFrigo.cosa, quanto: marcioFrigo.kg }];
+  // il fornello di casa acceso senza niente sopra: si torna a spegnerlo (il gas si paga)
+  const kc = casaDi(mondo, c), fo = kc && fornelloDi(mondo, kc);
+  if (fo && fo.acceso && !(fo.sopra || []).length) return [...aCasaSe(mondo, c), { tipo: 'spegni' }];
   // 1) sete
   if (dis > 0.012) return [{ tipo: 'bevi', luogo: 'Fontana', quanto: Math.min(1, dis * c.peso * 0.8 + 0.2) }];
   // il bagno non aspetta
@@ -108,9 +111,9 @@ export function decidiARegole(mondo, id, t) {
   if (u.igiene < 0.6 && h >= 6 && h < 22) return [{ tipo: 'lavati' }];
   // pesce in piu': si vende al Mercatino
   const pesce = c.zaino.filter(q => q.cosa === 'pesce' && (q.guasto || 0) < 0.6).reduce((a, q) => a + q.kg, 0);
-  if (pesce > 0.8 && mondo.mercato && (mondo.mercato.vendutoOggi.pesce || 0) < 2.5) return [{ tipo: 'vendi', cosa: 'pesce', quanto: pesce - 0.4 }];
+  if (pesce > 0.8 && mondo.mercato && (mondo.mercato.vendutoOggi.pesce || 0) < 2.5) return [{ tipo: 'vendi_al_mercatino', cosa: 'pesce', quanto: pesce - 0.4 }];
   const turno = sceltaTurno(mondo, c, t);
-  if (turno) return [...(u.vescica > 0.12 ? [{ tipo: 'bagno' }] : []), { tipo: 'lavora', nome: turno.id, quanto: turno.ore }];
+  if (turno) return [...(u.vescica > 0.12 ? [{ tipo: 'bagno' }] : []), { tipo: 'turno', nome: turno.id, quanto: turno.ore }];
   if (u.solitudine > 0.45 && h >= 8 && h < 22) {
     const altro = Object.values(mondo.corpi).find(o => o !== c && !o.morto && !o.svenuto && !o.addormentato && !(o.lavoro && o.lavoro.tipo !== 'svago' && o.lavoro.tipo !== 'riposa'));
     if (altro) return [{ tipo: 'vai', x: altro.x + 1, z: altro.z + 1, entra: altro.stanza || null }, { tipo: 'chiacchiera', a: altro.id, quanto: 30 }];

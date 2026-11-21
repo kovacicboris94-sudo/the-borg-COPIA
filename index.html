@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="8db20f835614">
+  <meta name="versione" content="7a54187b36d9">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -31774,6 +31774,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
   function applica(d) {
     if (!d || !Array.isArray(d.agenti)) return;
     A.dati = d; A.scarto = d.ora - Date.now();
+    B.vitaCasa = (d.vita && d.vita.case) || null;   // le casette: fornello acceso, temperatura (src/borgo/casette-agenti.js)
     if (!gruppo) { gruppo = new T.Group(); app.gP.add(gruppo); }
     const visti = new Set();
     d.agenti.forEach(s => { visti.add(s.id); aggiornaAgente(s); });
@@ -32258,14 +32259,27 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
   /* ---------- scheda dell'agente (tocco sull'avatar) ---------- */
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const euro = v => v.toFixed(v < 0.1 ? 4 : 2).replace('.', ',') + ' $';
+  const FA = { dormi: 'Dorme 😴', svenuto: 'È svenuto', riposa: 'Si riposa', pesca: 'Pesca al Laghetto 🎣', lavora: 'Fa un turno di lavoro', mangia: 'Mangia', svago: 'Si svaga', chiacchiera: 'Chiacchiera', lavati: 'Si lava', raccogli: 'Raccoglie', modella: 'Modella l\'argilla', semina: 'Semina' };
   function cosaFa(s) {
+    if (s.morto) return 'È morto' + (s.morto.causa ? ' (' + s.morto.causa + ')' : '') + '. La morte nel borgo è vera.';
     if (A.dati && A.dati.pausa) return 'In pausa: è fermo, non pensa e non spende nulla';
+    const v = A.dati && A.dati.vita && A.dati.vita.corpi[s.id];
+    if (v && v.fa && v.fa !== 'morto') return FA[v.fa] || v.fa;
     if (s.modo === 'automatico') return s.motivo === 'budget-finito' ? 'Ha finito il budget del mese: vive in automatico fino al mese prossimo' : 'Vive in automatico (il cervello non è collegato)';
     if (s.lavoro && s.lavoro.tipo === 'usa') return 'Sta usando: ' + s.lavoro.nome + ' ' + (s.lavoro.icona || '');
     if (s.lavoro) { const o = A.oggetti.get(s.lavoro.id); return (s.lavoro.tipo === 'costruisci' ? 'Sta costruendo ' : 'Sta smontando ') + (o ? '"' + o.d.nome + '"' : ''); }
     if (Math.hypot(s.tx - s.x, s.tz - s.z) > 0.5) return 'Sta camminando';
     const m = Math.max(0, Math.round((s.prossimo - ora()) / 60000));
     return m < 1 ? 'Sta per pensare' : 'Ripenserà tra ' + (m < 60 ? m + ' min' : Math.round(m / 60) + ' h');
+  }
+  // il corpo (vita vera): salute, fame, sete, sonno, e la casa
+  const barra = (n, v, col) => `<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin:2px 0"><span style="width:52px">${n}</span><div style="flex:1;height:7px;border-radius:4px;background:#3d3355;overflow:hidden"><div style="height:100%;width:${Math.round(Math.max(0, Math.min(1, v)) * 100)}%;background:${col}"></div></div></div>`;
+  function corpo(s) {
+    const vv = A.dati && A.dati.vita, v = vv && vv.corpi[s.id]; if (!v || s.morto) return '';
+    const casa = vv.case && vv.case['casa_' + s.id];
+    return `<div style="margin:8px 0 4px"><b>Corpo:</b> salute ${v.salute}/100 · ${v.peso} kg · ${v.temperatura} °C${v.malato && v.malato.length ? ' · malato' : ''}</div>` +
+      barra('Fame', v.fame, '#e8873a') + barra('Sete', v.sete, '#7ec8e3') + barra('Sonno', v.sonno, '#7a4fb8') +
+      (casa ? `<div style="font-size:12px;opacity:.85;margin-top:3px">Casa: ${casa.T} °C${casa.fornello ? ' · fornello acceso 🔥' : ''}${casa.bolletta != null ? ' · ultima bolletta ' + casa.bolletta + ' Starlight' : ''}${casa.staccato ? ' · gas e luce staccati!' : ''}</div>` : '');
   }
   function disegnaScheda() {
     const el = A.scheda; if (!el) return;
@@ -32277,6 +32291,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
        <div style="opacity:.75;font-size:12px;margin-bottom:8px">Agente IA libero · ${esc(A.dati.modello || '')}</div>
        <div style="margin:6px 0"><b>Adesso:</b> ${esc(cosaFa(s))}</div>
        <div style="margin:6px 0"><b>Dove:</b> ${esc(s.stanza === 'tetto' ? 'sul tetto della Torre della Cometa' : s.stanza ? 'dentro ' + ({ negozio: 'Negozio TCG', tcg: 'Sala TCG' }[s.stanza] || (app.stanze[s.stanza] || {}).nome || s.stanza) : 'in piazza')}</div>
+       ${corpo(s)}
        ${s.starlight != null ? `<div style="margin:8px 0 4px"><b>Starlight:</b> ${s.starlight}${Object.keys(s.zaino || {}).length ? ' · zaino: ' + esc(Object.keys(s.zaino).join(', ')) : ''}</div>` : ''}
        <div style="margin:8px 0 4px"><b>Budget del mese:</b> ${euro(b.spesi)} su ${euro(b.tetto)} · ${b.pensieri} pensieri · restano ${b.giorni} giorni</div>
        <div style="height:10px;border-radius:5px;background:#3d3355;overflow:hidden"><div style="height:100%;width:${pc.toFixed(1)}%;background:${pc > 85 ? '#e0675c' : '#7ec8e3'}"></div></div>

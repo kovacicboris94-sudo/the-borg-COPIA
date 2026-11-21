@@ -2,7 +2,7 @@
 
 Un motore che dà ad Ada e Teo (e a chi verrà) un **corpo vero** dentro un **mondo che rispetta fisica e chimica**. È il primo pezzo del piano "civiltà di agenti" (fase 1: il borgo vive anche senza IA).
 
-**Stato: progetto, non pubblicato.** Il motore degli agenti dal vivo (`agenti/motore.mjs`) non lo usa ancora: Ada e Teo sul server non cambiano finché Boris non dice sì.
+**Stato: pubblicato e collegato ad Ada e Teo dal vivo il 21 novembre 2026** (Boris: "Carica tutto vai"). Si spegne con `REGOLE.vita = false` in `agenti/motore.mjs`.
 
 ## Come è fatto
 
@@ -112,6 +112,16 @@ Deciso da Boris il 20 novembre 2026 (`REGOLE_VITA.morte = true`): chi muore rest
 - Le reazioni hanno una temperatura minima, non una cinetica completa.
 - Le probabilità di ammalarsi sono stime ragionevoli, non dati epidemiologici.
 
-## Collegarlo agli agenti dal vivo (da fare dopo il sì di Boris)
+## Collegato agli agenti dal vivo (21 novembre 2026)
 
-`aggancio.mjs` ha già tutto: in `motore.mjs` servono poche righe dietro `REGOLE.vita` (spenta). L'elenco è in testa al file. Il costo in più per pensiero è circa 600-900 token di percezione (~0,00007 $), e le azioni del corpo sono codice, quindi gratis. Lo stato in più occupa circa 60 KB.
+`motore.mjs` usa `aggancio.mjs` dietro `REGOLE.vita` (accesa). In breve:
+- a ogni passo del server (30 s) scorre la vita: corpo, fuochi, cibo, casette, bollette, Mercatino;
+- le azioni del corpo stanno nella stessa lista delle altre; se il posto è lontano l'agente ci cammina (o entra in casa / in Biblioteca) e poi la ripete;
+- mentre il corpo è occupato (dorme, pesca, fa un turno) l'agente resta fermo e non pensa (si risparmia);
+- i bisogni urgenti (sete forte, bagno, sonno di notte, fame vera, freddo, fornello lasciato acceso) li soddisfa il cervello a regole, gratis, quando l'agente non ha altro in coda; un nuovo pensiero non li interrompe;
+- chi vive "in automatico" (budget finito) usa sempre il cervello a regole: lavora, compra, cucina, dorme a casa;
+- la casa è privata: nella Casa di Ada entra solo Ada;
+- la morte è vera: chi muore non pensa e non si muove più;
+- il gioco riceve `vita` in `/stato` (corpo e casette) e lo mostra nella scheda dell'agente; il fornello acceso si vede in cucina.
+
+Costo: il prompt è circa 2.000 token più lungo (~0,0002 $ a pensiero). Lo stato in più occupa circa 50-60 KB.

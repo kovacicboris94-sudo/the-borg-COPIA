@@ -25,7 +25,7 @@ const oraRoma = ms => +new Date(ms).toLocaleString('en-GB', { timeZone: 'Europe/
 
 // ---- descrizione per il prompt degli agenti ----
 export const TIPI_VITA = ['bevi', 'mangia', 'raccogli', 'pesca', 'accendi', 'alimenta', 'metti_sul_fuoco', 'togli_dal_fuoco', 'riempi', 'aggiungi', 'impasta', 'modella', 'dormi', 'riposa', 'semina', 'annaffia', 'prendi', 'lascia', 'dai',
-  'compra', 'vendi', 'lavora', 'lavati', 'bagno', 'svago', 'chiacchiera', 'butta', 'casa', 'spegni', 'termostato'];
+  'compra', 'vendi_al_mercatino', 'turno', 'lavati', 'bagno', 'svago', 'chiacchiera', 'butta', 'casa', 'spegni', 'termostato'];
 // durante un turno di lavoro si puo' fare una pausa per queste (senza lasciare il turno)
 const IN_PAUSA = ['mangia', 'bevi', 'bagno'];
 export function promptAzioniVita() {
@@ -51,8 +51,8 @@ AZIONI DEL CORPO (vanno nella stessa lista delle altre; se il posto e' lontano c
 - {"tipo":"prendi","nome":"farina","x":1}: prendi x kg (o pezzi, per gli attrezzi) dalla Dispensa o da terra vicino a te. {"tipo":"lascia","nome":"...","x":..} li lasci (in Dispensa se ci sei, se no a terra). {"tipo":"butta","nome":"pesce"}: butti nel compost il cibo andato a male (non si lascia per terra).
 - {"tipo":"dai","nome":"pane","id":"teo","x":0.5}: dai x kg a chi ti sta vicino (id = il suo nome).
 SOLDI E LAVORO: il cibo, la legna e gli attrezzi arrivano da fuori ogni mattina al Mercatino (x=0 z=8) e si pagano in Starlight. Le scorte sono limitate: se finiscono, il prezzo sale.
-- {"tipo":"compra","nome":"pane","x":0.5}: compri x kg (o pezzi per gli attrezzi) al Mercatino. {"tipo":"vendi","nome":"pesce","x":1}: vendi al Mercatino quello che hai prodotto (te lo paga meta' del suo prezzo).
-- {"tipo":"lavora","nome":"barista","x":4}: fai un turno di x ore (massimo ${ORE_MAX_GIORNO} al giorno, solo negli orari della bottega, posti limitati). Mestieri: ${descriviMestieri()}. Con l'esperienza la paga sale fino al 40% in piu'. Durante il turno puoi solo mangiare, bere e andare in bagno. Oppure lavori in proprio: pesca, coltiva, fai pentole o pane e vendi.
+- {"tipo":"compra","nome":"pane","x":0.5}: compri x kg (o pezzi per gli attrezzi) al Mercatino. {"tipo":"vendi_al_mercatino","nome":"pesce","x":1}: vendi al Mercatino quello che hai prodotto (te lo paga meta' del suo prezzo, e ne compra quanto chiedono i suoi clienti).
+- {"tipo":"turno","nome":"facchino","x":4}: fai un turno da dipendente di x ore, pagato a ore (diverso dal bancone, dove vendi tu ai clienti e prendi meta' dell'incasso) (massimo ${ORE_MAX_GIORNO} al giorno, solo negli orari della bottega, posti limitati). Mestieri: ${descriviMestieri()}. Con l'esperienza la paga sale fino al 40% in piu'. Durante il turno puoi solo mangiare, bere e andare in bagno. Oppure lavori in proprio: pesca, coltiva, fai pentole o pane e vendi.
 CASA: hai una casetta tua in piazza. {"tipo":"casa"} ci torni. Dentro: fornello a gas ({"tipo":"accendi"}, poi metti_sul_fuoco / togli_dal_fuoco, poi {"tipo":"spegni"}), frigo a 4 gradi (il cibo che lasci a casa va in frigo e dura molto di piu'; {"tipo":"prendi"} per riprenderlo), bagno con doccia calda, letto con il piumone, riscaldamento ({"tipo":"termostato","x":19}). Gas, luce e acqua si pagano a fine giornata in Starlight: se non paghi per troppo tempo staccano gas e luce.
 CORPO E TESTA: {"tipo":"bagno"} (a casa o in un edificio: Biblioteca, Sala Giochi, Casa degli Scacchi, Negozio TCG, Laugh Tale, Torre); {"tipo":"lavati"} (in un edificio con acqua calda, o alla Fontana con acqua gelata); {"tipo":"svago","luogo":"Belvedere","x":1} (x ore di riposo e divertimento: passa la noia); {"tipo":"chiacchiera","id":"teo","x":20} (x minuti con chi ti sta vicino: passa la solitudine a tutti e due).`;
 }
@@ -456,7 +456,7 @@ const AZIONI = {
     return { ok: true, esito: `comprati ${pezzi ? quanti + ' ' + nomeDi(a.cosa) : quanti.toFixed(2) + ' kg di ' + nomeDi(a.cosa)} per ${costo} Starlight (ne restano ${Math.floor(c.starlight)})` };
   },
 
-  vendi(mondo, c, a, t) {
+  vendi_al_mercatino(mondo, c, a, t) {
     const m = mondo.mercato; if (!m) return no('non c\'e\' un mercato');
     if (!a.cosa) return no('cosa vendi?');
     if (!((LISTINO[a.cosa] || [])[2])) return no(`il Mercatino non compra ${nomeDi(a.cosa)}`);
@@ -475,7 +475,7 @@ const AZIONI = {
     return { ok: true, esito: `venduti ${pezzi ? '1 ' + nomeDi(a.cosa) : quanti.toFixed(2) + ' kg di ' + nomeDi(a.cosa)} per ${ricavo} Starlight (ora ne hai ${Math.floor(c.starlight)})` };
   },
 
-  lavora(mondo, c, a, t) {
+  turno(mondo, c, a, t) {
     const id = cercaMestiere(a.nome || a.luogo); if (!id) return no('che mestiere? ' + Object.keys(MESTIERI).join(', '));
     const M = MESTIERI[id];
     const posto = { nome: M.luogo, x: M.x, z: M.z, raggio: 5 };

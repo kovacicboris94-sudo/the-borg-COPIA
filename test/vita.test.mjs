@@ -235,9 +235,9 @@ ok(normalizzaAzioneVita({ tipo: 'mangia', nome: 'Pane' }).cosa === 'pane' && nor
   ok(eseguiAzioneVita(m, 'teo', { tipo: 'compra', cosa: 'pane', quanto: 0.5 }, T0).vai, 'per comprare bisogna andare al Mercatino');
   ok(!eseguiAzioneVita(m, 'ada', { tipo: 'compra', cosa: 'cappotto', quanto: 1 }, T0).ok, 'senza abbastanza Starlight non si compra');
   ada.zaino.push(nuovaCosa(m, 'pesce', 1, { T: 10 }));
-  const s0 = ada.starlight, v = eseguiAzioneVita(m, 'ada', { tipo: 'vendi', cosa: 'pesce', quanto: 1 }, T0);
+  const s0 = ada.starlight, v = eseguiAzioneVita(m, 'ada', { tipo: 'vendi_al_mercatino', cosa: 'pesce', quanto: 1 }, T0);
   ok(v.ok && vicino(ada.starlight - s0, prezzoDi(m.mercato, 'pesce') * 0.5, 0.01), 'il Mercatino compra a meta\' prezzo');
-  ok(!eseguiAzioneVita(m, 'ada', { tipo: 'vendi', cosa: 'farina', quanto: 1 }, T0).ok, 'non compra quello che arriva gia\' da fuori (farina)');
+  ok(!eseguiAzioneVita(m, 'ada', { tipo: 'vendi_al_mercatino', cosa: 'farina', quanto: 1 }, T0).ok, 'non compra quello che arriva gia\' da fuori (farina)');
   // domanda e offerta: pane esaurito -> +8%; farina rimasta tutta -> -4%
   m.mercato.scorte.pane = 0; m.mercato.scorte.farina = 25; const pPane = m.mercato.prezzi.pane, pFarina = m.mercato.prezzi.farina;
   chiudiGiornataMercato(m.mercato);
@@ -253,10 +253,10 @@ ok(normalizzaAzioneVita({ tipo: 'mangia', nome: 'Pane' }).cosa === 'pane' && nor
   ok(vicino(competenza(200), 0.632, 0.001), 'curva di apprendimento: 63% dopo 200 ore');
   const m = nuovoMondo({ adesso: T0, seme: 2, posizioni: { ada: { x: 18, z: -3 }, teo: { x: 18, z: -2 } } });
   const notte = Date.UTC(2026, 10, 21, 3, 0);
-  ok(!eseguiAzioneVita(m, 'ada', { tipo: 'lavora', nome: 'barista', quanto: 3 }, notte).ok, 'la Caffetteria di notte non assume');
-  const r = eseguiAzioneVita(m, 'ada', { tipo: 'lavora', nome: 'barista', quanto: 3 }, T0);
+  ok(!eseguiAzioneVita(m, 'ada', { tipo: 'turno', nome: 'barista', quanto: 3 }, notte).ok, 'la Caffetteria di notte non assume');
+  const r = eseguiAzioneVita(m, 'ada', { tipo: 'turno', nome: 'barista', quanto: 3 }, T0);
   ok(r.ok && m.corpi.ada.lavoro.tipo === 'lavora', 'turno da barista iniziato');
-  ok(!eseguiAzioneVita(m, 'teo', { tipo: 'lavora', nome: 'barista', quanto: 3 }, T0).ok, 'un solo posto da barista: Teo non entra');
+  ok(!eseguiAzioneVita(m, 'teo', { tipo: 'turno', nome: 'barista', quanto: 3 }, T0).ok, 'un solo posto da barista: Teo non entra');
   ok(!eseguiAzioneVita(m, 'ada', { tipo: 'raccogli', cosa: 'rami' }, T0).ok && eseguiAzioneVita(m, 'ada', { tipo: 'bagno' }, T0).ok, 'durante il turno si puo\' andare in bagno ma non fare altro');
   const s0 = m.corpi.ada.starlight, paga = m.corpi.ada.lavoro.paga;
   for (let t = T0 + 60000; t <= T0 + 3 * 3600000 + 120000; t += 60000) passoMondo(m, t);

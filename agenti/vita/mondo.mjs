@@ -236,7 +236,7 @@ function trasforma(mondo, f, s, dt) {
 // Fa scorrere il tempo fino ad "adesso". posizioni: { id: {x, z, stanza} } dal motore degli agenti (facoltativo).
 export function passoMondo(mondo, adesso, regole = REGOLE_VITA, posizioni = null) {
   const eventi = [];
-  if (posizioni) for (const [id, p] of Object.entries(posizioni)) { const c = mondo.corpi[id]; if (c) { c.x = p.x; c.z = p.z; c.stanza = p.stanza || null; } }
+  if (posizioni) for (const [id, p] of Object.entries(posizioni)) { const c = mondo.corpi[id]; if (c) { c.x = p.x; c.z = p.z; c.stanza = p.stanza || null; c.attivitaMotore = p.attivita || null; } }
   let resto = Math.max(0, Math.min(6 * 3600 * 1000, adesso - mondo.t)) / 1000;
   while (resto > 0.001) {
     const dt = Math.min(regole.passoMaxS || 60, resto);
@@ -316,7 +316,7 @@ function chiudiGiornata(mondo, giorno) {
 /*  lavori in corso (le azioni che richiedono tempo)                    */
 /* ------------------------------------------------------------------ */
 function finisciLavoro(mondo, c, t, eventi) {
-  if (!c.lavoro) { if (!c.addormentato && !c.svenuto) c.attivita = 'riposare'; return; }
+  if (!c.lavoro) { if (!c.addormentato && !c.svenuto) c.attivita = c.attivitaMotore || 'riposare'; return; }   // camminare, costruire, stare al bancone: lo dice il motore
   c.attivita = c.lavoro.attivita || 'riposare';
   if (c.lavoro.tipo === 'dormi') {
     // ci si sveglia quando si e' riposati (o finito il tempo, o se si sta molto male)
