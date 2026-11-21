@@ -15,7 +15,7 @@
 //     l'agente vive "in automatico" fino al mese dopo.
 // =====================================================================
 
-import { cosaDi, manuale, merceDi, portafoglio } from './borgo-cose.mjs';
+import { cosaDi, manuale, merceDi, mobileDi, portafoglio, SEDUTE } from './borgo-cose.mjs';
 export const MODELLO = 'claude-haiku-5-5';
 
 // Prezzi di Claude Haiku 5.5 in dollari per milione di token (prompt fino a 100.000 token).
@@ -36,6 +36,8 @@ export const REGOLE = {
   velocitaBici: 3.9,          // in bici (solo in piazza)
   minutiPerMetroCubo: 3,      // tempo di costruzione
   maxOggetti: 150, maxOggettiAgente: 60,
+  regaliGiocatore: 3,         // mobili regalati da una persona vera che possono stare in piazza insieme
+  sedutaMin: 10,              // minuti seduti su un mobile della piazza
   maxAzioni: 8,
   diarioMax: 24,              // oltre questo l'agente riscrive la memoria e il diario si accorcia
   memoriaMax: 1500,           // caratteri
@@ -236,6 +238,12 @@ export function normalizzaAzione(a) {
     return st ? { tipo, stanza: st.id } : { errore: 'entra: edificio sconosciuto (puoi entrare in ' + STANZE.map(q => q.nome).join(', ') + ')' };
   }
   if (tipo === 'esci') return { tipo };
+  if (tipo === 'usa') {
+    // un mobile posato in piazza (per sedersi): per id ("o12") oppure per nome ("Poltrona")
+    const n = String(a.nome || a.luogo || a.testo || '').trim(), id = n.match(/^o\d+$/i);
+    if (id) return { tipo, oggetto: id[0].toLowerCase() };
+    if (!cosaDi(n)) { const m = merceDi(n); if (m && SEDUTE[m[7]]) return { tipo, oggetto: m[0] }; }
+  }
   if (tipo === 'usa') { const c = cosaDi(a.nome || a.luogo || a.testo); return c ? { tipo, cosa: c.id, richiesta: testo(a.testo, 40) } : { errore: 'usa: cosa sconosciuta (vedi MANUALE DEL BORGO)' }; }
   if (tipo === 'metti') { const m = merceDi(a.nome || a.testo); if (!m) return { errore: 'metti: cosa sconosciuta (puoi mettere solo le cose comprate al Mercatino)' }; const o = { tipo, merce: m[0] }; if (a.x != null && a.z != null && isFinite(num(a.x, NaN)) && isFinite(num(a.z, NaN))) { o.x = r2(num(a.x, 0)); o.z = r2(num(a.z, 0)); } return o; }
   if (tipo === 'scrivi') {
@@ -550,7 +558,7 @@ function esegui(stato, ag, a, adesso, regole) {
     const z = portafoglio(ag).zaino || {};
     if (!z[a.merce]) return esito(ag, `metti ${a.merce}: rifiutata, non ce l'hai nello zaino (prima compralo al Mercatino)`);
     const m = merceDi(a.merce);
-    const o = { id: 'o' + stato.prossimoId, autore: ag.id, nome: m[0], forma: m[5], l: m[2], h: m[3], p: m[4], y: 0, rot: 0, colore: m[6], scritta: '', arredo: true,
+    const o = { id: 'o' + stato.prossimoId, autore: ag.id, nome: m[0], forma: m[5], l: m[2], h: m[3], p: m[4], y: 0, rot: 0, colore: m[6], scritta: '', arredo: true, modello: m[7],
       x: a.x != null ? a.x : r2(ag.x + 1.5), z: a.z != null ? a.z : r2(ag.z + 1.5), creato: adesso, pronto: true };
     if (dist(o, ag) > regole.portata) return esito(ag, `metti ${m[0]}: rifiutata, il punto e' troppo lontano da te (entro ${regole.portata} m)`);
     if (stato.oggetti.length >= regole.maxOggetti) return esito(ag, `metti ${m[0]}: rifiutata, nel borgo ci sono gia' troppi oggetti`);
@@ -583,6 +591,7 @@ function esegui(stato, ag, a, adesso, regole) {
     if (!o) return esito(ag, `${a.tipo} ${a.id}: rifiutata, quell'oggetto non esiste (piu')`);
     if (dist(o, ag) > regole.portata) return esito(ag, `${a.tipo} ${a.id}: rifiutata, e' troppo lontano (${Math.round(dist(o, ag))} m)`);
     if (!o.pronto) return esito(ag, `${a.tipo} ${a.id}: rifiutata, e' ancora in costruzione`);
+    if (Object.values(stato.agenti).some(q => q.lavoro && q.lavoro.oggetto && q.lavoro.id === o.id)) return esito(ag, `${a.tipo} ${a.id}: rifiutata, c'e' seduto qualcuno sopra`);
     if (stato.oggetti.some(q => q !== o && q.pronto && Math.abs(q.y - (o.y + o.h)) < 0.35 && Math.hypot(q.x - o.x, q.z - o.z) < raggioOggetto(o) + 0.3))
       return esito(ag, `${a.tipo} ${a.id}: rifiutata, sopra c'e' appoggiato un altro oggetto: togli prima quello`);
     if (a.tipo === 'rimuovi') {
@@ -604,7 +613,32 @@ function esegui(stato, ag, a, adesso, regole) {
 }
 
 // usare una cosa del borgo (borgo-cose.mjs): si va li' da soli, poi si resta occupati qualche minuto
+// un mobile della piazza su cui ci si siede: davanti (il fronte dei mobili guarda verso +z, girato di rot gradi)
+function davanti(o, k = 1) { const r = (o.rot || 0) * Math.PI / 180; return { x: r2(o.x + Math.sin(r) * (o.p / 2 + 0.6 * k)), z: r2(o.z + Math.cos(r) * (o.p / 2 + 0.6 * k)) }; }
+function siedi(stato, ag, a, adesso, regole) {
+  if (ag.stanza) { ag.coda.unshift(a); return esegui(stato, ag, { tipo: 'esci', auto: true }, adesso, regole); }
+  const sedile = q => q.pronto && q.arredo && SEDUTE[q.modello] && (q.y || 0) < 0.05;
+  const n = String(a.oggetto).toLowerCase();
+  const o = stato.oggetti.find(q => q.id === n) || stato.oggetti.filter(q => sedile(q) && q.nome.toLowerCase() === n).sort((u, v) => dist(u, ag) - dist(v, ag))[0];
+  if (!o) return esito(ag, `usa ${a.oggetto}: rifiutata, in piazza non c'e' (vedi gli oggetti intorno a te)`);
+  if (!sedile(o)) return esito(ag, `usa ${o.id} "${o.nome}": rifiutata, non e' un mobile su cui sedersi`);
+  const occupati = Object.values(stato.agenti).filter(q => q !== ag && q.lavoro && q.lavoro.oggetto && q.lavoro.id === o.id).map(q => q.lavoro.posto);
+  const posti = SEDUTE[o.modello], posto = [...Array(posti).keys()].find(i => !occupati.includes(i));
+  if (posto == null) return esito(ag, `usa ${o.id} "${o.nome}": rifiutata, e' gia' occupato`);
+  const p = davanti(o);
+  if (Math.hypot(ag.x - p.x, ag.z - p.z) > 1.5) {
+    if (!a.inCammino) esito(ag, `usa ${o.nome}: in cammino`);
+    ag.tx = p.x; ag.tz = p.z; ag.ancora = null; ag.esplora = null; ag.meta = o.nome;
+    ag.coda.unshift(Object.assign({}, a, { inCammino: true })); return 'cammina';
+  }
+  ag.meta = null; ag.ancora = { x: p.x, z: p.z }; ag.bici = false;
+  const di = o.donatore ? ` (regalo di ${nomeDi(stato, o.donatore)})` : '';
+  ag.lavoro = { tipo: 'usa', id: o.id, oggetto: true, posto, nome: o.nome + di, icona: '🛋️', inizio: adesso, fine: adesso + regole.sedutaMin * 60000 };
+  evento(stato, { chi: ag.id, tipo: 'usa', testo: o.nome + di, x: ag.x, z: ag.z });
+  return esito(ag, `usa ${o.id} "${o.nome}": ti sei seduto, ci resti ${regole.sedutaMin} minuti`);
+}
 function usa(stato, ag, a, adesso, regole) {
+  if (a.oggetto) return siedi(stato, ag, a, adesso, regole);
   const c = cosaDi(a.cosa);
   if (c.id === 'bici') {
     if (ag.stanza) { ag.coda.unshift(a); return esegui(stato, ag, { tipo: 'esci', auto: true }, adesso, regole); }
@@ -639,6 +673,7 @@ function usa(stato, ag, a, adesso, regole) {
   return esito(ag, `usa ${c.nome}: iniziato, ci vorranno ${c.min} minuti`);
 }
 function fineUso(stato, ag, L, adesso) {
+  if (L.oggetto) { const r = `Sei rimasto seduto un po' su ${L.nome}, poi ti sei alzato.`; esito(ag, `usa ${L.id}: finito. ${r}`); annota(ag, adesso, r); return; }
   const c = cosaDi(L.id); if (!c) return;
   const r = c.fai({ ag, stato, adesso, momento: momento(adesso), compagno: L.compagno ? stato.agenti[L.compagno] : null, risultato: L.risultato, richiesta: L.richiesta, nomeDi, luogoVicino });
   esito(ag, `usa ${c.nome}: finito. ${r}`); annota(ag, adesso, r);
@@ -759,11 +794,13 @@ export function percezione(stato, ag, adesso, regole = REGOLE) {
   stato.eventi.filter(e => e.chi && e.chi.indexOf('g:') === 0 && e.tipo !== 'scrivi' && adesso - e.t < 5 * 60000 && dist(e, ag) <= regole.vista).forEach(e => giocatori.set(e.chi, e));
   giocatori.forEach((e, id) => visti.push(`- ${id.slice(2)} (persona vera), a ${Math.round(dist(e, ag))} m`));
   const oggetti = stato.oggetti.filter(o => dist(o, ag) <= regole.vista).sort((a, c) => dist(a, ag) - dist(c, ag)).slice(0, 20);
-  oggetti.forEach(o => visti.push(`- oggetto ${o.id} "${o.nome}" di ${o.autore === ag.id ? 'te' : nomeDi(stato, o.autore)}: ${o.forma} ${o.l}x${o.h}x${o.p} m, colore ${o.colore}, a x=${o.x} z=${o.z} y=${o.y}${o.scritta ? `, scritta "${o.scritta}"` : ''}${o.pronto ? '' : ' (in costruzione)'}, a ${Math.round(dist(o, ag))} m`));
+  oggetti.forEach(o => visti.push(o.arredo && o.modello
+    ? `- mobile ${o.id} "${o.nome}" di ${o.autore === ag.id ? 'te' : nomeDi(stato, o.autore)}${o.donatore ? ` (regalo di ${nomeDi(stato, o.donatore)}, persona vera)` : ''}, a x=${o.x} z=${o.z}, a ${Math.round(dist(o, ag))} m${SEDUTE[o.modello] && !(o.y > 0.05) ? `: ci si siede ({"tipo":"usa","nome":"${o.id}"})` : ''}`
+    : `- oggetto ${o.id} "${o.nome}" di ${o.autore === ag.id ? 'te' : nomeDi(stato, o.autore)}: ${o.forma} ${o.l}x${o.h}x${o.p} m, colore ${o.colore}, a x=${o.x} z=${o.z} y=${o.y}${o.scritta ? `, scritta "${o.scritta}"` : ''}${o.pronto ? '' : ' (in costruzione)'}, a ${Math.round(dist(o, ag))} m`));
   righe.push('COSA VEDI intorno a te:\n' + (visti.length ? visti.join('\n') : '- nessuno e niente di nuovo'));
   const da = ag.ultimaVolta || 0;
-  const sentiti = stato.eventi.filter(e => e.t > da && e.chi !== ag.id && (e.tipo === 'scrivi' ? e.a === ag.id : dist(e, ag) <= regole.vista && ['parla', 'costruisce', 'finito', 'rimosso', 'sposta', 'gesto', 'entra', 'esce', 'usa', 'usato'].includes(e.tipo))).slice(-12);
-  if (sentiti.length) righe.push('COSA E\' SUCCESSO VICINO A TE dall\'ultima volta:\n' + sentiti.map(e => `- [${oraBreve(e.t)}] ${nomeDi(stato, e.chi)}${e.chi.indexOf('g:') === 0 ? ' (persona vera)' : ''} ` + (e.tipo === 'parla' ? `ha detto: "${e.testo}"` : e.tipo === 'scrivi' ? `ti ha scritto da lontano: "${e.testo}" (per rispondere da lontano usa "scrivi")` : e.tipo === 'entra' ? `e' entrato qui` : e.tipo === 'esce' ? `e' arrivato da ${e.testo}` : e.tipo === 'costruisce' ? `ha iniziato a costruire "${e.testo}"` : e.tipo === 'finito' ? `ha finito "${e.testo}"` : e.tipo === 'rimosso' ? `ha smontato "${e.testo}"` : e.tipo === 'gesto' ? e.testo : e.tipo === 'usa' ? `usa: ${e.testo}` : e.tipo === 'usato' ? `ha finito. ${e.testo}` : `ha spostato "${e.testo}"`)).join('\n'));
+  const sentiti = stato.eventi.filter(e => e.t > da && e.chi !== ag.id && (e.tipo === 'scrivi' || (e.tipo === 'regalo' && e.a === ag.id) ? e.a === ag.id : dist(e, ag) <= regole.vista && ['regalo', 'parla', 'costruisce', 'finito', 'rimosso', 'sposta', 'gesto', 'entra', 'esce', 'usa', 'usato'].includes(e.tipo))).slice(-12);
+  if (sentiti.length) righe.push('COSA E\' SUCCESSO VICINO A TE dall\'ultima volta:\n' + sentiti.map(e => `- [${oraBreve(e.t)}] ${nomeDi(stato, e.chi)}${e.chi.indexOf('g:') === 0 ? ' (persona vera)' : ''} ` + (e.tipo === 'parla' ? `ha detto: "${e.testo}"` : e.tipo === 'scrivi' ? `ti ha scritto da lontano: "${e.testo}" (per rispondere da lontano usa "scrivi")` : e.tipo === 'regalo' ? (e.a === ag.id ? `ti ha regalato "${e.testo}" (${e.id}): l'ha posato in piazza a x=${e.x} z=${e.z}, ed e' tuo` : `ha regalato "${e.testo}" a ${nomeDi(stato, e.a)}`) : e.tipo === 'entra' ? `e' entrato qui` : e.tipo === 'esce' ? `e' arrivato da ${e.testo}` : e.tipo === 'costruisce' ? `ha iniziato a costruire "${e.testo}"` : e.tipo === 'finito' ? `ha finito "${e.testo}"` : e.tipo === 'rimosso' ? `ha smontato "${e.testo}"` : e.tipo === 'gesto' ? e.testo : e.tipo === 'usa' ? `usa: ${e.testo}` : e.tipo === 'usato' ? `ha finito. ${e.testo}` : `ha spostato "${e.testo}"`)).join('\n'));
   if (ag.esiti.length) righe.push('COME SONO ANDATE LE TUE ULTIME AZIONI:\n' + ag.esiti.map(s => '- ' + s).join('\n'));
   righe.push('LA TUA MEMORIA:\n' + (ag.memoria || '(vuota)'));
   if (ag.diario.length) righe.push('IL TUO DIARIO RECENTE:\n' + ag.diario.slice(-regole.diarioMax).map(d => `- [${oraBreve(d.t)}] ${d.s}`).join('\n'));
@@ -883,6 +920,37 @@ export function giocatoreParla(stato, nick, frase, x, z, adesso, opz = {}) {
   return true;
 }
 
+// Una persona vera regala un mobile a un abitante: lo posa in piazza davanti a se' e da quel momento e' dell'abitante
+// (come se l'avesse comprato: se qualcuno lo smonta torna nel suo zaino). Solo i mobili del Mercatino (mobileDi),
+// solo in piazza, con le stesse zone libere degli abitanti, e al massimo regole.regaliGiocatore regali a persona in piazza.
+// Restituisce { ok, id } oppure { ok: false, motivo } (il motivo lo legge il giocatore).
+export function giocatoreRegala(stato, nick, d, adesso, regole = REGOLE) {
+  d = d || {};
+  const n = testo(nick, 20).replace(/[^\p{L}\p{N}_ .-]/gu, ''), m = mobileDi(d.mobile), ag = stato.agenti[d.a];
+  const x = num(d.x, NaN), z = num(d.z, NaN), rot = Math.round(((num(d.rot, 0) % 360) + 360) % 360);
+  if (!n) return { ok: false, motivo: 'Serve il tuo nome nel gioco.' };
+  if (!ag) return { ok: false, motivo: 'A chi lo vuoi regalare?' };
+  if (!m) return { ok: false, motivo: 'Questo mobile non si puo\' mettere in piazza.' };
+  if (!isFinite(x) || !isFinite(z)) return { ok: false, motivo: 'Posizione non valida.' };
+  const chi = 'g:' + n;
+  if (stato.oggetti.filter(o => o.donatore === chi).length >= regole.regaliGiocatore) return { ok: false, motivo: `In piazza ci sono gia' ${regole.regaliGiocatore} tuoi regali: per ora basta cosi'.` };
+  if (stato.oggetti.length >= regole.maxOggetti) return { ok: false, motivo: 'La piazza e\' piena di oggetti, riprova piu\' tardi.' };
+  const o = { id: 'o' + stato.prossimoId, autore: ag.id, donatore: chi, nome: m[0], forma: m[5], l: m[2], h: m[3], p: m[4], y: 0, rot, colore: m[6], scritta: '', arredo: true, modello: m[7],
+    x: r2(x), z: r2(z), creato: adesso, pronto: true };
+  const no = postoValido(stato, o);
+  if (no) return { ok: false, motivo: 'Qui non si puo\': ' + no + '. Spostati un po\' e riprova.' };
+  const sopra = stato.oggetti.find(q => q.pronto && Math.abs(q.x - o.x) < (q.l + o.l) / 2 && Math.abs(q.z - o.z) < (q.p + o.p) / 2 && (q.y || 0) < 0.05);
+  if (sopra) return { ok: false, motivo: `Qui c'e' gia' "${sopra.nome}". Spostati un po' e riprova.` };
+  stato.prossimoId++; stato.oggetti.push(o);
+  (stato.persone || (stato.persone = {}))[n.toLowerCase()] = chi;   // chi ti ha fatto un regalo: gli puoi scrivere per ringraziare
+  const prima = stato.ora; stato.ora = adesso;
+  evento(stato, { chi, tipo: 'regalo', a: ag.id, id: o.id, testo: m[0], x: o.x, z: o.z });
+  stato.ora = prima;
+  annota(ag, adesso, `${n} (persona vera) mi ha regalato "${m[0]}" (${o.id}) e l'ha posato in piazza a x=${o.x} z=${o.z}.`);
+  svegliaPerVoce(ag, adesso, regole);
+  return { ok: true, id: o.id };
+}
+
 // un giocatore e' arrivato in un punto (lo dice il gioco): tesoro trovato o traguardo raggiunto?
 export function giocatoreArriva(stato, nick, x, z, adesso) {
   const n = testo(nick, 20).replace(/[^\p{L}\p{N}_ .-]/gu, ''), p = { x: num(x, NaN), z: num(z, NaN) };
@@ -931,7 +999,7 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
     agenti: Object.values(stato.agenti).map(a => {
       const b = budget(a, adesso, regole);
       return { id: a.id, nome: a.nome, look: a.look, x: a.x, z: a.z, tx: a.tx, tz: a.tz, stanza: a.stanza || null,
-        lavoro: a.lavoro ? { tipo: a.lavoro.tipo, id: a.lavoro.id, nome: a.lavoro.nome, icona: a.lavoro.icona, inizio: a.lavoro.inizio, fine: a.lavoro.fine } : null, bici: !!a.bici, starlight: portafoglio(a).starlight, zaino: a.zaino || {},
+        lavoro: a.lavoro ? { tipo: a.lavoro.tipo, id: a.lavoro.id, nome: a.lavoro.nome, icona: a.lavoro.icona, inizio: a.lavoro.inizio, fine: a.lavoro.fine, oggetto: !!a.lavoro.oggetto, posto: a.lavoro.posto || 0 } : null, bici: !!a.bici, starlight: portafoglio(a).starlight, zaino: a.zaino || {},
         detto: a.detto, gesto: a.gesto || null, pensiero: a.ultimoPensiero, memoria: a.memoria, modo: a.modo, motivo: a.motivo || null,
         prossimo: a.prossimoPensiero, budget: { spesi: b.spesi, tetto: b.tetto, resto: b.resto, giorni: b.giorni, pensieri: b.pensieri } };
     }),

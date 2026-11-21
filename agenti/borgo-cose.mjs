@@ -12,14 +12,18 @@ export const portafoglio = ag => { if (ag.starlight == null) ag.starlight = STAR
 const guadagna = (ag, n) => { portafoglio(ag).starlight += n; return n ? ` +${n} Starlight (ora ne hai ${ag.starlight}).` : ''; };
 const oggi = ms => new Date(ms + 3600000).toISOString().slice(0, 10);   // il giorno (circa ora di Roma)
 // i banchi del mercatino (prezzi dei mobili del gioco, src/borgo/coins-arredi.js, scontati come al mercatino)
-// [nome, prezzo, larghezza, altezza, profondita, forma, colore]: comprati finiscono nello zaino, con "metti" li posi in piazza
+// [nome, prezzo, larghezza, altezza, profondita, forma, colore, modello]: modello = id del mobile vero del gioco (B.ARREDI), il gioco lo disegna uguale a quello di casa; comprati finiscono nello zaino, con "metti" li posi in piazza
 export const MERCE = {
-  usato: [['Sedia', 28, 0.7, 1, 0.7, 'cubo', '#a0703f'], ['Pouf', 25, 0.8, 0.45, 0.8, 'cilindro', '#e89ab8'], ['Tavolino', 40, 1.2, 0.5, 1.2, 'cilindro', '#a0703f'],
-    ['Cassapanca', 65, 1.7, 0.6, 0.7, 'cubo', '#7a4f2e'], ['Tavolo da pranzo', 75, 2, 0.8, 1.1, 'cubo', '#a0703f'], ['Poltrona', 85, 1.3, 1, 1.3, 'cubo', '#c8453b'],
-    ['Libreria', 105, 1.7, 2, 0.6, 'cubo', '#7a4f2e'], ['Acquario', 155, 1.4, 1.2, 0.7, 'cubo', '#7ec8e3'], ['Divano', 175, 2.5, 0.9, 1.1, 'cubo', '#3b6fc8'], ['Cabinato arcade', 210, 1, 1.9, 0.9, 'cubo', '#7a4fb8']],
-  luci: [['Vaso con fiori', 20, 0.6, 0.8, 0.6, 'cilindro', '#e89ab8'], ['Pianta grande', 35, 0.9, 1.6, 0.9, 'cono', '#4f9a4a'], ['Lampada da terra', 60, 0.6, 1.8, 0.6, 'cilindro', '#f2c94c'],
-    ['Tappeto tondo', 70, 2.2, 0.2, 2.2, 'cilindro', '#e8873a'], ['Fontana', 300, 2.4, 1.2, 2.4, 'cilindro', '#b9b0a2']]
+  usato: [['Sedia', 28, 0.7, 1, 0.7, 'cubo', '#a0703f', 'sedia'], ['Pouf', 25, 0.8, 0.45, 0.8, 'cilindro', '#e89ab8', 'pouf'], ['Tavolino', 40, 1.2, 0.5, 1.2, 'cilindro', '#a0703f', 'tavolino'],
+    ['Cassapanca', 65, 1.7, 0.6, 0.7, 'cubo', '#7a4f2e', 'cassapanca'], ['Tavolo da pranzo', 75, 2, 0.8, 1.1, 'cubo', '#a0703f', 'tavolo'], ['Poltrona', 85, 1.3, 1, 1.3, 'cubo', '#c8453b', 'poltrona'],
+    ['Libreria', 105, 1.7, 2, 0.6, 'cubo', '#7a4f2e', 'libreria'], ['Acquario', 155, 1.4, 1.2, 0.7, 'cubo', '#7ec8e3', 'acquario'], ['Divano', 175, 2.5, 0.9, 1.1, 'cubo', '#3b6fc8', 'divano'], ['Cabinato arcade', 210, 1, 1.9, 0.9, 'cubo', '#7a4fb8', 'arcade']],
+  luci: [['Vaso con fiori', 20, 0.6, 0.8, 0.6, 'cilindro', '#e89ab8', 'vaso'], ['Pianta grande', 35, 0.9, 1.6, 0.9, 'cono', '#4f9a4a', 'pianta'], ['Lampada da terra', 60, 0.6, 1.8, 0.6, 'cilindro', '#f2c94c', 'lampada'],
+    ['Tappeto tondo', 70, 2.2, 0.2, 2.2, 'cilindro', '#e8873a', 'tappeto'], ['Fontana', 300, 2.4, 1.2, 2.4, 'cilindro', '#b9b0a2', 'fontana']]
 };
+// un mobile del gioco (id di B.ARREDI) -> la sua riga qui (i giocatori possono regalare solo questi)
+export const mobileDi = id => [...MERCE.usato, ...MERCE.luci].find(m => m[7] === String(id || '')) || null;
+// i mobili su cui ci si siede, e quanti posti hanno (come le "sedute" dei mobili di casa nel gioco)
+export const SEDUTE = { poltrona: 1, divano: 2, sedia: 1, pouf: 1, cassapanca: 2 };
 export const merceDi = nome => { const n = String(nome || '').toLowerCase().trim(); return [...MERCE.usato, ...MERCE.luci].find(m => m[0].toLowerCase() === n) || [...MERCE.usato, ...MERCE.luci].find(m => n && (m[0].toLowerCase().includes(n) || n.includes(m[0].toLowerCase()))) || null; };
 function compra(banco) {
   return c => {
@@ -145,5 +149,7 @@ ${COSE.map(c => `  ${c.nome}${c.min ? ` (${c.min} min)` : ''}: ${c.riga}`).join(
   Mobili usati: ${MERCE.usato.map(m => m[0] + ' ' + m[1]).join(', ')}
   Luci e decorazioni: ${MERCE.luci.map(m => m[0] + ' ' + m[1]).join(', ')}
 - {"tipo":"metti","nome":"Poltrona","x":..,"z":..}: posi in piazza, entro 8 m da te, una cosa comprata (subito, senza costruire). Diventa un oggetto come gli altri: chi la smonta la rimette nello zaino di chi l'aveva comprata.
+- SEDERSI: sui mobili posati in piazza da cui ci si siede (Poltrona, Divano, Sedia, Pouf, Cassapanca) ti siedi con {"tipo":"usa","nome":"<id dell'oggetto>"} (es. "o12"): ci vai da solo e resti seduto 10 minuti.
+- REGALI: le persone vere possono regalarti un mobile: lo posano in piazza ed e' tuo, come se l'avessi comprato (se qualcuno lo smonta torna nel tuo zaino).
 - Le persone vere (giocatori) per ora sono poche: compra, arreda e gioca anche per conto tuo. I 15 piani della Torre sono ancora vuoti, in attesa di negozi.
 - Le persone vere ti parlano con la chat: rispondi con "di" se sono vicine, con "scrivi" se sono lontane.`;
