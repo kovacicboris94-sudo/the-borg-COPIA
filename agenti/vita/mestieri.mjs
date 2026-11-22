@@ -35,7 +35,7 @@ export const MESTIERI = {
   giardiniere: { nome: 'giardiniere', luogo: 'Aiuole della piazza', x: -8, z: 42, dalle: 7, alle: 13, paga: 30, met: 3.5, posti: 1,
     descrizione: 'annaffi le 18 aiuole: senz\'acqua le piante seccano' },
   muratore: { nome: 'muratore', luogo: 'Cantiere', x: 0, z: 40, dalle: 8, alle: 17, giorni: [1, 2, 3, 4, 5, 6], paga: 32, met: 5.0, posti: 3, chiuso: 'nel borgo non c\'e\' nessun cantiere aperto',
-    descrizione: 'nel cantiere aperto sui terreni: ogni tua ora e\' un\'ora di lavoro in piu\'' },
+    descrizione: 'per Edilborgo, l\'impresa edile del borgo, nel cantiere aperto sui terreni: ogni tua ora e\' un\'ora di lavoro in piu\'' },
   segretario: { nome: 'segretario dell\'Ambulatorio', luogo: 'Ambulatorio', stanza: 'ambulatorio', posto: { x: -2.8, z: -1.8 }, x: 31, z: -3.5, dalle: 8, alle: 19, giorni: [1, 2, 3, 4, 5, 6], paga: 28, met: 1.6, posti: 1,
     descrizione: 'all\'accettazione: visite in 15 minuti invece di 45' }
 };

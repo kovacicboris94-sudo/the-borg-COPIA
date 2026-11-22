@@ -203,12 +203,14 @@ export function avviaCantiere(stato, chi, d, soldi, adesso) {
 function hash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
 
 // Un passo del tempo: i cantieri aperti avanzano nelle ore di lavoro. Restituisce i lotti appena finiti.
-export function passoCantieri(stato, adesso, dtS) {
+// ritmo(id): quanto lavora la squadra del cantiere (1 = squadra completa; agenti/impresa.mjs). Senza, si va al ritmo normale.
+export function passoCantieri(stato, adesso, dtS, ritmo) {
   const finiti = [];
   if (!dtS || !cantiereAperto(adesso)) return finiti;
   for (const [id, t] of Object.entries(stato.terreni || {})) {
     const p = t.progetto; if (!p || p.finito) continue;
-    p.fatte = Math.min(p.ore, Math.round((p.fatte + dtS / 3600) * 1000) / 1000);
+    const k = ritmo ? ritmo(id) : 1; if (!(k > 0)) continue;
+    p.fatte = Math.min(p.ore, Math.round((p.fatte + k * dtS / 3600) * 1000) / 1000);
     if (p.fatte >= p.ore) { p.finito = adesso; finiti.push(id); }
   }
   return finiti;

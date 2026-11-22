@@ -20,6 +20,7 @@ import { NEGOZI, CLIENTI, REGOLE_NEGOZI as RN, negozioDi, prodottoDi, decide } f
 import { LOTTI, lottoDi, geometria, compraLotto, avviaCantiere, passoCantieri, negoziDeiLotti, vistaTerreni, listinoTerreni, terrenoDi, costoProgetto, PROGETTI, GENERI, faseDi, finePrevista, REGOLE_TERRENI as RT, cambiaListino, PREZZO_MAX, tipoDi, abitazione, UN, APPARTAMENTI, appartamentoDato, appartamentoDi, compraAppartamento, immobileDi, prezzoAppartamento, vistaAppartamenti } from './terreni.mjs';
 import { BANCA, REGOLE_BANCA as RB, passoBanca, maturaGiocatore, chiediMutuo, chiediPrestito, rimborsa, vistaConto, vistaBanca, pianoMutuo, contoDi } from './banca.mjs';
 import { INTERNI, SPORTELLO, internoBottega, idBottega } from './interni.mjs';
+import { passoImpresa, ritmoCantiere, demoAlLavoro, risparmiDemo, spendeDemo, squadraDi, vistaImpresa, IMPRESA } from './impresa.mjs';
 import { passoBorgo, passoDipendenti, effettoMestiere, disponibile, togliScorta, scorteDi, descriviPiazza, vistaLavori, giocatoreDipendente as dipendenteDelGioco, inTurno } from './lavori.mjs';
 import { MESTIERI, cercaMestiere } from './vita/mestieri.mjs';
 import { passoVita, azioneVita, occupato, percezioneAgente, routineVita, normalizzaAzioneVita, promptVita, TIPI_VITA, bisognoUrgente, pianoPerMotore, vistaVita } from './vita/aggancio.mjs';
@@ -390,7 +391,8 @@ export async function passo(stato, adesso, cervello, opz = {}) {
   for (const e of evVita || []) if (e.tipo === 'lavoro_finito' && e.mestiere) lavoroFatto(stato, e.chi, e.mestiere, e.ore, adesso, e.lotto);
   for (const f of passoDipendenti(stato, adesso)) if (f.effetto) { const prima = stato.ora; stato.ora = adesso; evento(stato, { chi: f.chi, tipo: 'usa', testo: f.effetto, x: 0, z: 30 }); stato.ora = prima; }
   sincronizzaTerreni(stato);
-  for (const id of passoCantieri(stato, adesso, dt)) cantiereFinito(stato, id, adesso);
+  for (const e of passoImpresa(stato, adesso, dt)) { const prima = stato.ora; stato.ora = adesso; const l = e.lotto ? lottoDi(e.lotto) : null; evento(stato, { chi: e.demo ? 'd:' + e.nome : 'd:Edilborgo', tipo: 'usa', testo: e.testo, x: l ? l.x : 0, z: l ? l.z : 30 }); stato.ora = prima; }
+  for (const id of passoCantieri(stato, adesso, dt, id => ritmoCantiere(stato, id))) cantiereFinito(stato, id, adesso);
   for (const f of passoBanca(stato, adesso, id => stato.agenti[id] && !stato.agenti[id].morto ? portafoglio(stato.agenti[id]) : null)) fattoBanca(stato, f, adesso);
   // 1) il tempo scorre: si cammina, si costruisce, si eseguono le azioni in coda
   for (const ag of agenti) avanza(stato, ag, dt, adesso, regole);
@@ -1250,7 +1252,7 @@ function proponi(stato, chi, neg, d, adesso) {
   stato.ora = prima;
   let guadagno = 0;
   if (r.compra) {
-    togliScorta(stato, neg, prod);
+    togliScorta(stato, neg, prod); spendeDemo(stato, c.demo, prezzo);
     guadagno = Math.max(1, Math.round(prezzo * (neg.proprietario === chi ? RT.quotaProprietario : RN.quota))); c.servito = true; c.comprato = prod[0]; c.via = adesso + 20000;
     const t = stato.turni[chi]; if (t) { t.vendite = (t.vendite || 0) + 1; t.guadagno = (t.guadagno || 0) + guadagno; }
   } else if (c.tentativi >= RN.tentativi) { c.servito = true; c.via = adesso + 20000; }
@@ -1288,11 +1290,11 @@ function passoNegozi(stato, adesso, regole) {
     const t = chiLavora(stato, neg.id);
     if (!t || C.some(c => c.negozio === neg.id) || adesso < (P[neg.id] || 0)) continue;
     // un abitante demo che non e' gia' a un altro bancone e non e' passato di qui nell'ultima mezz'ora
-    const liberi = CLIENTI.filter(q => !C.some(c => c.demo === q.demo) && adesso - (V[q.demo + neg.id] || 0) > 30 * 60000);
+    const alLavoro = demoAlLavoro(stato), liberi = CLIENTI.filter(q => !C.some(c => c.demo === q.demo) && !alLavoro.has(q.demo) && adesso - (V[q.demo + neg.id] || 0) > 30 * 60000);
     if (!liberi.length) continue;
     const q = caso(liberi); V[q.demo + neg.id] = adesso;
     const c = { id: 'c' + stato.prossimoId++, demo: q.demo, nome: q.nome, negozio: neg.id, arrivo: adesso, via: adesso + RN.pazienzaMin * 60000, tentativi: 0, servito: false,
-      soldi: Math.max(5, Math.round(q.soldi * (0.6 + Math.random() * 0.8))), detto: { testo: caso(['Buongiorno!', 'Ciao! Cosa c\'e\' di buono?', 'Salve...', 'Eccomi!']), t: adesso } };
+      soldi: Math.max(5, Math.round(q.soldi * (0.6 + Math.random() * 0.8))) + Math.min(80, risparmiDemo(stato, q.demo)), detto: { testo: caso(['Buongiorno!', 'Ciao! Cosa c\'e\' di buono?', 'Salve...', 'Eccomi!']), t: adesso } };
     C.push(c);
     const prima = stato.ora; stato.ora = adesso;
     evento(stato, { chi: 'd:' + q.nome, tipo: 'parla', testo: c.detto.testo, x: neg.cliente.x, z: neg.cliente.z, stanza: neg.stanza || null });
@@ -1348,7 +1350,7 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
         chi: t ? { id: t[0], nome: nomeDi(stato, t[0]), vero: t[0].indexOf('g:') === 0, fine: t[1].fine } : null,
         ospite: c ? { id: c.id, demo: c.demo, nome: c.nome, vede: (CLIENTI.find(q => q.demo === c.demo) || {}).vede, soldi: c.soldi, tentativi: c.tentativi, via: c.via, detto: c.detto, servito: !!c.servito } : null }; }),
     giochi: (stato.giochi || []).filter(g => !g.finito || adesso - (g.fineVera || g.fine) < 60000).map(g => ({ id: g.id, chi: nomeDi(stato, g.chi), forma: g.forma, testo: g.testo, x: g.forma === 'quiz' ? null : g.x, z: g.forma === 'quiz' ? null : g.z, dove: g.dove, fine: g.fine, finito: g.finito, vincitore: g.vincitore })),
-    terreni: vistaTerreni(stato, adesso), listinoTerreni: listinoTerreni(), appartamenti: vistaAppartamenti(stato), banca: vistaBanca(stato),
+    terreni: vistaTerreni(stato, adesso).map(l => { if (l.progetto && !l.progetto.finito && stato.terreni[l.id]) { l.progetto.squadra = squadraDi(stato, l.id, id => nomeDi(stato, id)); l.progetto.ritmo = ritmoCantiere(stato, l.id); } return l; }), impresa: vistaImpresa(stato), listinoTerreni: listinoTerreni(), appartamenti: vistaAppartamenti(stato), banca: vistaBanca(stato),
     classifica: Object.entries(stato.punti || {}).sort((a, b) => b[1] - a[1]).slice(0, 10),
     vita: vistaVita(stato),
     partite: vistaPartite(stato, adesso),

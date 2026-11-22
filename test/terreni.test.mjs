@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { nuovoStato, passo, percezione, vistaPubblica, normalizzaAzione, giocatoreTerreno, giocatoreTurno, giocatoreVende, promptDiSistema, SCHEMA, STANZE, sincronizzaTerreni } from '../agenti/motore.mjs';
 import { LOTTI, LOTTO, geometria, costoProgetto, cantiereAperto, finePrevista, passoCantieri, PROGETTI, REGOLE_TERRENI, listinoDi, negoziDeiLotti, vistaTerreni, PREZZO_MAX } from '../agenti/terreni.mjs';
 import { CLIENTI, persuasione } from '../agenti/negozi.mjs';
+import { passoImpresa, ritmoCantiere, squadraDi, demoAlLavoro, risparmiDemo, inCercaDiLavoro } from '../agenti/impresa.mjs';
 import { NEGOZI } from '../agenti/negozi.mjs';
 
 let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -135,5 +136,29 @@ async function scorri(s, da, minuti, passoS = 30) { let t = da; for (let i = 0; 
   const dante = CLIENTI.find(x => x.nome === 'Dante') || CLIENTI[0], frase = 'Ciao, caffe buonissimo, un vero affare per te!';
   ok(persuasione(dante, neg, caffe, 9, frase).p < persuasione(dante, neg, [caffe[0], 6, caffe[2], 6], 6, frase).p, 'il prezzo alto convince meno');
   ok(listinoDi('bar', { Panino: 1 }).find(x => x[0] === 'Panino')[1] === 6 && PREZZO_MAX === 3, 'non meno della meta\' del normale');
+}
+
+// Edilborgo, l'impresa edile: la mattina assume gli abitanti demo, il cantiere va al ritmo della squadra
+{
+  const s = nuovoStato(ROMA(23, 7));
+  giocatoreTerreno(s, 'Ugo', { azione: 'compra', lotto: 'lotto3', soldi: 99999 }, ROMA(23, 7));
+  giocatoreTerreno(s, 'Ugo', { azione: 'costruisci', tipo: 'villa', soldi: 99999 }, ROMA(23, 7));
+  ok(!passoImpresa(s, ROMA(23, 7), 60).length && ritmoCantiere(s, 'lotto3') === 0, 'prima delle 8 nessuno lavora');
+  const ev = passoImpresa(s, ROMA(23, 8, 1), 60);
+  ok(ev.filter(e => e.tipo === 'assunto').length === 3 && ritmoCantiere(s, 'lotto3') === 1, 'alle 8 assume i 3 operai della villa');
+  const sq = squadraDi(s, 'lotto3');
+  ok(sq.length === 3 && sq.every(o => o.tipo === 'demo' && CLIENTI.some(c => c.demo === o.demo)) && sq[0].ruolo === 'capocantiere', 'la squadra e\' fatta di abitanti veri del borgo');
+  ok(demoAlLavoro(s).size === 3, 'chi lavora non va a fare la spesa');
+  passoImpresa(s, ROMA(23, 12), 3600); ok(risparmiDemo(s, sq[0].demo) >= 30, 'un\'ora di lavoro = 30 Starlight di paga');
+  passoImpresa(s, ROMA(23, 18), 60); ok(ritmoCantiere(s, 'lotto3') === 0 && demoAlLavoro(s).size === 0, 'la sera tornano a casa');
+  ok(inCercaDiLavoro('2026-11-23')[0].demo !== inCercaDiLavoro('2026-11-24')[0].demo || inCercaDiLavoro('2026-11-23')[1].demo !== inCercaDiLavoro('2026-11-24')[1].demo, 'ogni giorno chiama gente diversa');
+  // senza squadra il cantiere e' fermo, con mezza squadra va a meta'
+  const p = s.terreni.lotto3.progetto, f0 = p.fatte;
+  passoCantieri(s, ROMA(23, 10), 3600, id => ritmoCantiere(s, id)); ok(p.fatte === f0, 'senza operai il cantiere e\' fermo');
+  passoImpresa(s, ROMA(24, 9), 60); s.impresa.squadre.lotto3.pop();
+  passoCantieri(s, ROMA(24, 10), 3600, id => ritmoCantiere(s, id)); ok(Math.abs(p.fatte - f0 - 2 / 3) < 0.01, 'con 2 operai su 3 va ai due terzi');
+  // nel motore: la vista del gioco mostra la squadra
+  const v = vistaPubblica(s, ROMA(24, 10)).terreni.find(l => l.id === 'lotto3').progetto;
+  ok(v.squadra && v.squadra.length === 2 && v.ritmo > 0.6 && vistaPubblica(s, ROMA(24, 10)).impresa.nome === 'Edilborgo', 'il gioco vede la squadra e il ritmo');
 }
 console.log(`terreni: ${n} controlli passati`);

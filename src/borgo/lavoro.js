@@ -44,9 +44,9 @@
     const el = S.el; if (!el) return;
     const d = dati(), corpo = el.querySelector('.lv-corpo');
     if (!d) { corpo.innerHTML = '<div style="font-size:18px;font-weight:700">📋 Cerchiamo personale</div><p>Il borgo degli agenti non risponde: riprova tra poco.</p>'; return; }
-    const tutti = Object.entries(d.mestieri), qui = S.dove ? tutti.filter(([, m]) => m.stanza === S.dove) : tutti;
+    const tutti = Object.entries(d.mestieri), qui = S.dove === 'impresa' ? tutti.filter(([k]) => k === 'muratore') : S.dove ? tutti.filter(([, m]) => m.stanza === S.dove) : tutti;
     const h = ora();
-    let s = `<div style="font-size:19px;font-weight:700">📋 Cerchiamo personale${S.dove && app().stanze[S.dove] ? ' · ' + esc(app().stanze[S.dove].nome) : ''}</div>
+    let s = (S.dove === 'impresa' && B.Impresa ? B.Impresa.intestazione() : '') + `<div style="font-size:19px;font-weight:700">📋 Cerchiamo personale${S.dove === 'impresa' ? ' · Edilborgo' : S.dove && app().stanze[S.dove] ? ' · ' + esc(app().stanze[S.dove].nome) : ''}</div>
       <div style="opacity:.85;font-size:12px;margin:2px 0 8px">Turno di ${d.turnoGiocatoreMin} minuti, paga ${d.pagaGiocatoreMin} ${SL()} al minuto (${d.turnoGiocatoreMin * d.pagaGiocatoreMin} a turno). Quello che fai resta nel borgo, per tutti: lo vedono anche Ada e Teo. Orari di Roma.</div>`;
     if (S.mio) {
       const m = d.mestieri[S.mio.mestiere], resta = Math.max(0, Math.ceil((S.mio.fine - Date.now()) / 60000));

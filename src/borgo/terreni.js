@@ -58,7 +58,157 @@
     for (let i = 0; i < 900; i++) { const v = Math.random(); x.fillStyle = prato ? (v < 0.5 ? '#5f7a3e' : '#86a05a') : (v < 0.5 ? '#6a543d' : v < 0.85 ? '#8c7356' : '#a8977e'); x.fillRect(Math.random() * 256, Math.random() * 256, 2 + Math.random() * 4, 2 + Math.random() * 3); }
     const t = B.tex(cv, true); t.repeat.set(2, 2.5); terre[k] = t; return t;
   }
-  function chiave(l) { const p = l.progetto; return [l.chi ? l.chi.id : '', l.asta ? 'A' + l.prezzo : '', p ? p.tipo + p.nome + p.fase + p.colore + (p.insegna || '') + (p.finito ? 'F' : Math.floor(p.fatte / p.ore * 20)) : ''].join('|'); }
+  function chiave(l) { const p = l.progetto; return [l.chi ? l.chi.id : '', l.asta ? 'A' + l.prezzo : '', p ? p.tipo + p.nome + p.fase + p.colore + (p.insegna || '') + (p.squadra ? 's' + Math.min(1, p.squadra.length) : '') + (p.finito ? 'F' : Math.floor(p.fatte / p.ore * 20)) : ''].join('|'); }
+
+  // il cantiere a fasi, come uno vero (Boris: "si veda che si sta costruendo una vera e propria costruzione"):
+  // scavo con la ruspa, getto delle fondamenta con la betoniera, muri di mattoni che salgono fila per fila,
+  // la gru che porta su travi e tegole, l'imbianchino che dipinge, l'insegna coperta dal telo.
+  // Restituisce la funzione che anima le macchine (gira solo quando il cantiere e' aperto).
+  const texCache = {};
+  function texMattoni() {
+    if (texCache.m) return texCache.m;
+    const [cv, x] = B.tela(128, 128); x.fillStyle = '#c9c2b4'; x.fillRect(0, 0, 128, 128);
+    for (let r = 0; r < 8; r++) for (let c = -1; c < 4; c++) { const v = Math.random(); x.fillStyle = v < 0.33 ? '#b0563a' : v < 0.66 ? '#a44c32' : '#bb6244'; x.fillRect(c * 40 + (r % 2) * 20 + 2, r * 16 + 2, 36, 12); }
+    return (texCache.m = B.tex(cv, true));
+  }
+  function texTelo(testo) {
+    const [cv, x] = B.tela(512, 128); x.fillStyle = '#f6f2ea'; x.fillRect(0, 0, 512, 128);
+    x.strokeStyle = '#d8d0c0'; x.lineWidth = 4; for (let i = 0; i < 6; i++) { x.beginPath(); x.moveTo(i * 90, 0); x.lineTo(i * 90 + 30, 128); x.stroke(); }
+    x.fillStyle = '#5a4a3a'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = 'bold 44px sans-serif'; x.fillText(testo, 256, 64, 490);
+    return B.tex(cv);
+  }
+  function figura(col) {
+    // un operaio di Edilborgo (quando non ci sono gli abitanti veri: il gruista nella cabina, o senza dati dal borgo)
+    const o = new T.Group();
+    o.add(mesh(new T.CylinderGeometry(0.22, 0.26, 0.75, 10), M(col), { y: 0.75, l: 0.01 }));
+    [-0.1, 0.1].forEach(dx => o.add(mesh(new T.BoxGeometry(0.12, 0.4, 0.14), M('#34405a'), { x: dx, y: 0.2, l: 0.006 })));
+    o.add(mesh(new T.SphereGeometry(0.19, 12, 10), M('#f1c79a'), { y: 1.3, l: 0.008 }));
+    o.add(mesh(new T.SphereGeometry(0.22, 12, 8, 0, PI * 2, 0, PI / 2), M('#ffd21c'), { y: 1.36, l: 0.008 }));
+    const braccio = new T.Group(); braccio.position.set(0.28, 1.0, 0); braccio.add(mesh(new T.BoxGeometry(0.09, 0.45, 0.09), M(col), { y: -0.2, l: 0.006 }));
+    braccio.add(mesh(new T.BoxGeometry(0.06, 0.06, 0.32), M('#777'), { y: -0.42, z: 0.12, l: 0.004 })); o.add(braccio);
+    o.braccio = braccio; return o;
+  }
+  function cantiere3D(g, l, p, box, ost) {
+    const geo = l.geo, r = geo.rect, e = geo.edificio, k = p.fatte / p.ore, anim = [];
+    const pal = p.tipo === 'villa' ? VILLA : COLORI, c = pal[(p.colore || 0) % pal.length];
+    const fase = k < 0.06 ? 'scavo' : k < 0.15 ? 'fondamenta' : k < 0.55 ? 'muri' : k < 0.8 ? 'tetto' : 'finiture';
+    const x0 = e.x - e.w / 2, x1 = e.x + e.w / 2, zF = e.z - e.d / 2, zB = e.z + e.d / 2;
+    // --- lo scavo: la buca e il mucchio di terra
+    if (fase === 'scavo') {
+      const q = k / 0.06;
+      const buca = new T.Mesh(new T.PlaneGeometry(e.w * (0.5 + 0.5 * q), e.d * (0.5 + 0.5 * q)), new T.MeshToonMaterial({ color: new T.Color('#4a3626'), gradientMap: M('#fff').gradientMap, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      buca.rotation.x = -PI / 2; buca.position.set(e.x, 0.02, e.z); g.add(buca);
+      const mucchio = mesh(new T.ConeGeometry(0.8 + q * 1.1, 0.5 + q * 0.9, 9), M('#7a5a3c'), { x: x1 + 0.9, y: (0.5 + q * 0.9) / 2, z: zB - 0.6, l: 0.01 }); g.add(mucchio);
+    } else {
+      // --- le fondamenta: la cassaforma di legno e il getto di cemento
+      const qf = fase === 'fondamenta' ? (k - 0.06) / 0.09 : 1;
+      box(e.w + 0.4, 0.06 + 0.26 * qf, e.d + 0.4, qf < 1 ? '#9a958c' : '#a9a39a', e.x, (0.06 + 0.26 * qf) / 2, e.z, 0.02);
+      if (fase === 'fondamenta') { [[e.w + 0.6, 0.06, 0, -1], [e.w + 0.6, 0.06, 0, 1], [0.06, e.d + 0.6, -1, 0], [0.06, e.d + 0.6, 1, 0]].forEach(([w, d, sx, sz]) => box(w, 0.4, d, '#c89a5a', e.x + sx * (e.w / 2 + 0.3), 0.2, e.z + sz * (e.d / 2 + 0.3), 0.006)); }
+    }
+    // --- i muri: file di mattoni (e alla fine l'intonaco colorato che sale con l'imbianchino)
+    const muri = Math.max(0, Math.min(1, (k - 0.15) / 0.4)), H = 4.5;
+    if (muri > 0) {
+      const file = Math.max(1, Math.round(muri * 18)), h = file * H / 18, fw = (e.w - 1.3) / 2;
+      const pittura = fase === 'finiture' ? Math.min(1, (k - 0.8) / 0.17) : 0;
+      const muro = (w, hh, d, x, y, z) => {
+        const tm = texMattoni().clone(); tm.needsUpdate = true; tm.repeat.set(Math.max(w, d) / 1.2, hh / 1.2);
+        const m = mesh(new T.BoxGeometry(w, hh, d), new T.MeshToonMaterial({ map: tm, gradientMap: M('#fff').gradientMap }), { x, y, z, lb: 0.02 }); g.add(m);
+        if (pittura > 0) { const hp = hh * pittura; const v = mesh(new T.BoxGeometry(w + 0.04, hp, d + 0.04), M(c.muro), { x, y: y - hh / 2 + hp / 2, z, lb: 0.02 }); g.add(v); }
+      };
+      [-1, 1].forEach(sg => muro(fw, h, 0.25, e.x + sg * (0.65 + fw / 2), 0.32 + h / 2, zF + 0.12));
+      if (h > 2.3) muro(1.3, h - 2.3, 0.25, e.x, 0.32 + 2.3 + (h - 2.3) / 2, zF + 0.12);
+      muro(e.w, h, 0.25, e.x, 0.32 + h / 2, zB - 0.12);
+      muro(0.25, h, e.d - 0.5, x0 + 0.12, 0.32 + h / 2, e.z);
+      muro(0.25, h, e.d - 0.5, x1 - 0.12, 0.32 + h / 2, e.z);
+      // le finestre: vani scuri, poi i vetri nelle finiture
+      if (h > 1.6) [-1, 1].forEach(sg => { const f = new T.Mesh(new T.PlaneGeometry(1.0, 0.9), new T.MeshBasicMaterial({ color: fase === 'finiture' ? '#bfe3f0' : '#2a2420' })); f.position.set(e.x + sg * (0.65 + fw / 2), 1.6, zF - 0.02); f.rotation.y = PI; g.add(f); });
+      // le impalcature
+      const HS = 0.32 + h + 0.7;
+      [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1]].forEach(q => box(0.07, HS, 0.07, '#9aa0a8', e.x + q[0] * (e.w / 2 + 0.5), HS / 2, e.z + q[1] * (e.d / 2 + 0.5), 0.006));
+      for (let y = 1.2; y < HS; y += 1.5) { box(e.w + 1, 0.06, 0.3, '#c8a060', e.x, y, zF - 0.5, 0.006); box(e.w + 1, 0.06, 0.3, '#c8a060', e.x, y, zB + 0.5, 0.006); }
+      // l'insegna, coperta da un telo fino all'apertura
+      if (fase === 'finiture' && h > 3.4) { const t = new T.Mesh(new T.PlaneGeometry(2.6, 0.62), new T.MeshBasicMaterial({ map: texTelo(p.tipo === 'negozio' ? 'Prossima apertura' : 'Presto: ' + p.nome) })); t.position.set(e.x, 3.25, zF - 0.62); t.rotation.y = PI; g.add(t); }
+    }
+    // --- il tetto: prima le travi di legno, poi le tegole
+    const tetto = Math.max(0, Math.min(1, (k - 0.55) / 0.25));
+    if (tetto > 0) {
+      const yT = 0.32 + H;
+      const travi = Math.max(1, Math.round(Math.min(1, tetto * 2) * 7));
+      const tegole = Math.max(0, (tetto - 0.5) * 2);
+      if (tegole < 0.6) for (let i = 0; i < travi; i++) { const z = zF + 0.3 + i * (e.d - 0.6) / 6; box(e.w + 0.4, 0.14, 0.14, '#8a5a35', e.x, yT + 0.75, z, 0.006); }
+      if (tegole < 0.6) { box(0.16, 1.5, 0.16, '#8a5a35', e.x, yT + 0.75, zF + 0.3, 0.006); box(0.16, 1.5, 0.16, '#8a5a35', e.x, yT + 0.75, zB - 0.3, 0.006); }
+      if (tegole > 0) {
+        const cono = mesh(new T.ConeGeometry(Math.hypot(e.w, e.d) / 2 + 0.3, 1.6, 4, 1, true), M(c.tetto), { x: e.x, y: yT + 0.8, z: e.z, l: 0.02 });
+        cono.rotation.y = PI / 4; cono.scale.set(e.w / Math.hypot(e.w, e.d) * 1.4, tegole, e.d / Math.hypot(e.w, e.d) * 1.4); cono.position.y = yT + 0.8 * tegole; g.add(cono);
+      }
+    }
+    // --- le macchine
+    // la ruspa: scava nello scavo, poi resta parcheggiata in un angolo
+    const ruspa = new T.Group(), sc = fase === 'scavo';
+    ruspa.position.set(sc ? x0 - 0.2 : r.x0 + 1.3, 0, sc ? zF - 1.4 : r.z1 - 1.6); ruspa.rotation.y = sc ? PI * 0.25 : PI * 0.5; g.add(ruspa);
+    ruspa.add(mesh(new T.BoxGeometry(1.5, 0.35, 0.9), M('#3a3a3a'), { y: 0.2, lb: 0.008 }));
+    const torretta = new T.Group(); torretta.position.y = 0.38; ruspa.add(torretta);
+    torretta.add(mesh(new T.BoxGeometry(1.2, 0.5, 0.85), M('#f2b81c'), { y: 0.25, lb: 0.008 }));
+    torretta.add(mesh(new T.BoxGeometry(0.55, 0.6, 0.7), M('#f2b81c'), { x: -0.25, y: 0.8, lb: 0.008 }));
+    const vetro = new T.Mesh(new T.PlaneGeometry(0.5, 0.4), new T.MeshBasicMaterial({ color: '#9fd3e8' })); vetro.position.set(0.03, 0.85, 0); vetro.rotation.y = PI / 2; torretta.add(vetro);
+    const brA = new T.Group(); brA.position.set(0.5, 0.45, 0); torretta.add(brA);
+    brA.add(mesh(new T.BoxGeometry(1.3, 0.16, 0.16), M('#e0a818'), { x: 0.6, lb: 0.006 }));
+    const brB = new T.Group(); brB.position.x = 1.25; brA.add(brB);
+    brB.add(mesh(new T.BoxGeometry(0.14, 0.9, 0.14), M('#e0a818'), { y: -0.4, lb: 0.006 }));
+    brB.add(mesh(new T.BoxGeometry(0.4, 0.25, 0.4), M('#555'), { y: -0.9, lb: 0.006 }));
+    brA.rotation.z = 0.5;
+    ost.push({ t: 'c', x: ruspa.position.x, z: ruspa.position.z, r: 0.9 });
+    if (sc) anim.push(t => { torretta.rotation.y = Math.sin(t * 0.6) * 0.5; brA.rotation.z = 0.35 + Math.sin(t * 1.2) * 0.3; brB.rotation.z = -0.4 + Math.sin(t * 1.2 + 1) * 0.35; });
+    // la betoniera che gira
+    const bet = new T.Group(); bet.position.set(r.x1 - 1.0, 0, r.z0 + 2.2); g.add(bet);
+    bet.add(mesh(new T.BoxGeometry(0.9, 0.35, 0.6), M('#5a5a5a'), { y: 0.25, lb: 0.006 }));
+    const tamburo = mesh(new T.CylinderGeometry(0.3, 0.45, 0.8, 12), M('#e07a2a'), { y: 0.85, l: 0.01 }); tamburo.rotation.z = 0.7; bet.add(tamburo);
+    anim.push((t, dt) => { tamburo.rotation.y += dt * 2.2; });
+    ost.push({ t: 'c', x: bet.position.x, z: bet.position.z, r: 0.6 });
+    // il bancale di mattoni: si svuota man mano che i muri salgono
+    const pile = Math.max(0, Math.round((1 - muri) * 4)); box(0.9, 0.12, 0.9, '#8a6a4a', r.x1 - 1.0, 0.06, r.z0 + 4.0, 0.006);
+    for (let i = 0; i < pile; i++) { const m = mesh(new T.BoxGeometry(0.8, 0.2, 0.8), new T.MeshToonMaterial({ map: texMattoni(), gradientMap: M('#fff').gradientMap }), { x: r.x1 - 1.0, y: 0.22 + i * 0.2, z: r.z0 + 4.0, lb: 0.006 }); g.add(m); }
+    // la gru: arriva con i muri, porta su travi e tegole, se ne va alle finiture
+    if (muri > 0.2 && fase !== 'finiture') {
+      const gx = x1 + 1.1, gz = zB + 1.0, HG = 9.5;
+      for (let i = 0; i < 4; i++) { const a = (i + 0.5) * PI / 2; box(0.06, HG, 0.06, '#e8c21c', gx + Math.cos(a) * 0.25, HG / 2, gz + Math.sin(a) * 0.25, 0.004); }
+      for (let y = 0.8; y < HG; y += 1.2) box(0.5, 0.05, 0.5, '#e8c21c', gx, y, gz, 0.004);
+      const braccio = new T.Group(); braccio.position.set(gx, HG, gz); g.add(braccio);
+      braccio.add(mesh(new T.BoxGeometry(9, 0.3, 0.3), M('#f2cc22'), { x: 2.5, lb: 0.006 }));
+      braccio.add(mesh(new T.BoxGeometry(1.0, 0.7, 0.6), M('#d0d0d0'), { x: -1.6, y: -0.2, lb: 0.006 }));   // il contrappeso
+      const cabina = mesh(new T.BoxGeometry(0.6, 0.6, 0.6), M('#f2cc22'), { x: 0.2, y: -0.5, lb: 0.006 }); braccio.add(cabina);
+      const gruista = figura('#e8781e'); gruista.scale.setScalar(0.35); gruista.position.set(0.2, -0.75, 0); braccio.add(gruista);
+      const carrello = new T.Group(); carrello.position.x = 4; braccio.add(carrello);
+      const cavo = mesh(new T.BoxGeometry(0.03, 1, 0.03), M('#333'), { y: -0.5, l: 0 }); carrello.add(cavo);
+      const carico = new T.Group(); carrello.add(carico);
+      carico.add(fase === 'tetto' ? mesh(new T.BoxGeometry(2.2, 0.14, 0.14), M('#8a5a35'), { lb: 0.006 }) : mesh(new T.BoxGeometry(0.7, 0.4, 0.7), new T.MeshToonMaterial({ map: texMattoni(), gradientMap: M('#fff').gradientMap }), { lb: 0.006 }));
+      ost.push({ t: 'c', x: gx, z: gz, r: 0.45 });
+      // gira tra il bancale dei mattoni e il centro dell'edificio, cala il carico e torna
+      const dir = (x, z) => Math.atan2(-(z - gz), x - gx);
+      const aBanc = dir(r.x1 - 1.0, r.z0 + 4.0), aCasa = dir(e.x, e.z), dBanc = Math.hypot(r.x1 - 1.0 - gx, r.z0 + 4.0 - gz), dCasa = Math.hypot(e.x - gx, e.z - gz);
+      anim.push(t => {
+        const c = (t % 24) / 24, s = x => x * x * (3 - 2 * x);
+        let a, d, cala;
+        if (c < 0.2) { a = aBanc; d = dBanc; cala = 1 - Math.abs(c - 0.1) / 0.1; }
+        else if (c < 0.5) { const q = s((c - 0.2) / 0.3); a = aBanc + (aCasa - aBanc) * q; d = dBanc + (dCasa - dBanc) * q; cala = 0; }
+        else if (c < 0.7) { a = aCasa; d = dCasa; cala = (1 - Math.abs(c - 0.6) / 0.1) * 0.6; }
+        else { const q = s((c - 0.7) / 0.3); a = aCasa + (aBanc - aCasa) * q; d = dCasa + (dBanc - dCasa) * q; cala = 0; }
+        braccio.rotation.y = a; carrello.position.x = Math.max(0.6, Math.min(6.8, d));
+        const L = 2 + cala * (HG - 3); cavo.scale.y = L; cavo.position.y = -L / 2; carico.position.y = -L - 0.2;
+        carico.visible = !(c > 0.62 && c < 0.7);
+      });
+    }
+    // l'imbianchino sulla scala, alle finiture
+    if (fase === 'finiture') {
+      const sx = e.x - 1.6, sz = zF - 0.95;
+      [-0.22, 0.22].forEach(dx => box(0.06, 2.6, 0.06, '#c8c8c8', sx + dx, 1.3, sz, 0.004));
+      for (let y = 0.3; y < 2.6; y += 0.4) box(0.5, 0.04, 0.05, '#c8c8c8', sx, y, sz, 0.004);
+      const im = figura('#f4f4f4'); im.position.set(sx, 1.2, sz - 0.25); im.rotation.y = 0; g.add(im);
+      anim.push(t => { im.braccio.rotation.x = -1.2 + Math.sin(t * 5) * 0.5; });
+    }
+    ost.push({ t: 'b', x0: x0 - 0.6, x1: x1 + 0.6, z0: zF - 0.6, z1: zB + 0.6 });
+    return { anim, fase };
+  }
 
   function costruisciLotto(l) {
     const app = S.app, g = new T.Group(), geo = l.geo, r = geo.rect, p = l.progetto, ost = [];
@@ -91,48 +241,22 @@
     const e = geo.edificio;
     let edificio = null, anim = null;
     if (p && !p.finito) {
-      // il cantiere: platea di cemento, muri che salgono, impalcature, poi il tetto
-      const k = p.fatte / p.ore, muri = Math.max(0, Math.min(1, (k - 0.15) / 0.4)), tetto = Math.max(0, Math.min(1, (k - 0.55) / 0.25));
-      box(e.w + 0.4, 0.3, e.d + 0.4, '#a9a39a', e.x, 0.15, e.z, 0.02);
-      if (muri > 0) {
-        const h = 0.2 + muri * 4.5, mt = COLORI[p.colore % COLORI.length].muro;
-        const fw = (e.w - 1.3) / 2;   // la facciata ha il vano della porta
-        [-1, 1].forEach(sg => box(fw, h, 0.25, k > 0.8 ? mt : '#b0614a', e.x + sg * (0.65 + fw / 2), 0.3 + h / 2, e.z - e.d / 2 + 0.12, 0.02));
-        if (h > 2.3) box(1.3, h - 2.3, 0.25, k > 0.8 ? mt : '#b0614a', e.x, 0.3 + 2.3 + (h - 2.3) / 2, e.z - e.d / 2 + 0.12, 0.02);
-        box(e.w, h, 0.25, k > 0.8 ? mt : '#b0614a', e.x, 0.3 + h / 2, e.z + e.d / 2 - 0.12, 0.02);
-        box(0.25, h, e.d, k > 0.8 ? mt : '#b0614a', e.x - e.w / 2 + 0.12, 0.3 + h / 2, e.z, 0.02);
-        box(0.25, h, e.d, k > 0.8 ? mt : '#b0614a', e.x + e.w / 2 - 0.12, 0.3 + h / 2, e.z, 0.02);
-        // impalcature
-        const H = 0.3 + h + 0.6;
-        [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1]].forEach(q => box(0.07, H, 0.07, '#9aa0a8', e.x + q[0] * (e.w / 2 + 0.5), H / 2, e.z + q[1] * (e.d / 2 + 0.5), 0.006));
-        for (let y = 1.2; y < H; y += 1.5) { box(e.w + 1, 0.06, 0.3, '#c8a060', e.x, y, e.z - e.d / 2 - 0.5, 0.006); box(e.w + 1, 0.06, 0.3, '#c8a060', e.x, y, e.z + e.d / 2 + 0.5, 0.006); }
-      }
-      if (tetto > 0) {
-        const cono = mesh(new T.ConeGeometry(Math.hypot(e.w, e.d) / 2 + 0.3, 1.6 * tetto, 4, 1, true), M(COLORI[p.colore % COLORI.length].tetto), { x: e.x, y: 4.95 + 0.8 * tetto, z: e.z, l: 0.02 });
-        cono.rotation.y = PI / 4; cono.scale.set(e.w / Math.hypot(e.w, e.d) * 1.4, 1, e.d / Math.hypot(e.w, e.d) * 1.4); g.add(cono);
-      }
-      // betoniera e mattoni
-      const bet = mesh(new T.CylinderGeometry(0.35, 0.5, 0.8, 12), M('#e07a2a'), { x: r.x0 + 1, y: 0.8, z: r.z0 + 2.2, l: 0.01 }); bet.rotation.z = 0.6; g.add(bet);
-      box(0.8, 0.4, 0.8, '#b0563a', r.x1 - 1, 0.2, r.z0 + 1.5);
-      // gli operai col caschetto giallo: lavorano solo quando il cantiere e' aperto (lun-sab 8-17, ora di Roma)
+      const cz = cantiere3D(g, l, p, box, ost);
+      // senza la squadra dal borgo (servizio vecchio o non raggiungibile) lavorano tre operai di Edilborgo disegnati qui;
+      // con la squadra, gli operai sono gli abitanti veri (vedi squadre() piu' sotto)
       const operai = [];
-      [[e.x - e.w / 2 - 0.9, e.z - e.d / 2 - 1.1], [e.x + 1.2, e.z - e.d / 2 - 1.3], [e.x + e.w / 2 + 0.9, e.z + 0.5]].forEach((q, i) => {
-        const o = new T.Group(); o.position.set(q[0], 0, q[1]);
-        const corpo = mesh(new T.CylinderGeometry(0.22, 0.26, 0.75, 10), M(i === 1 ? '#3a6ea8' : '#e8781e'), { y: 0.75, l: 0.01 }); o.add(corpo);
-        [-0.1, 0.1].forEach(dx => o.add(mesh(new T.BoxGeometry(0.12, 0.4, 0.14), M('#34405a'), { x: dx, y: 0.2, l: 0.006 })));
-        o.add(mesh(new T.SphereGeometry(0.19, 12, 10), M('#f1c79a'), { y: 1.3, l: 0.008 }));
-        const casco = mesh(new T.SphereGeometry(0.22, 12, 8, 0, PI * 2, 0, PI / 2), M('#ffd21c'), { y: 1.36, l: 0.008 }); o.add(casco);
-        const braccio = new T.Group(); braccio.position.set(0.28, 1.0, 0); braccio.add(mesh(new T.BoxGeometry(0.09, 0.45, 0.09), M(i === 1 ? '#3a6ea8' : '#e8781e'), { y: -0.2, l: 0.006 }));
-        braccio.add(mesh(new T.BoxGeometry(0.06, 0.06, 0.32), M('#777'), { y: -0.42, z: 0.12, l: 0.004 })); o.add(braccio);
-        o.lookAt(e.x, 0, e.z); g.add(o); operai.push({ o, braccio, k: i * 1.7 });
+      if (!p.squadra) [[e.x - e.w / 2 - 0.9, e.z - e.d / 2 - 1.1], [e.x + 1.2, e.z - e.d / 2 - 1.3], [e.x + e.w / 2 + 0.9, e.z + 0.5]].forEach((q, i) => {
+        const o = figura(i === 1 ? '#3a6ea8' : '#e8781e'); o.position.set(q[0], 0, q[1]); o.lookAt(e.x, 0, e.z); g.add(o); operai.push({ o, braccio: o.braccio, k: i * 1.7 });
+        ost.push({ t: 'c', x: q[0], z: q[1], r: 0.35 });
       });
+      // le macchine e gli operai lavorano solo quando il cantiere e' aperto (lun-sab 8-17, ora di Roma)
       let ultimo = -1, aperto = false;
-      anim = t => {
-        if (t - ultimo > 20) { ultimo = t; aperto = cantiereAperto(Date.now()); operai.forEach(w => { w.o.visible = aperto; }); }
-        if (aperto) operai.forEach(w => { w.braccio.rotation.x = -0.4 + Math.sin(t * 6 + w.k) * 0.7; w.o.position.y = Math.abs(Math.sin(t * 3 + w.k)) * 0.03; });
+      anim = (t, dt) => {
+        if (t - ultimo > 20 || ultimo < 0) { ultimo = t; aperto = cantiereAperto(Date.now()) && (!p.squadra || p.squadra.length > 0); operai.forEach(w => { w.o.visible = aperto; }); }
+        if (!aperto) return;
+        cz.anim.forEach(f => f(t, dt));
+        operai.forEach(w => { w.braccio.rotation.x = -0.4 + Math.sin(t * 6 + w.k) * 0.7; w.o.position.y = Math.abs(Math.sin(t * 3 + w.k)) * 0.03; });
       };
-      ost.push(...operai.map(w => ({ t: 'c', x: w.o.position.x, z: w.o.position.z, r: 0.35 })));
-      ost.push({ t: 'b', x0: e.x - e.w / 2 - 0.6, x1: e.x + e.w / 2 + 0.6, z0: e.z - e.d / 2 - 0.6, z1: e.z + e.d / 2 + 0.6 });
     } else if (p && p.finito && B.edificioPiazza) {
       const c = p.tipo === 'villa' ? VILLA[p.colore % VILLA.length] : COLORI[p.colore % COLORI.length];
       edificio = B.edificioPiazza({ x: e.x, z: e.z, rot: PI, w: e.w, d: e.d, nome: p.nome, muro: c.muro, muroSopra: c.muroSopra, tetto: c.tetto, persiane: c.persiane, tendaA: '#f6e8cc', tendaB: c.tendaB, porta: 0, insegnaStile: p.insegna, tendaLarg: p.tipo === 'villa' ? 4.2 : 3.4 });
@@ -328,7 +452,7 @@
   }
 
   /* ---------- il progettista: cosa costruisci e come lo vuoi, passo per passo ---------- */
-  const FASI = { fondamenta: 'si scavano le fondamenta', muri: 'si alzano i muri', tetto: 'si mette il tetto', finiture: 'finiture: intonaco, vetrine, insegna' };
+  const FASI = { fondamenta: 'scavo e getto delle fondamenta', muri: 'si alzano i muri', tetto: 'si mette il tetto', finiture: 'finiture: intonaco, vetrine, insegna' };
   const INS_CSS = {
     legno: 'background:#6a3f27;border:3px solid #3a2216;color:#f6d27a;font-family:Georgia,serif',
     neon: 'background:#1a1230;border:3px solid #ff4fd8;color:#7ff3ff;text-shadow:0 0 6px #4fe3ff;font-family:Trebuchet MS,sans-serif',
