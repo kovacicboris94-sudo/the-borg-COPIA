@@ -1,0 +1,47 @@
+# SPENTO: per attivarlo spostalo in .github/workflows/ (rende pubblico l'archivio nel repo pubblico).
+name: Copia l'archivio di Ada e Teo
+
+# Due volte al giorno copia l'archivio dell'esperimento (/registro del servizio degli agenti)
+# nel branch "registro-agenti", un file per giorno. Il rapporto delle 9 e delle 21 legge da li'.
+# Orari in UTC: 7:30 e 19:30 = 8:30 e 20:30 in Italia d'inverno (9:30 e 21:30 d'estate).
+on:
+  schedule:
+    - cron: '30 7 * * *'
+    - cron: '30 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: registro-agenti
+  cancel-in-progress: false
+
+jobs:
+  copia:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepara il branch dell'archivio
+        run: |
+          if git ls-remote --exit-code --heads origin registro-agenti >/dev/null; then
+            git fetch origin registro-agenti
+            git worktree add archivio origin/registro-agenti
+            git -C archivio checkout -B registro-agenti
+          else
+            git worktree add --orphan -b registro-agenti archivio
+          fi
+      - name: Copia le righe nuove
+        run: node strumenti/copia-registro.mjs https://borgo-agenti.kovacic-boris-94.workers.dev archivio/registro
+      - name: Salva
+        working-directory: archivio
+        run: |
+          git config user.name "registro-agenti"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "niente di nuovo"; exit 0; fi
+          git commit -m "Archivio di Ada e Teo: $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push origin registro-agenti
