@@ -513,8 +513,40 @@ function passeggia(ag, adesso) {
 
 // Un'azione del corpo (agenti/vita/): se il posto e' lontano ci si cammina prima (o si entra in casa / in Biblioteca),
 // poi la si ripete all'arrivo. Al massimo 3 tentativi, cosi' un posto irraggiungibile non blocca l'agente.
+// "dai" con una cosa comprata ai negozi o al Mercatino (Cioccolata calda, Cornetto, un mobile...): quelle stanno
+// nello zaino del borgo (ag.zaino), non tra le cose del corpo. Prima questo "dai" cercava solo tra le cose del corpo
+// e falliva sempre ("cosa dai?"): Teo ha provato per un giorno intero a dare la cioccolata ad Ada (22/11/2026).
+// Restituisce null se la cosa non e' nello zaino del borgo (allora decide la vita vera).
+function daiDalloZaino(stato, ag, a, adesso, regole) {
+  const z = portafoglio(ag).zaino || {}, n = s => String(s || '').toLowerCase().replace(/[’`]/g, '\'').replace(/\s+/g, ' ').trim();
+  const k = Object.keys(z).find(x => z[x] > 0 && n(x) === n(a.nome));
+  if (!k) return null;
+  const altro = stato.agenti[n(a.a)];
+  if (!altro || altro === ag) return esito(ag, `dai ${k}: a chi? metti il suo nome in "id"`);
+  if (altro.morto) return esito(ag, `dai ${k}: ${altro.nome} non c'e' piu'`);
+  if ((altro.stanza || null) !== (ag.stanza || null)) return esito(ag, `dai ${k}: ${altro.nome} non e' qui con te (e' ${altro.stanza ? 'dentro un edificio' : 'fuori'})`);
+  if (dist(ag, altro) > 3) {
+    // si va vicino e si riprova all'arrivo (al massimo 3 volte, perche' l'altro puo' spostarsi)
+    const tent = (a.tentativi || 0) + 1;
+    if (tent > 3) return esito(ag, `dai ${k}: non riesco ad avvicinarmi a ${altro.nome}`);
+    ag.coda.unshift(Object.assign({}, a, { tentativi: tent }));
+    const ang = Math.atan2(ag.x - altro.x, ag.z - altro.z);
+    ag.tx = lim(altro.x + Math.sin(ang) * 1.5, AREA.x0, AREA.x1); ag.tz = lim(altro.z + Math.cos(ang) * 1.5, AREA.z0, AREA.z1);
+    ag.meta = altro.nome; ag.ancora = null; ag.esplora = null;
+    return 'cammina';
+  }
+  z[k]--; if (z[k] <= 0) delete z[k];
+  const za = portafoglio(altro).zaino || (altro.zaino = {}); za[k] = (za[k] || 0) + 1;
+  esito(ag, `dai ${k}: fatto, ora ce l'ha ${altro.nome}`);
+  annota(ag, adesso, `Ho dato "${k}" a ${altro.nome}.`);
+  annota(altro, adesso, `${ag.nome} mi ha dato "${k}": e' nel mio zaino.`);
+  esito(altro, `${ag.nome} ti ha dato "${k}" (e' nel tuo zaino)`);
+  evento(stato, { chi: ag.id, tipo: 'gesto', testo: `ha dato "${k}" a ${altro.nome}`, x: ag.x, z: ag.z });
+}
+
 function eseguiVita(stato, ag, a, adesso, regole) {
   if (ag.morto) return;
+  if (a.tipo === 'dai' && !a.cosa && a.nome) { const d = daiDalloZaino(stato, ag, a, adesso, regole); if (d !== null) return d; }
   const r = azioneVita(stato, ag, a, adesso);
   if (r.cammina) {
     const tent = (a.tentativi || 0) + 1;

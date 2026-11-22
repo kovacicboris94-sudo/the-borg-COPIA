@@ -88,4 +88,20 @@ ok(JSON.stringify(memo).length < 2000, 'memo piccolo');
   ok(/Teo, a 3 m, sta usando: Sedia/.test(p) && !/smontando/.test(p), 'Teo seduto si vede seduto');
 }
 
+// 8) "dai" con una cosa comprata al negozio (nello zaino del borgo): Teo ha provato un giorno intero a dare la cioccolata ad Ada
+{
+  const s3 = nuovoStato(T0), a = s3.agenti.ada, t = s3.agenti.teo;
+  t.zaino = { 'Cioccolata calda': 2 }; t.stanza = null; a.stanza = null;
+  t.x = 0; t.z = 10; t.tx = 0; t.tz = 10; a.x = 12; a.z = 10; a.tx = 12; a.tz = 10;
+  const dai = { pensiero: 'Le porto la cioccolata.', azioni: [{ tipo: 'dai', nome: 'cioccolata calda', id: 'Ada' }], ricorda: '', prossimo_pensiero_minuti: 30, sforzo_prossimo: 'basso', memoria_nuova: '' };
+  const zitto = { pensiero: 'Aspetto.', azioni: [], ricorda: '', prossimo_pensiero_minuti: 60, sforzo_prossimo: 'basso', memoria_nuova: '' };
+  let primo = true;
+  const cerv = async (q) => { const v = (q.agente === 'teo' && !q.mossa && primo) ? (primo = false, dai) : zitto; return { testo: JSON.stringify(v), usage: { input_tokens: 100, output_tokens: 50 }, stop_reason: 'end_turn' }; };
+  let tt = T0;
+  for (let i = 0; i < 40 && !(a.zaino && a.zaino['Cioccolata calda']); i++) { tt += 30000; a.tx = a.x; a.tz = a.z; await passo(s3, tt, cerv); }
+  ok(a.zaino && a.zaino['Cioccolata calda'] === 1, 'Ada ha ricevuto la cioccolata: ' + JSON.stringify(a.zaino) + ' esiti Teo: ' + JSON.stringify(t.esiti));
+  ok(t.zaino['Cioccolata calda'] === 1, 'a Teo ne resta una');
+  ok(a.diario.some(d => /Teo mi ha dato "Cioccolata calda"/.test(d.s)), 'Ada lo sa (diario)');
+}
+
 console.log(`registro: ${n} prove superate`);
