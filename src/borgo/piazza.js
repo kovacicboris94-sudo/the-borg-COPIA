@@ -186,6 +186,8 @@
     defs.forEach(d => aggiungi(d, edificio(d), d.nome, d.nome === 'Casa' ? 'casa' : d.nome === 'Negozio TCG' ? 'negozio' : d.nome === 'Sala Giochi' ? 'sala' : d.insegnaLtc ? 'collectibles' : d.nome === 'Biblioteca' ? 'biblioteca' : d.insegnaScacchi ? 'scacchi' : d.casetta || null));
     porte.forEach(p => { if (p.id === 'porta-Arredamenti') { p.arredi = true; p.testo = 'Entra nel negozio di arredi'; } });
     porte.forEach(p => { if (p.verso === 'sala') p.arrivo = { x: 0, z: 12.6, yaw: PI }; if (p.verso === 'negozio') p.arrivo = { x: 0, z: 6.2, yaw: PI }; if (p.verso === 'collectibles') p.arrivo = { x: 0, z: 13.5, yaw: PI }; if (p.verso === 'biblioteca') p.arrivo = { x: 0, z: 6.0, yaw: PI }; if (p.verso === 'scacchi') { p.arrivo = { x: 0, z: 7.0, yaw: PI }; p.testo = 'Entra nella Casa degli Scacchi'; } if (B.CASETTE_AGENTI && B.CASETTE_AGENTI[p.verso]) { p.arrivo = { x: 0, z: 2.4, yaw: PI }; p.testo = 'Entra nella casa di ' + B.CASETTE_AGENTI[p.verso].chi; } });
+    // per i terreni del borgo (src/borgo/terreni.js): le case e i negozi costruiti dopo usano lo stesso edificio
+    B.edificioPiazza = o => { const n = ostacoli.length, g = edificio(o); return { g, ost: ostacoli.slice(n) }; };
     if (B.CasaScacchi) B.CasaScacchi.decoraPiazza(scene, { ostCer });
     // la Torre della Cometa, al posto della Torre dell'Orologio: piani da esplorare e il telescopio in cima (js/torre.js)
     if (B.costruisciTorreEsterna) B.costruisciTorreEsterna(scene, { anim, lancette, ostacoli, porte, edifici });

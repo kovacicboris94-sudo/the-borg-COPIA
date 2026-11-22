@@ -69,6 +69,7 @@
     A.agenti.forEach((e, id) => { if (!visti.has(id)) { app.gP.remove(e.av.root); B.liberaAvatar(e.av); A.agenti.delete(id); } });
     aggiornaOggetti(d.oggetti || []);
     aggiornaNegozi(d.negozi || []);
+    if (B.Terreni) B.Terreni.applica(d.terreni || [], d.listinoTerreni || null, app);
     messaggiPerMe(d.messaggi || []);
     if (A.scheda) disegnaScheda();
   }
@@ -301,7 +302,7 @@
       const g = new T.Group(), r = (n.bancone.rot || 0) * PI / 180, legno = new T.MeshToonMaterial({ color: '#8a5a36' }), piano = new T.MeshToonMaterial({ color: '#e9d3a8' });
       const base = new T.Mesh(new T.BoxGeometry(2.4, 0.95, 0.7), legno); base.position.y = 0.475; base.castShadow = true; g.add(base);
       const top = new T.Mesh(new T.BoxGeometry(2.6, 0.08, 0.85), piano); top.position.y = 0.99; g.add(top);
-      const lab = B.etichetta((ICONA[n.id] || '🛒') + ' ' + n.nome, { sfondo: '#fbf3dc', colore: '#3a2216', altezza: 0.34 }); lab.position.y = 1.55; g.add(lab);
+      const lab = B.etichetta((n.icona || ICONA[n.id] || '🛒') + ' ' + n.nome, { sfondo: '#fbf3dc', colore: '#3a2216', altezza: 0.34 }); lab.position.y = 1.55; g.add(lab);
       const tocco = new T.Mesh(new T.BoxGeometry(2.6, 1.6, 1.2), new T.MeshBasicMaterial()); tocco.visible = false; tocco.position.y = 0.8; g.add(tocco);
       g.position.set(n.bancone.x, 0, n.bancone.z); g.rotation.y = r; app.gP.add(g);
       const c = Math.abs(Math.cos(r)), sn = Math.abs(Math.sin(r)), hx = (2.6 * c + 0.85 * sn) / 2, hz = (2.6 * sn + 0.85 * c) / 2;
@@ -352,10 +353,12 @@
     // mentre scrivi la proposta non si ridisegna (si perderebbe il testo): si aggiorna solo il cliente
     if (mio && corpo.querySelector('.bn-testo') && corpo.dataset.cl === (o && !o.servito ? o.id : '')) { const c = corpo.querySelector('.bn-cliente'); if (c) c.innerHTML = clienteHtml(o); return; }
     corpo.dataset.cl = o && !o.servito ? o.id : '';
-    let h = `<div style="font-size:20px;font-weight:700">${ICONA[n.id] || '🛒'} ${esc(n.nome)}</div>
+    let h = `<div style="font-size:20px;font-weight:700">${n.icona || ICONA[n.id] || '🛒'} ${esc(n.nome)}</div>
       <div style="opacity:.8;font-size:12px;margin:2px 0 8px">Listino: ${n.prodotti.map(p => esc(p[0]) + ' ' + p[1]).join(' · ')}</div>`;
     if (!mio) {
       h += n.chi ? `<div>Al bancone c'è <b>${esc(n.chi.nome)}</b>${n.chi.vero ? '' : ' 🤖'} fino alle ${new Date(n.chi.fine).toTimeString().slice(0, 5)}.</div>` + (o ? `<div style="margin-top:6px">Sta servendo <b>${esc(o.nome)}</b>.</div>` : '')
+        : n.proprietario && !(n.proprietario.vero && mioNick() && n.proprietario.nome.toLowerCase() === mioNick().toLowerCase()) ? `<div>È il negozio di <b>${esc(n.proprietario.nome)}</b>${n.proprietario.vero ? '' : ' 🤖'}: al bancone lavora solo chi ne è proprietario. Ora è chiuso.</div>`
+        : n.proprietario ? `<div>È il <b>tuo negozio</b>. Fai un turno al bancone (20 minuti): arrivano i clienti del borgo, li convinci tu, e tieni l'80% del prezzo.</div>` + btn('bn-lavora', '🧑‍🍳 Apri il negozio', true)
         : `<div>Il bancone è libero. Fai un turno da venditore (20 minuti): arrivano i clienti del borgo, ognuno con il suo carattere. Non comprano da soli: li devi convincere tu, con il prodotto giusto, il prezzo e le parole giuste. A te va metà del prezzo.</div>` + btn('bn-lavora', '🧑‍🍳 Lavora qui', true);
       corpo.innerHTML = h + '<div class="bn-nota" style="font-size:12px;opacity:.85;margin-top:6px"></div>';
       const b = corpo.querySelector('.bn-lavora'); if (b) b.addEventListener('click', () => iniziaTurno(n));
@@ -401,7 +404,7 @@
         if (!q || stanzaIo() !== 'piazza' || Math.hypot(app.io.x - q.venditore.x, app.io.z - q.venditore.z) > 4) { smettiTurno(mioTurno, 'Ti sei allontanato dal bancone: turno finito'); return; }
         chiama('/turno', { negozio: mioTurno, on: true }).catch(() => { });
       }, 90000);
-      G.emetti('toast', ICONA[n.id] + ' Sei al bancone di ' + n.nome + ': aspetta i clienti!');
+      G.emetti('toast', (n.icona || ICONA[n.id] || '🛒') + ' Sei al bancone di ' + n.nome + ': aspetta i clienti!');
       setTimeout(chiedi, 200); disegnaBancone();
     } catch (e) { nota('Il borgo degli agenti non risponde, riprova tra poco.'); }
   }
@@ -645,9 +648,10 @@
   function chiudiScheda() { if (A.scheda) { A.scheda.remove(); A.scheda = null; } A.voci = null; chiudiBancone(); }
   G.su('stanza', () => { chiudiScheda(); if (app) setTimeout(chiedi, 50); });
   B.agentiToccabili = () => [...A.agenti.values()].filter(e => e.av.root.visible && e.s && qui(e.s)).map(e => ({ obj: e.av.proxy, fn: () => apriScheda(e.id) }))
-    .concat(app && app.gioco() && stanzaIo() === 'piazza' ? [...banconi.values()].map(b => ({ obj: b.tocco, fn: () => apriBancone(b.id) })) : []);
+    .concat(app && app.gioco() && stanzaIo() === 'piazza' ? [...banconi.values()].map(b => ({ obj: b.tocco, fn: () => apriBancone(b.id) })) : [])
+    .concat(app && app.gioco() && stanzaIo() === 'piazza' && B.Terreni ? B.Terreni.toccabili() : []);
 
-  A.frame = frame; A.apriScheda = apriScheda; A.applica = applica; A.apriBancone = apriBancone;
+  A.frame = frame; A.apriScheda = apriScheda; A.applica = applica; A.apriBancone = apriBancone; A.mioNick = mioNick; A.chiama = chiama; A.aggiorna = () => setTimeout(chiedi, 200);
   function aspettaApp() { if (B.app && B.app.gP) { app = B.app; chiedi(); } else setTimeout(aspettaApp, 300); }
   aspettaApp();
 })();
