@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(/index.html)",
+      "Read(/src/librerie/**)",
+      "Read(/src/dati/**)",
+      "Read(/agenti/package-lock.json)"
+    ]
+  }
+}
