@@ -24,7 +24,7 @@ import { azioneSponsor, vistaVetrine, vistaCataloghi, eModeratore, logoDi } from
 import { passoImpresa, ritmoCantiere, demoAlLavoro, risparmiDemo, spendeDemo, squadraDi, vistaImpresa, IMPRESA } from './impresa.mjs';
 import { passoBorgo, passoDipendenti, effettoMestiere, disponibile, togliScorta, scorteDi, descriviPiazza, vistaLavori, giocatoreDipendente as dipendenteDelGioco, inTurno } from './lavori.mjs';
 import { MESTIERI, cercaMestiere } from './vita/mestieri.mjs';
-import { passoVita, azioneVita, occupato, percezioneAgente, routineVita, normalizzaAzioneVita, promptVita, TIPI_VITA, bisognoUrgente, pianoPerMotore, vistaVita } from './vita/aggancio.mjs';
+import { passoVita, azioneVita, mangiaDalloZaino, occupato, percezioneAgente, routineVita, normalizzaAzioneVita, promptVita, TIPI_VITA, bisognoUrgente, pianoPerMotore, vistaVita } from './vita/aggancio.mjs';
 import { avviaPartita, passoPartite, promptMossa, SCHEMA_MOSSA, REGOLE_GIOCHI, rigaGiochi, vistaPartite } from './giochi/index.mjs';
 export const MODELLO = 'claude-haiku-5-5';
 
@@ -225,7 +225,37 @@ function annota(ag, t, s) {
   // tetto di sicurezza: il riassunto vero lo fa l'agente stesso (memoria_nuova)
   if (ag.diario.length > REGOLE.diarioMax * 2) ag.diario.splice(0, ag.diario.length - REGOLE.diarioMax * 2);
 }
-function esito(ag, s) { ag.esiti.push(testo(s, 200)); if (ag.esiti.length > 8) ag.esiti.shift(); }
+function esito(ag, s) { ag.esiti.push(testo(s, 200)); if (ag.esiti.length > 8) ag.esiti.shift(); ag.nEsiti = (ag.nEsiti || 0) + 1; }
+
+// ---- FRENO AI TENTATIVI A VUOTO ----
+// Il 22/11/2026 Teo ha ripetuto per 10 ore (114 pensieri, ~0,22 $) un "dai" che il gioco non poteva eseguire.
+// Da allora: se la stessa azione (stesso tipo, stessa cosa, stessa persona) fallisce 3 volte di fila,
+// l'agente riceve il motivo chiaro e quell'azione resta bloccata per un'ora. Costo zero: niente modello.
+export const FRENO = { fallimenti: 3, bloccoMin: 60, dimenticaDopoOre: 6 };
+const FALLITA = /rifiutat|non vendono|sconosciut|non esiste|non riesco|non c'e'|non ce l'|non e' (abbastanza|qui|piu')|non hai |non sei |non stai|non conosci|non si (mangia|beve|puo')|sei gia'|a chi\?|cosa (dai|mangi|bevi)|troppo (lontan|pien)|azione sconosciuta|chius[oa]|esaurit|finit[oie] le scorte|bloccata/i;
+export const esitoFallito = s => FALLITA.test(String(s || ''));
+const minuscolo = v => String(v == null ? '' : v).toLowerCase().replace(/[’`]/g, '\'').replace(/\s+/g, ' ').trim();
+export const firmaAzione = a => [a.tipo, a.nome || a.oggetto || a.merce || a.gioco || a.stanza || a.luogo || a.cosa || '', a.a || (a.tipo === 'usa' || a.tipo === 'rimuovi' || a.tipo === 'sposta' ? a.id : '') || ''].map(minuscolo).join('|');
+function eseguiConFreno(stato, ag, a, adesso, regole) {
+  if (a.auto || a.riflesso || a.tipo === 'di' || a.tipo === 'scrivi' || a.tipo === 'vai') return esegui(stato, ag, a, adesso, regole);
+  const firma = firmaAzione(a), F = ag.falliti || (ag.falliti = {});
+  for (const k of Object.keys(F)) if (adesso - F[k].t > FRENO.dimenticaDopoOre * 3600000 && !(F[k].fino > adesso)) delete F[k];
+  const f = F[firma];
+  if (f && f.fino > adesso) { esito(ag, `${a.tipo}${a.nome ? ' ' + a.nome : ''}: bloccata fino alle ${oraBreve(f.fino)} perche' e' fallita ${FRENO.fallimenti} volte di fila (${f.motivo}). Non riprovarla: fai altro o cambia modo.`); return; }
+  const prima = ag.nEsiti || 0; ag.vitaFallita = false;
+  const r = esegui(stato, ag, a, adesso, regole);
+  if (r === 'cammina') return r;                     // ancora in cammino: non e' ne' riuscita ne' fallita
+  const nuovi = ag.esiti.slice(-Math.min(ag.esiti.length, (ag.nEsiti || 0) - prima));
+  const male = ag.vitaFallita || nuovi.some(esitoFallito);
+  if (!male) { if (nuovi.length || f) delete F[firma]; return r; }
+  const g = F[firma] = { n: (f ? f.n : 0) + 1, t: adesso, motivo: testo(nuovi[nuovi.length - 1] || 'non riuscita', 140) };
+  if (g.n >= FRENO.fallimenti) {
+    g.fino = adesso + FRENO.bloccoMin * 60000;
+    esito(ag, `ATTENZIONE: "${a.tipo}${a.nome ? ' ' + a.nome : ''}" e' fallita ${g.n} volte di fila. Resta bloccata fino alle ${oraBreve(g.fino)}. Motivo: ${g.motivo}`);
+    annota(ag, adesso, `"${a.tipo}${a.nome ? ' ' + a.nome : ''}" non mi riesce (${g.n} volte): ${g.motivo}. Smetto di riprovarla e faccio altro.`);
+  }
+  return r;
+}
 
 /* ------------------------------------------------------------------ */
 /*  regole del mondo                                                   */
@@ -443,7 +473,7 @@ function avanza(stato, ag, dt, adesso, regole) {
     let cammina = false;
     while (ag.coda.length && !fermo()) {
       const a = ag.coda.shift();
-      if (esegui(stato, ag, a, adesso, regole) === 'cammina') { cammina = true; break; }
+      if (eseguiConFreno(stato, ag, a, adesso, regole) === 'cammina') { cammina = true; break; }
     }
     if (!cammina || resto <= 0) return;
   }
@@ -546,8 +576,17 @@ function daiDalloZaino(stato, ag, a, adesso, regole) {
 
 function eseguiVita(stato, ag, a, adesso, regole) {
   if (ag.morto) return;
-  if (a.tipo === 'dai' && !a.cosa && a.nome) { const d = daiDalloZaino(stato, ag, a, adesso, regole); if (d !== null) return d; }
-  const r = azioneVita(stato, ag, a, adesso);
+  if (a.tipo === 'dai' && a.nome) { const d = daiDalloZaino(stato, ag, a, adesso, regole); if (d !== null) return d; }
+  // le altre azioni del corpo con una cosa comprata (lascia, butta, vendi_al_mercatino, metti_sul_fuoco...): prima rispondevano
+  // "cosa lasci?" anche se la cosa era nello zaino. Ora dicono chiaro cosa si puo' fare con le cose comprate.
+  if (!a.cosa && a.nome && !['dai', 'mangia', 'bevi', 'compra', 'turno', 'casa', 'termostato', 'chiacchiera', 'svago'].includes(a.tipo)) {
+    const z = portafoglio(ag).zaino || {}, n = s => String(s || '').toLowerCase().replace(/[’`]/g, '\'').replace(/\s+/g, ' ').trim();
+    const k = Object.keys(z).find(x => z[x] > 0 && n(x) === n(a.nome));
+    if (k) { ag.vitaFallita = true; return esito(ag, `${a.tipo} ${k}: non si puo'. Le cose comprate ai negozi o al Mercatino si mangiano o si bevono (se sono cibo), si danno a qualcuno ("dai") o, se sono mobili, si posano in piazza ("metti").`); }
+  }
+  // cibo e bevande comprati ai negozi (Cioccolata calda, Cornetto, Pane del Forno...): stanno nello zaino del borgo
+  const r = ((a.tipo === 'mangia' || a.tipo === 'bevi') && a.nome && mangiaDalloZaino(stato, ag, a, adesso)) || azioneVita(stato, ag, a, adesso);
+  if (!r.cammina && r.ok === false) ag.vitaFallita = true;
   if (r.cammina) {
     const tent = (a.tentativi || 0) + 1;
     if (tent > 3) return a.auto ? undefined : esito(ag, `${a.tipo}: non riesco ad arrivare a ${r.cammina.dove || 'quel posto'}`);
@@ -1129,7 +1168,8 @@ async function pensa(stato, ag, adesso, cervello, regole) {
   // nuove decisioni: la coda vecchia si butta (il lavoro gia' iniziato invece continua)
   // ...tranne quello che il corpo sta facendo per un bisogno urgente (bere, il bagno, dormire): prima si finisce quello
   const riflessiInCorso = regole.vita ? ag.coda.filter(q => q.riflesso && !ag.morto) : [];
-  ag.coda = [...riflessiInCorso, ...azioni.map(a => normalizzaAzione(a, regole))];
+  // un'azione sbagliata tiene il suo tipo e nome: serve al freno dei tentativi a vuoto (eseguiConFreno)
+  ag.coda = [...riflessiInCorso, ...azioni.map(a => { const n = normalizzaAzione(a, regole); if (n.errore && !n.tipo) { n.tipo = String((a && a.tipo) || '').toLowerCase().trim(); n.nome = a && a.nome; } return n; })];
   if (ag.coda.length && !ag.lavoro) { ag.tx = ag.x; ag.tz = ag.z; ag.esplora = null; ag.ancora = null; }   // si smette di passeggiare: ora si fa quello che si e' deciso
   if (Array.isArray(v.azioni) && v.azioni.length > regole.maxAzioni) esito(ag, `solo le prime ${regole.maxAzioni} azioni sono state eseguite`);
   if (!ag.lavoro && ag.coda.length) avanza(stato, ag, 0, adesso, regole);

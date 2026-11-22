@@ -14,6 +14,7 @@ import { nuovoMondo, passoMondo, REGOLE_VITA } from './mondo.mjs';
 import { eseguiAzioneVita, normalizzaAzioneVita, promptAzioniVita, TIPI_VITA } from './azioni.mjs';
 import { percezioneVita, esitiLetti } from './percezione.mjs';
 import { decidiARegole } from './cervello-regole.mjs';
+import { porzioneDi, consumaPorzione, chiavePorzione } from './porzioni.mjs';
 
 export { normalizzaAzioneVita, TIPI_VITA };
 export const promptVita = promptAzioniVita;
@@ -59,10 +60,30 @@ function testoEvento(e) {
 // il motore mette un "vai" in testa alla coda e ripete l'azione all'arrivo.
 export function azioneVita(stato, ag, a, adesso) {
   const mondo = assicuraVita(stato, adesso);
-  const c = mondo.corpi[ag.id]; if (c) { c.x = ag.x; c.z = ag.z; c.stanza = ag.stanza || null; if (typeof ag.starlight === 'number') c.starlight = ag.starlight; }
+  // le posizioni di TUTTI vengono dal motore adesso, non dall'inizio del passo: prima "dai" e "chiacchiera"
+  // vedevano l'altro dov'era fino a 30 secondi fa ("troppo lontano" anche a un metro, 22/11/2026)
+  for (const o of Object.values(stato.agenti)) { const k = mondo.corpi[o.id]; if (k && !k.morto) { k.x = o.x; k.z = o.z; k.stanza = o.stanza || null; } }
+  const c = mondo.corpi[ag.id]; if (c && typeof ag.starlight === 'number') c.starlight = ag.starlight;
   const r = eseguiAzioneVita(mondo, ag.id, a, adesso);
   if (c && typeof c.starlight === 'number') ag.starlight = c.starlight;
   if (r.vai) return { cammina: { x: r.vai.x, z: r.vai.z, dove: r.vai.nome, entra: r.vai.entra || null }, esito: r.esito };
+  return r;
+}
+
+// "mangia"/"bevi" una cosa comprata ai negozi (nello zaino del borgo, ag.zaino): passa dal corpo come il cibo vero.
+// Restituisce null se quella cosa non e' nello zaino del borgo (allora decide la vita vera, come prima).
+export function mangiaDalloZaino(stato, ag, a, adesso) {
+  const z = ag.zaino || {}, k = Object.keys(z).find(x => z[x] > 0 && chiavePorzione(x) === chiavePorzione(a.nome));
+  if (!k) return null;
+  const P = porzioneDi(k);
+  if (!P) return { ok: false, esito: `${k} non si ${a.tipo === 'bevi' ? 'beve' : 'mangia'}` };
+  const mondo = assicuraVita(stato, adesso), c = mondo.corpi[ag.id];
+  if (!c || c.morto) return { ok: false, esito: 'sei morto' };
+  if (c.svenuto || c.addormentato) return { ok: false, esito: 'stai dormendo' };
+  const av = ag.avanzi || (ag.avanzi = {});
+  const r = consumaPorzione(c, k, P, av[k], adesso, a.tipo);
+  if (!r.ok) return r;
+  if (r.finita) { z[k]--; if (z[k] <= 0) delete z[k]; delete av[k]; } else av[k] = r.resta;
   return r;
 }
 

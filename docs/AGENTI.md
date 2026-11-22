@@ -42,4 +42,4 @@ Lato gioco: `src/borgo/agenti-ia.js` (scheda, cronaca, banconi, DM), `casette-ag
 Boris studia Ada e Teo come un esperimento: diario "Diario dell'esperimento: Ada e Teo" (Claude Doc). Ogni cambiamento che può cambiare il loro comportamento (prompt, regole, prezzi, ritmo) si annota nel diario come "intervento", con data e ora. Non usare mai la chiave degli agenti per analisi.
 
 ## Prove
-`cd agenti && npm ci` una volta, poi dalla radice: `node test/agenti.test.mjs`, `giochi-agenti`, `vita`, `registro`, `terreni`, `interni`, `banca` (tutti `test/*.test.mjs`).
+`cd agenti && npm ci` una volta, poi dalla radice: `node test/agenti.test.mjs`, `giochi-agenti`, `vita`, `registro`, `azioni` (tutte le azioni e il freno ai tentativi a vuoto), `terreni`, `interni`, `banca` (tutti `test/*.test.mjs`).
