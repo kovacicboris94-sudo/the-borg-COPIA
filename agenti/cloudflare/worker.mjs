@@ -4,11 +4,14 @@
 //  - una sveglia (alarm) ogni 30 secondi fa scorrere il tempo e pensare gli agenti;
 //  - AGENTI_PAUSA = 1 (variabile nel pannello di Cloudflare) li mette in pausa: niente pensieri, niente spese;
 //  - la chiave di Anthropic sta nei segreti di Cloudflare (ANTHROPIC_API_KEY),
-//    il gioco non la vede mai: riceve solo /stato e manda /parla, /regala, /turno, /vendi e /terreno.
+//    il gioco non la vede mai: riceve solo /stato e manda /parla, /regala, /turno, /vendi e /terreno;
+//  - /registro e' l'archivio dell'esperimento: tutto quello che dicono, pensano e fanno, per sempre
+//    (tabella SQLite del Durable Object, nessun costo di modello).
 // =====================================================================
 import { DurableObject } from 'cloudflare:workers';
 import { nuovoStato, passo, vistaPubblica, giocatoreParla, giocatoreRegala, giocatoreTurno, giocatoreVende, giocatoreTerreno, cronaca, proposte } from '../motore.mjs';
 import { cervelloClaude, cervelloFinto } from '../cervello.mjs';
+import { osserva } from '../registro.mjs';
 
 const PASSO_MS = 30 * 1000;
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
@@ -29,11 +32,36 @@ export class Borgo extends DurableObject {
     if ((await this.ctx.storage.getAlarm()) == null) await this.ctx.storage.setAlarm(Date.now() + PASSO_MS);
     return this.stato;
   }
+  // l'archivio: righe che non si cancellano mai. Se qualcosa va storto, gli agenti vanno avanti lo stesso.
+  sql() {
+    if (!this.tabella) {
+      this.ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS registro (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER NOT NULL, tipo TEXT NOT NULL, chi TEXT, dati TEXT NOT NULL)');
+      this.ctx.storage.sql.exec('CREATE INDEX IF NOT EXISTS registro_t ON registro (t)');
+      this.tabella = true;
+    }
+    return this.ctx.storage.sql;
+  }
+  async archivia(s, ora) {
+    try {
+      const { righe, memo } = osserva(s, await this.ctx.storage.get('registroMemo'), ora);
+      const sql = this.sql();
+      for (const r of righe) sql.exec('INSERT INTO registro (t, tipo, chi, dati) VALUES (?, ?, ?, ?)', r.t, r.tipo, r.chi, JSON.stringify(r.dati));
+      await this.ctx.storage.put('registroMemo', memo);
+    } catch (e) { console.log('registro: ' + (e && e.message)); }
+  }
+  leggiRegistro(url) {
+    const da = Math.max(0, +url.searchParams.get('da') || 0), max = Math.min(5000, Math.max(1, +url.searchParams.get('max') || 2000));
+    const sql = this.sql();
+    const righe = sql.exec('SELECT id, t, tipo, chi, dati FROM registro WHERE id > ? ORDER BY id LIMIT ?', da, max).toArray().map(r => ({ id: r.id, t: r.t, tipo: r.tipo, chi: r.chi, dati: JSON.parse(r.dati) }));
+    const tot = sql.exec('SELECT COUNT(*) AS n, MAX(id) AS ultimo FROM registro').one();
+    return { ora: Date.now(), totale: tot.n, ultimo: tot.ultimo || 0, righe };
+  }
   async alarm() {
     const s = await this.carica();
     try { await passo(s, Date.now(), this.cervello, { pausa: this.env.AGENTI_PAUSA === '1' }); }
     finally {
       await this.ctx.storage.put('stato', s);
+      await this.archivia(s, Date.now());
       await this.ctx.storage.setAlarm(Date.now() + PASSO_MS);
     }
   }
@@ -41,6 +69,7 @@ export class Borgo extends DurableObject {
     const url = new URL(req.url), s = await this.carica();
     if (url.pathname === '/stato') return json(vistaPubblica(s, Date.now()));
     if (url.pathname === '/cronaca') return json({ ora: Date.now(), voci: cronaca(s, +url.searchParams.get('da') || 0) });
+    if (url.pathname === '/registro') return json(this.leggiRegistro(url));
     if (url.pathname === '/proposte') return json({ ora: Date.now(), proposte: proposte(s) });
     if (url.pathname === '/parla' && req.method === 'POST') {
       // al massimo un messaggio ogni 8 secondi per chi scrive (cosi' nessuno svuota il budget degli agenti)
