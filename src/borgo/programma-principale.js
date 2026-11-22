@@ -93,6 +93,12 @@
     if (G.stato.atmosfera) m.atm(G.stato.atmosfera);
     return stanze[id];
   }
+  // un interno da rifare (la vetrina aziendale cambia tipo): si toglie, al prossimo ingresso si ricostruisce
+  function rimuoviInterno(id) {
+    const q = interni[id]; if (!q || stanza === stanze[id]) return false;
+    scene.remove(q.g); q.g.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    delete interni[id]; delete stanze[id]; return true;
+  }
   Object.entries(B.INTERNI || {}).forEach(([id, def]) => aggiungiInterno(id, def));
   let stanza = stanze.piazza;
   const luci = piazza.luci;                       // 6 luci puntiformi condivise tra le stanze
@@ -552,7 +558,7 @@
   { const bb = $('#btn-bici'); if (bb) bb.addEventListener('click', () => setBici(!io.bici)); }
   { const bc = $('#btn-corri'); if (bc) bc.addEventListener('click', () => { io.corre = !io.corre; bc.classList.toggle('attivo', io.corre); G.emetti('toast', io.corre ? 'Corsa attiva: ti muovi più veloce' : 'Si torna a camminare'); }); }
   B.app = {
-    aggiungiInterno, io, gC, gP, piazza, libero, muovi, vistaAlto, assegnaLuci, ricostruisciCasa, casaOspite, setBici, creaBici, npc, C, cam, scene, renderer, stanze, G, joy, entraStanza, usaPorta, portaVicina, misura, atmosfera, impostaZoom,
+    aggiungiInterno, rimuoviInterno, io, gC, gP, piazza, libero, muovi, vistaAlto, assegnaLuci, ricostruisciCasa, casaOspite, setBici, creaBici, npc, C, cam, scene, renderer, stanze, G, joy, entraStanza, usaPorta, portaVicina, misura, atmosfera, impostaZoom,
     inclina, emote, mostraBolla, ruota: d => { C.azT += d * PI / 2; setSegui(false); },
     stanza: () => stanza, gioco: () => giocoAttivo,
     rivesti: () => { if (G.stato.giocatore && io.av) costruisciIo(G.stato.giocatore.look); }

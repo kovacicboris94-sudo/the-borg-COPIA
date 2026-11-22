@@ -39,6 +39,7 @@
     dolci: { muro: '#f8e4ec', fascia: '#c05a7a', pav: 'scacchi', insegna: '🧁' },
     alimentari: { muro: '#f2ead8', fascia: '#6a7a2f', pav: 'cotto', insegna: '🧺' },
     bottega: { muro: '#ece0cc', fascia: '#7a4a2a', pav: 'legno', insegna: '🏺' },
+    vetrina: { muro: '#f6f6f4', fascia: '#2a2a30', pav: 'marmo', insegna: '🏢' },
     banca: { muro: '#ece8de', fascia: '#2f4a6a', pav: 'marmo', insegna: '🏦' },
     arredi: { muro: '#efe6d8', fascia: '#b0703c', pav: 'legno', insegna: '🛋️' },
     ambulatorio: { muro: '#eef4f6', fascia: '#3f8a9a', pav: 'linoleum', insegna: '⚕️' }
@@ -68,7 +69,7 @@
 
   /* def = { nome, tipo, w, d, fuori: {x, z, yaw}, verso } -> la stanza (stesso formato delle altre: ostacoli, porte, sedili, toccabili...) */
   function costruisciInterno(scena, def) {
-    const W = def.w || 12, D = def.d || 10, X = W / 2, Z0 = -D / 2, Z1 = D / 2, st = Object.assign({}, STILE[def.tipo] || STILE.bottega, ARREDO[def.arredo] || {});
+    const W = def.w || 12, D = def.d || 10, X = W / 2, Z0 = -D / 2, Z1 = D / 2, st = Object.assign({}, STILE[def.tipo] || STILE.bottega, ARREDO[def.arredo] || {}, def.fascia ? { fascia: def.fascia } : {});
     const AREA = { x0: -X + 0.5, x1: X - 0.5, z0: Z0 + 0.6, z1: Z1 - 0.4 };
     const sedili = [], ostacoli = [], anim = [], porte = [], toccabili = [], lampade = [], vetri = [], muri = [];
     const gm = M('#fff').gradientMap;
@@ -117,6 +118,7 @@
       muri.push({ g, out, mats: [], lines: [], q: 1, ap: 1 });
     }
     parete(W + 0.6, 0, Z0, 0, [0, -1], g => {
+      if (def.senzaInsegna) return;   // la vetrina aziendale mette la sua (src/borgo/sponsor.js)
       const ins = new T.Mesh(new T.PlaneGeometry(3.2, 0.8), new T.MeshBasicMaterial({ map: insegnaTex(st.insegna + ' ' + def.nome, '#2a1f33', '#ffd36a') })); ins.position.set(0, 3.0, 0.1); g.add(ins);
     });
     parete(D + 0.3, -X, 0, PI / 2, [-1, 0], g => { finestra(g, -1.8, 2.0, 1.3, 1.1); finestra(g, 1.8, 2.0, 1.3, 1.1); });
@@ -195,6 +197,9 @@
       scaffale(-X + 0.35, 0, 4.0, PI / 2, legno, (g, y, i) => { for (let k = 0; k < 6; k++) scatola(g, 0.3, 0.36, 0.25, ['#e05a3a', '#f4d03f', '#3f7a3a', '#2a4a7a'][(k + i) % 4], -1.6 + k * 0.64, y + 0.2, 0.02, 0.006); });
       scaffale(X - 0.35, 0, 4.0, -PI / 2, legno, (g, y, i) => { for (let k = 0; k < 7; k++) cil(g, 0.08, 0.08, 0.3, ['#c8a040', '#3a7a4a', '#7a2a2a'][(k + i) % 3], -1.7 + k * 0.56, y + 0.16, 0.02, 8, 0); });
       [[-2.5, 3.0], [-1.6, 3.0], [1.6, 3.0], [2.5, 3.0]].forEach((p, i) => { scatola(scena, 0.7, 0.35, 0.5, '#b08a5a', p[0], 0.18, p[1], 0.008); for (let k = 0; k < 4; k++) palla(scena, 0.09, ['#e0402a', '#f4a030', '#7ac040', '#f4e040'][i], p[0] - 0.2 + (k % 2) * 0.4, 0.42, p[1] - 0.1 + Math.floor(k / 2) * 0.2); ostBox(p[0], p[1], 0.8, 0.6); });
+    } else if (t === 'vetrina') {
+      // la vetrina aziendale: solo il bancone, il resto lo sceglie l'azienda (src/borgo/sponsor.js mette i mobili negli 8 posti)
+      banconeDietro(def.fascia || '#2a2a30');
     } else if (t === 'bottega') {
       banconeDietro('#6a4a2a');
       // banco da lavoro dell'artigiano, vasi, candele e lanterne

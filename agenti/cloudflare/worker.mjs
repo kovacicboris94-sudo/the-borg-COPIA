@@ -9,7 +9,7 @@
 //    (tabella SQLite del Durable Object, nessun costo di modello).
 // =====================================================================
 import { DurableObject } from 'cloudflare:workers';
-import { nuovoStato, passo, vistaPubblica, giocatoreParla, giocatoreRegala, giocatoreTurno, giocatoreVende, giocatoreTerreno, giocatoreDipendente, cronaca, proposte } from '../motore.mjs';
+import { nuovoStato, passo, vistaPubblica, giocatoreParla, giocatoreRegala, giocatoreTurno, giocatoreVende, giocatoreTerreno, giocatoreDipendente, giocatoreSponsor, logoDi, cronaca, proposte } from '../motore.mjs';
 import { cervelloClaude, cervelloFinto } from '../cervello.mjs';
 import { osserva } from '../registro.mjs';
 
@@ -120,6 +120,24 @@ export class Borgo extends DurableObject {
       const r = giocatoreTerreno(s, d.nick, d, ora);
       if (r.ok) await this.ctx.storage.put('stato', s);
       return json(r);
+    }
+    if (url.pathname === '/sponsor' && req.method === 'POST') {
+      // le vetrine aziendali e la moderazione (agenti/sponsor.mjs): al massimo una richiesta ogni secondo e mezzo, corpo piccolo
+      const chi = 's' + (req.headers.get('CF-Connecting-IP') || 'x'), ora = Date.now();
+      if (ora - (this.voci.get(chi) || 0) < 1500) return json({ ok: false, motivo: 'Piano, un attimo.' }, 429);
+      this.voci.set(chi, ora); if (this.voci.size > 500) this.voci.clear();
+      if (+(req.headers.get('Content-Length') || 0) > 80000) return json({ ok: false, motivo: 'Troppo grande.' }, 413);
+      let d = {}; try { d = JSON.parse((await req.text()).slice(0, 80000)); } catch (e) { /* vuoto */ }
+      const r = giocatoreSponsor(s, d.nick, d, ora, this.env.MODERATORI || '');
+      if (r.ok && !['coda', 'moderatore', 'mia'].includes(d.azione)) await this.ctx.storage.put('stato', s);
+      return json(r);
+    }
+    if (url.pathname === '/logo') {
+      // il logo approvato di una vetrina (l'indirizzo cambia a ogni nuova approvazione: si puo' tenere in cache)
+      const m = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(logoDi(s, url.searchParams.get('lotto') || ''));
+      if (!m) return new Response('', { status: 404, headers: CORS });
+      const b = Uint8Array.from(atob(m[2]), c => c.charCodeAt(0));
+      return new Response(b, { headers: Object.assign({ 'Content-Type': m[1], 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' }, CORS) });
     }
     return json({ ok: true, borgo: 'Il Borgo degli Agenti', chiave: !!this.cervello, pausa: this.env.AGENTI_PAUSA === '1', agenti: Object.keys(s.agenti) });
   }

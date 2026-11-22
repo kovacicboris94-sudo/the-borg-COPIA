@@ -20,6 +20,7 @@ import { NEGOZI, CLIENTI, REGOLE_NEGOZI as RN, negozioDi, prodottoDi, decide } f
 import { LOTTI, lottoDi, geometria, compraLotto, avviaCantiere, passoCantieri, negoziDeiLotti, vistaTerreni, listinoTerreni, terrenoDi, costoProgetto, PROGETTI, GENERI, faseDi, finePrevista, REGOLE_TERRENI as RT, cambiaListino, PREZZO_MAX, tipoDi, abitazione, UN, APPARTAMENTI, appartamentoDato, appartamentoDi, compraAppartamento, immobileDi, prezzoAppartamento, vistaAppartamenti } from './terreni.mjs';
 import { BANCA, REGOLE_BANCA as RB, passoBanca, maturaGiocatore, chiediMutuo, chiediPrestito, rimborsa, vistaConto, vistaBanca, pianoMutuo, contoDi } from './banca.mjs';
 import { INTERNI, SPORTELLO, internoBottega, idBottega } from './interni.mjs';
+import { azioneSponsor, vistaVetrine, vistaCataloghi, eModeratore, logoDi } from './sponsor.mjs';
 import { passoImpresa, ritmoCantiere, demoAlLavoro, risparmiDemo, spendeDemo, squadraDi, vistaImpresa, IMPRESA } from './impresa.mjs';
 import { passoBorgo, passoDipendenti, effettoMestiere, disponibile, togliScorta, scorteDi, descriviPiazza, vistaLavori, giocatoreDipendente as dipendenteDelGioco, inTurno } from './lavori.mjs';
 import { MESTIERI, cercaMestiere } from './vita/mestieri.mjs';
@@ -1351,7 +1352,7 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
         chi: t ? { id: t[0], nome: nomeDi(stato, t[0]), vero: t[0].indexOf('g:') === 0, fine: t[1].fine } : null,
         ospite: c ? { id: c.id, demo: c.demo, nome: c.nome, vede: (CLIENTI.find(q => q.demo === c.demo) || {}).vede, soldi: c.soldi, tentativi: c.tentativi, via: c.via, detto: c.detto, servito: !!c.servito } : null }; }),
     giochi: (stato.giochi || []).filter(g => !g.finito || adesso - (g.fineVera || g.fine) < 60000).map(g => ({ id: g.id, chi: nomeDi(stato, g.chi), forma: g.forma, testo: g.testo, x: g.forma === 'quiz' ? null : g.x, z: g.forma === 'quiz' ? null : g.z, dove: g.dove, fine: g.fine, finito: g.finito, vincitore: g.vincitore })),
-    terreni: vistaTerreni(stato, adesso).map(l => { if (l.progetto && !l.progetto.finito && stato.terreni[l.id]) { l.progetto.squadra = squadraDi(stato, l.id, id => nomeDi(stato, id)); l.progetto.ritmo = ritmoCantiere(stato, l.id); } return l; }), impresa: vistaImpresa(stato), listinoTerreni: listinoTerreni(), appartamenti: vistaAppartamenti(stato), banca: vistaBanca(stato),
+    terreni: vistaTerreni(stato, adesso).map(l => { if (l.progetto && !l.progetto.finito && stato.terreni[l.id]) { l.progetto.squadra = squadraDi(stato, l.id, id => nomeDi(stato, id)); l.progetto.ritmo = ritmoCantiere(stato, l.id); } return l; }), impresa: vistaImpresa(stato), vetrine: vistaVetrine(stato), cataloghiVetrine: vistaCataloghi(), listinoTerreni: listinoTerreni(), appartamenti: vistaAppartamenti(stato), banca: vistaBanca(stato),
     classifica: Object.entries(stato.punti || {}).sort((a, b) => b[1] - a[1]).slice(0, 10),
     vita: vistaVita(stato),
     partite: vistaPartite(stato, adesso),
@@ -1585,6 +1586,18 @@ const prezziPuliti = p => (p && typeof p === 'object') ? Object.fromEntries(Obje
 const sceltePersona = d => ({ colore: d.colore == null ? null : num(d.colore, null), insegna: testo(d.insegna, 12), arredo: testo(d.arredo, 12), prezzi: prezziPuliti(d.prezzi) });
 // Una persona vera e' riconosciuta da una chiave segreta che il suo gioco si inventa la prima volta (resta nel suo telefono):
 // cosi' nessuno puo' fare debiti o comprare case a nome di un altro.
+// Le vetrine aziendali (agenti/sponsor.mjs): il proprietario le prepara, i moderatori (variabile MODERATORI) le approvano
+export function giocatoreSponsor(stato, nick, d, adesso, moderatori) {
+  d = d || {};
+  const n = testo(nick, 20).replace(/[^\p{L}\p{N}_ .-]/gu, '');
+  if (['visita', 'clic', 'codice'].includes(d.azione)) return azioneSponsor(stato, null, n, d, adesso);
+  if (!n) return { ok: false, motivo: 'Serve il tuo nome nel gioco.' };
+  if (!chiaveOk(stato, n, d.chiave)) return { ok: false, motivo: 'Questo nome e\' gia\' usato da un\'altra persona sul borgo.' };
+  // moderatore: il nome e' nell'elenco E ha gia' la sua chiave segreta registrata (nessuno puo' fingersi lui)
+  const mod = eModeratore(n, moderatori) && !!(stato.chiavi || {})[n.toLowerCase()] && typeof d.chiave === 'string' && d.chiave.length > 0;
+  return azioneSponsor(stato, 'g:' + n, n, d, adesso, { moderatore: mod });
+}
+export { logoDi };
 function chiaveOk(stato, nick, chiave) {
   const K = stato.chiavi || (stato.chiavi = {}), k = nick.toLowerCase(), c = typeof chiave === 'string' ? chiave.slice(0, 64) : '';
   if (!c) return !K[k];

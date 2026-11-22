@@ -15,7 +15,7 @@ import http from 'node:http';
 import { readFileSync, writeFileSync, existsSync, renameSync, statSync } from 'node:fs';
 import { join, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nuovoStato, passo, vistaPubblica, giocatoreParla, giocatoreRegala, giocatoreTurno, giocatoreVende, giocatoreTerreno, giocatoreDipendente, cronaca, proposte } from '../motore.mjs';
+import { nuovoStato, passo, vistaPubblica, giocatoreParla, giocatoreRegala, giocatoreTurno, giocatoreVende, giocatoreTerreno, giocatoreDipendente, giocatoreSponsor, logoDi, cronaca, proposte } from '../motore.mjs';
 import { cervelloClaude, cervelloFinto } from '../cervello.mjs';
 
 const qui = p => fileURLToPath(new URL(p, import.meta.url));
@@ -89,6 +89,16 @@ const server = http.createServer((req, res) => {
     let corpo = ''; req.on('data', c => { corpo += c; if (corpo.length > 4000) req.destroy(); });
     req.on('end', () => { let d = {}; try { d = JSON.parse(corpo); } catch (e) { /* vuoto */ } const r = giocatoreTerreno(stato, d.nick, d, Date.now()); if (r.ok) salva(); manda(r); });
     return;
+  }
+  if (url.pathname === '/sponsor' && req.method === 'POST') {
+    let corpo = ''; req.on('data', c => { corpo += c; if (corpo.length > 80000) req.destroy(); });
+    req.on('end', () => { let d = {}; try { d = JSON.parse(corpo); } catch (e) { /* vuoto */ } const r = giocatoreSponsor(stato, d.nick, d, Date.now(), process.env.MODERATORI || ''); if (r.ok) salva(); manda(r); });
+    return;
+  }
+  if (url.pathname === '/logo') {
+    const m = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(logoDi(stato, url.searchParams.get('lotto') || ''));
+    if (!m) { res.writeHead(404, CORS); return res.end(); }
+    res.writeHead(200, Object.assign({ 'Content-Type': m[1], 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' }, CORS)); return res.end(Buffer.from(m[2], 'base64'));
   }
   if (url.pathname === '/info') return manda({ ok: true, borgo: 'Il Borgo degli Agenti', chiave: !!cervello, agenti: Object.keys(stato.agenti) });
   // il gioco stesso, servito dalla cartella del progetto: http://localhost:8787/ apre il borgo con gli agenti
