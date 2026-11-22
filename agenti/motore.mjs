@@ -950,6 +950,7 @@ async function pensa(stato, ag, adesso, cervello, regole) {
   const v = r.stop_reason === 'refusal' ? null : leggiRisposta(r.testo);
   if (!v) {
     ag.ultimoPensiero = '(non sono riuscito a decidere)';
+    ag.ultimaDecisione = { t: adesso, pensiero: ag.ultimoPensiero, azioni: [], ricorda: '', valido: false, costo };
     ag.prossimoPensiero = adesso + 20 * 60000;
     return { agente: ag.id, pensato: true, costo, valido: false };
   }
@@ -964,6 +965,8 @@ async function pensa(stato, ag, adesso, cervello, regole) {
   if (inAmbientamento(ag, adesso, regole)) minuti = Math.min(minuti, regole.ambientamentoMaxMin);
   ag.prossimoPensiero = Math.max(adesso + regole.pausaMinimaMs, adesso + minuti * 60000);
   const azioni = Array.isArray(v.azioni) ? v.azioni.slice(0, regole.maxAzioni) : [];
+  // la decisione intera, per l'archivio dell'esperimento (agenti/registro.mjs): non entra nel prompt
+  ag.ultimaDecisione = { t: adesso, pensiero: ag.ultimoPensiero, azioni, ricorda: testo(v.ricorda || '', 600), minuti, costo, ingresso: (r.usage && r.usage.input_tokens) || 0, uscita: (r.usage && r.usage.output_tokens) || 0 };
   // nuove decisioni: la coda vecchia si butta (il lavoro gia' iniziato invece continua)
   // ...tranne quello che il corpo sta facendo per un bisogno urgente (bere, il bagno, dormire): prima si finisce quello
   const riflessiInCorso = regole.vita ? ag.coda.filter(q => q.riflesso && !ag.morto) : [];
