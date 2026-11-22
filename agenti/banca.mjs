@@ -17,10 +17,10 @@
 //  - PRESTITO PERSONALE: da 200 a 5.000 Starlight, senza ipoteca, tasso 9%,
 //    12, 24 o 36 rate. Uno alla volta.
 //  - LE RATE: per gli abitanti IA la banca le prende da sola dal conto ogni
-//    giorno (addebito automatico). Per le persone vere una rata scade per ogni
-//    giorno in cui giocano (chi non gioca per una settimana non si ritrova
-//    pignorato: anche lo stipendio arriva solo giocando) e il gioco la paga da
-//    solo se hai gli Starlight.
+//    giorno (addebito automatico). Per le persone vere le rate scadono ogni giorno
+//    anche quando non giocano (Boris: "cosi' la gente e' invogliata a giocare"):
+//    appena entrano il gioco paga da solo quelle scadute, se hanno gli Starlight.
+//    Chi sta via 10 giorni senza pagare perde la casa.
 //  - SE NON PAGHI: sulla rata scaduta corrono gli interessi di mora (8% annuo).
 //    Dopo 3 rate non pagate arriva la lettera di sollecito. Dopo 10 rate non
 //    pagate: per il mutuo la banca PIGNORA la casa e la mette all'asta al 70%
@@ -44,8 +44,7 @@ export const REGOLE_BANCA = {
   rateSollecito: 3,              // dopo 3 rate non pagate: lettera
   ratePignoramento: 10,          // dopo 10: pignoramento (mutuo) o decadenza (prestito)
   astaQuota: 0.7,                // all'asta la casa si vende al 70% del valore
-  periodoMs: 864e5,              // abitanti IA: una rata ogni 24 ore
-  periodoGiocatoreMs: 20 * 3600e3   // persone vere: al massimo una rata ogni 20 ore, e solo nei giorni in cui giocano
+  periodoMs: 864e5               // una rata ogni 24 ore, per tutti (anche per chi non gioca: Boris, 22/11/2026)
 };
 const R = REGOLE_BANCA;
 // l'edificio della banca, in piazza a sud del laghetto: la porta guarda a nord; chi ci va si ferma allo sportello davanti
@@ -131,30 +130,31 @@ function controlla(stato, chi, c, adesso) {
 export function passoBanca(stato, adesso, soldiDi) {
   const fatti = [];
   for (const [chi, c] of Object.entries(conti(stato))) {
-    if (c.vero || !c.prestiti.length) continue;
-    const w = soldiDi(chi); if (!w) continue;
+    if (!c.prestiti.length) continue;
+    // le persone vere: le rate scadono anche quando non giocano (le paga il gioco appena entrano, se hanno gli Starlight)
+    const w = c.vero ? null : soldiDi(chi); if (!c.vero && !w) continue;
     let nuove = 0;
     for (const L of c.prestiti) while (L.prossima <= adesso && nuove < 50) { maturaRata(L); L.prossima += R.periodoMs; nuove++; }
     const dovuto = c.prestiti.reduce((a, L) => a + L.scaduto, 0);
-    if (dovuto > 0.005 && w.starlight > 0.005) {
+    if (w && dovuto > 0.005 && w.starlight > 0.005) {
       // come un addebito vero: si prendono solo rate intere (o tutto il dovuto), cosi' non si resta a zero per un pezzetto di rata
       const intere = c.prestiti.reduce((a, L) => a + (L.scaduto > 0 ? Math.min(L.scaduto, Math.floor(w.starlight / Math.max(1, L.rata)) * L.rata) : 0), 0);
       const usati = pagaScaduto(c, w.starlight >= dovuto ? dovuto : Math.min(w.starlight, intere));
       if (usati > 0) { w.starlight = tondo(w.starlight - usati); if (nuove) fatti.push({ chi, tipo: 'addebito', testo: `La banca ha preso dal tuo conto ${usati} Starlight per le rate.` }); }
     }
     if (nuove || dovuto > 0) for (const f of controlla(stato, chi, c, adesso)) {
-      if (f.accredito) { w.starlight = tondo(w.starlight + f.accredito); c.accredito = 0; }
+      if (f.accredito && w) { w.starlight = tondo(w.starlight + f.accredito); c.accredito = 0; }
       fatti.push(f);
     }
   }
   return fatti;
 }
 
-// Per le persone vere: quando giocano scade al massimo una rata (se e' il momento)
+// Per le persone vere, quando entrano: scadono tutte le rate arretrate (di solito le ha gia' fatte scadere passoBanca)
 export function maturaGiocatore(stato, chi, adesso) {
   const c = conti(stato)[chi]; if (!c) return [];
   let nuove = 0;
-  for (const L of c.prestiti) if (L.prossima <= adesso) { maturaRata(L); L.prossima = adesso + R.periodoGiocatoreMs; nuove++; }
+  for (const L of c.prestiti) while (L.prossima <= adesso && nuove < 400) { maturaRata(L); L.prossima += R.periodoMs; nuove++; }
   return nuove ? controlla(stato, chi, c, adesso) : [];
 }
 
@@ -203,7 +203,7 @@ export function chiediMutuo(stato, chi, nomeChi, d, soldi, adesso) {
     nomeBene = l.nome;
   }
   if (!r || !r.ok) return r || { ok: false, motivo: 'Non si puo\'.' };
-  const L = nuovoPrestito('mutuo', capitale, R.tanMutuo, n, adesso, c.vero ? R.periodoGiocatoreMs : R.periodoMs, { bene: app ? app.id : l.id, valore });
+  const L = nuovoPrestito('mutuo', capitale, R.tanMutuo, n, adesso, R.periodoMs, { bene: app ? app.id : l.id, valore });
   c.prestiti.push(L);
   const pi = pianoMutuo(capitale, R.tanMutuo, n);
   nota(c, adesso, `Mutuo di ${capitale} Starlight per ${nomeBene}${tipo ? ' (' + UN[tipo] + ')' : ''}: anticipo ${anticipo}, ${n} rate da ${L.rata}, in tutto restituisci ${pi.totale} (${pi.interessi} di interessi).`);
@@ -218,7 +218,7 @@ export function chiediPrestito(stato, chi, nomeChi, importo, durata, adesso) {
   const P = Math.round(+importo || 0);
   if (!(P >= R.prestitoMin && P <= R.prestitoMax)) return { ok: false, motivo: `Un prestito va da ${R.prestitoMin} a ${R.prestitoMax} Starlight.` };
   const n = durataVicina(+durata || 24, R.duratePrestito);
-  const L = nuovoPrestito('prestito', P, R.tanPrestito, n, adesso, c.vero ? R.periodoGiocatoreMs : R.periodoMs);
+  const L = nuovoPrestito('prestito', P, R.tanPrestito, n, adesso, R.periodoMs);
   c.prestiti.push(L);
   const pi = pianoMutuo(P, R.tanPrestito, n);
   nota(c, adesso, `Prestito di ${P} Starlight: ${n} rate da ${L.rata}, in tutto restituisci ${pi.totale}.`);
