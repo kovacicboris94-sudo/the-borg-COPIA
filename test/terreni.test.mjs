@@ -80,12 +80,12 @@ async function scorri(s, da, minuti, passoS = 30) { let t = da; for (let i = 0; 
   ada.starlight = 200;
   ada.coda = [normalizzaAzione({ tipo: 'terreno', nome: 'lotto1' })];
   let t = await scorri(s, ROMA(23, 9), 2);
-  ok(!s.terreni.lotto1 && ada.esiti.some(e => /Costa 1800/.test(e)), 'senza soldi: rifiutato (dopo esserci andata)');
+  ok(!s.terreni.lotto1 && ada.esiti.some(e => new RegExp('Costa ' + LOTTI[0].prezzo).test(e)), 'senza soldi: rifiutato (dopo esserci andata)');
   ada.starlight = 8000; ada.coda = [normalizzaAzione({ tipo: 'terreno', nome: 'lotto1' }), normalizzaAzione({ tipo: 'edifica', nome: 'casa' })];
   t = await scorri(s, t, 2);
   ok(s.terreni.lotto1 && s.terreni.lotto1.chi === 'ada', 'Ada ha comprato il lotto 1');
   ok(s.terreni.lotto1.progetto && s.terreni.lotto1.progetto.tipo === 'casa', 'e aperto il cantiere della casa');
-  ok(Math.round(ada.starlight) === 8000 - 1800 - costoProgetto('casa'), 'ha pagato terreno e casa: ' + ada.starlight);
+  ok(Math.round(ada.starlight) === 8000 - LOTTI[0].prezzo - costoProgetto('casa'), 'ha pagato terreno e casa: ' + ada.starlight);
   ok(/Cantiere di "Casa di Ada"/.test(percezione(s, ada, t)), 'vede il suo cantiere');
   // non si costruiscono oggetti sopra un lotto
   ada.x = ada.tx = -10; ada.z = ada.tz = 55; ada.stanza = null;

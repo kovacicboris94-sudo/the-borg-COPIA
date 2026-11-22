@@ -19,25 +19,28 @@
 //    arrivano e si convincono come negli altri negozi, ma il proprietario
 //    tiene l'80% del prezzo (il resto e' la merce che ha comprato).
 //  Tutti i numeri stanno qui: si cambiano in un posto solo.
+//  Prezzi (Boris 22/11/2026: "falli in modo razionale"): un abitante che lavora ~4 ore al giorno
+//  (~30 Starlight l'ora, meno le bollette) mette da parte ~100 S al giorno: il terreno in circa una
+//  settimana, il negozio in altre due (poi il negozio lo ripaga). Chi gioca (~500 S al giorno) in 3-5 giorni.
 // =====================================================================
 
 // x, z = centro del lotto; il lotto e' largo 8 m (x) e profondo 10 m (z).
 // La casa o il negozio sta nella meta' dietro (verso sud), con la porta che guarda a nord;
 // davanti resta il cortile con il bancone (per un negozio).
 export const LOTTI = [
-  { id: 'lotto1', nome: 'Lotto 1, accanto alla Porta del Borgo (ovest)', x: -10, z: 62, prezzo: 1800 },
-  { id: 'lotto2', nome: 'Lotto 2, accanto alla Porta del Borgo (est)', x: 10, z: 62, prezzo: 1800 },
-  { id: 'lotto3', nome: 'Lotto 3, lato sud verso il Fioraio', x: 35, z: 62, prezzo: 1500 },
-  { id: 'lotto4', nome: 'Lotto 4, nord-ovest verso la Torre', x: -32, z: 13, prezzo: 1200 },
-  { id: 'lotto5', nome: 'Lotto 5, nord-ovest dietro il Mercatino', x: -22, z: 13, prezzo: 1500 },
-  { id: 'lotto6', nome: 'Lotto 6, nord-est verso la Ruota', x: 20, z: 13, prezzo: 1500 }
+  { id: 'lotto1', nome: 'Lotto 1, accanto alla Porta del Borgo (ovest)', x: -10, z: 62, prezzo: 700 },
+  { id: 'lotto2', nome: 'Lotto 2, accanto alla Porta del Borgo (est)', x: 10, z: 62, prezzo: 700 },
+  { id: 'lotto3', nome: 'Lotto 3, lato sud verso il Fioraio', x: 35, z: 62, prezzo: 600 },
+  { id: 'lotto4', nome: 'Lotto 4, nord-ovest verso la Torre', x: -32, z: 13, prezzo: 500 },
+  { id: 'lotto5', nome: 'Lotto 5, nord-ovest dietro il Mercatino', x: -22, z: 13, prezzo: 600 },
+  { id: 'lotto6', nome: 'Lotto 6, nord-est verso la Ruota', x: 20, z: 13, prezzo: 600 }
 ];
 export const LOTTO = { w: 8, d: 10, edW: 5.6, edD: 5 };
 
 // Cosa si puo' costruire. costo = materiali + operai (paga del borgo); ore = ore di cantiere (dalle 8 alle 17, lun-sab).
 export const PROGETTI = {
-  casa: { nome: 'Casa', ore: 72, operai: 3, materiali: 2400, pagaOra: 8, descr: 'casetta in muratura di 28 m2 con il tetto di tegole' },
-  negozio: { nome: 'Negozio', ore: 54, operai: 3, materiali: 1700, pagaOra: 8, descr: 'bottega di 28 m2 con vetrine, insegna e un bancone davanti' }
+  casa: { nome: 'Casa', ore: 72, operai: 2, materiali: 1200, pagaOra: 4, descr: 'casetta in muratura di 28 m2 con il tetto di tegole' },
+  negozio: { nome: 'Negozio', ore: 54, operai: 2, materiali: 800, pagaOra: 4, descr: 'bottega di 28 m2 con vetrine, insegna e un bancone davanti' }
 };
 export const costoProgetto = t => { const p = PROGETTI[t]; return p ? p.materiali + p.ore * p.operai * p.pagaOra : 0; };
 
