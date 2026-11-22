@@ -33,7 +33,9 @@
     const fz = E.z - E.d / 2;
     g.add(mesh(new T.BoxGeometry(E.w - 0.6, 0.18, 1.0), M('#d8d2c4'), { x: E.x, y: 0.09, z: fz - 0.5, lb: 0.012 }));
     [-1, 1].forEach(sg => [1.6, 3.1].forEach(dx => g.add(mesh(new T.CylinderGeometry(0.2, 0.24, 2.5, 14), M('#f4efe2'), { x: E.x + sg * dx, y: 1.35, z: fz - 0.35, l: 0.012 }))));
-    app.piazza.porte.push({ id: 'porta-banca', nome: E.nome, x: E.porta.x, z: E.porta.z, r: 1.4, testo: '🏦 Entra in banca', fn: () => apri() });
+    // si entra davvero (src/borgo/interni.js): gli sportelli sono dentro, si tocca lo sportello per il conto, il mutuo e il prestito
+    if (app.stanze.banca) app.piazza.porte.push({ id: 'porta-banca', nome: E.nome, x: E.porta.x, z: E.porta.z, r: 1.4, testo: '🏦 Entra in banca', verso: 'banca', arrivo: { x: 0, z: 3.6, yaw: PI } });
+    else app.piazza.porte.push({ id: 'porta-banca', nome: E.nome, x: E.porta.x, z: E.porta.z, r: 1.4, testo: '🏦 Entra in banca', fn: () => apri() });
   }
 
   /* ---------- dati ---------- */

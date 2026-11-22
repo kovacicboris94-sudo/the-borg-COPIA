@@ -5,6 +5,8 @@
 // Per insegnare una cosa nuova agli agenti basta aggiungerla qui.
 
 import { NEGOZI, prodottoDi, REGOLE_NEGOZI } from './negozi.mjs';
+import { disponibile, togliScorta, inTurno, ambulatorioAperto, durataVisita, visitaMedica, REGOLE_LAVORI } from './lavori.mjs';
+import { VISITA, SPORTELLO } from './interni.mjs';
 
 const caso = l => l[Math.floor(Math.random() * l.length)];
 
@@ -117,7 +119,7 @@ export const COSE = [
   { id: 'bici', nome: 'Bici', dove: null, min: 0, icona: '🚲', posti: [],
     riga: 'in piazza sali o scendi dalla bici: vai 3 volte piu\' veloce (entrando in un edificio scendi)' },
   { id: 'leggio', nome: 'Leggio', dove: 'biblioteca', min: 5, icona: '📖', posti: [{ x: 0, z: 4.9 }],
-    riga: 'nella Biblioteca leggi una poesia', fai: c => 'Hai letto ' + LETTURE[(c.ag.letture = ((c.ag.letture || 0) + 1)) % LETTURE.length] },
+    riga: 'nella Biblioteca leggi una poesia', fai: c => 'Hai letto ' + LETTURE[(c.ag.letture = ((c.ag.letture || 0) + 1)) % LETTURE.length] + bibliotecario(c) },
   { id: 'scacchi', nome: 'Scacchi', dove: 'scacchi', min: 15, icona: '♞', posti: [{ x: -6.4, z: 1.8 }, { x: 6.4, z: 1.8 }],
     riga: 'nella Casa degli Scacchi: contro il computer, o contro un abitante che e\' gia\' al tavolo',
     fai: c => c.compagno ? c.risultato + guadagna(c.ag, /vinto/.test(c.risultato) ? 10 : 2) : partita('Partita a scacchi contro il computer', ['hai vinto!', 'hai perso.', 'patta.'])(c) },
@@ -137,21 +139,41 @@ export const COSE = [
   { id: 'pacchetto', nome: 'Pacchetto Belinverse', dove: 'tcg', min: 2, icona: '🎁', posti: [{ x: 8, z: 11 }], riga: 'dal venditore della Sala TCG: 6 carte, uno al giorno gratis, poi 150 Starlight', fai: pacchetto }
 ];
 
+// in Biblioteca, se c'e' il bibliotecario in turno: ti consiglia la lettura giusta e ti annoi molto meno (corpo vero, agenti/vita)
+function bibliotecario(c) {
+  const chi = inTurno(c.stato, 'bibliotecario').filter(id => id !== c.ag.id)[0]; if (!chi) return '';
+  const corpo = c.stato.vita && c.stato.vita.corpi[c.ag.id]; if (corpo && corpo.umano) corpo.umano.noia = Math.max(0, corpo.umano.noia - 0.25);
+  return ` Te l'ha consigliata ${c.nomeDi(c.stato, chi)}, il bibliotecario: ti e' piaciuta molto.`;
+}
+// la visita dall'Ambulatorio: paga il ticket, la Dottoressa Ferri cura le malattie (agenti/lavori.mjs)
+function visita(c) {
+  const ag = portafoglio(c.ag), P = REGOLE_LAVORI.prezzoVisita;
+  if (ag.starlight < P) return `La visita costa ${P} Starlight e ne hai solo ${ag.starlight}: la Dottoressa ti ha dato solo un consiglio.`;
+  ag.starlight -= P;
+  return visitaMedica(c.stato, c.ag.id, c.adesso) + ` Hai pagato il ticket di ${P} Starlight.`;
+}
+COSE.push({ id: 'visita', nome: 'Visita medica', dove: 'ambulatorio', min: REGOLE_LAVORI.visitaMin, minuti: durataVisita, icona: '🩺', posti: [VISITA],
+  aperto: (stato, adesso) => (ambulatorioAperto(adesso) ? null : 'l\'Ambulatorio e\' chiuso: la Dottoressa Ferri riceve dal lunedi\' al sabato, 8-13 e 15-19'),
+  riga: `nell'Ambulatorio la Dottoressa Ferri ti visita e ti cura (${REGOLE_LAVORI.prezzoVisita} Starlight; lun-sab 8-13 e 15-19; ${REGOLE_LAVORI.visitaMin} minuti, ${REGOLE_LAVORI.visitaConSegretarioMin} se c'e' il segretario)`, fai: visita });
+COSE.push({ id: 'sportello', nome: 'Sportello della banca', dove: 'banca', min: 2, icona: '🏦', posti: [SPORTELLO], riga: 'dentro la Banca del Borgo: per mutui, prestiti e appartamenti usa le azioni "mutuo", "prestito", "appartamento" (ci vai da solo)',
+  fai: c => `L'impiegata ti ha mostrato il conto: hai ${portafoglio(c.ag).starlight} Starlight.` });
+
 // comprare al bancone dei negozi (Caffetteria, Forno, Fioraio): prezzo di listino, va nello zaino.
 // Se al bancone c'e' qualcuno al lavoro, a lui va la sua parte, come per una vendita.
 function compraAlBancone(id) {
   return c => {
     const neg = NEGOZI.find(q => q.id === id), p = prodottoDi(neg, c.richiesta), ag = portafoglio(c.ag);
     if (!p) return `Al bancone non hai detto cosa comprare (scrivilo in "testo"). Listino: ${neg.prodotti.map(q => q[0] + ' ' + q[1]).join(', ')}.`;
+    const manca = disponibile(c.stato, neg, p); if (manca) return `Niente da fare: ${manca}.`;
     if (ag.starlight < p[1]) return `${p[0]} costa ${p[1]} Starlight ma ne hai solo ${ag.starlight}.`;
-    ag.starlight -= p[1]; const z = ag.zaino || (ag.zaino = {}); z[p[0]] = (z[p[0]] || 0) + 1;
+    ag.starlight -= p[1]; togliScorta(c.stato, neg, p); const z = ag.zaino || (ag.zaino = {}); z[p[0]] = (z[p[0]] || 0) + 1;
     const t = Object.entries(c.stato.turni || {}).find(([, q]) => q.negozio === id), v = t && c.stato.agenti[t[0]];
     if (v && v !== ag) { const g = Math.max(1, Math.round(p[1] * REGOLE_NEGOZI.quota)); portafoglio(v).starlight += g; t[1].vendite = (t[1].vendite || 0) + 1; t[1].guadagno = (t[1].guadagno || 0) + g; }
     return `Hai comprato ${p[0]} per ${p[1]} Starlight (te ne restano ${ag.starlight}). E' nello zaino.`;
   };
 }
-NEGOZI.forEach(n => COSE.push({ id: n.id, nome: n.nome, dove: null, min: 1, icona: n.id === 'fioraio' ? '💐' : n.id === 'forno' ? '🥖' : '☕', posti: [n.cliente],
-  riga: `bancone, compri: ${n.prodotti.map(p => p[0] + ' ' + p[1]).join(', ')} (nome in "testo")`, fai: compraAlBancone(n.id) }));
+NEGOZI.forEach(n => COSE.push({ id: n.id, nome: n.nome, dove: n.stanza || null, min: 1, icona: n.id === 'fioraio' ? '💐' : n.id === 'forno' ? '🥖' : '☕', posti: [n.cliente],
+  riga: `bancone (dentro il negozio), compri: ${n.prodotti.map(p => p[0] + ' ' + p[1]).join(', ')} (nome in "testo")`, fai: compraAlBancone(n.id) }));
 
 export const cosaDi = nome => {
   const n = String(nome || '').toLowerCase().trim(); if (!n) return null;

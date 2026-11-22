@@ -169,22 +169,25 @@
       porte.push({ id: 'porta-' + nome, nome: def.senzaNome ? '' : nome, x: def.x + lx * Math.cos(th) + lz * Math.sin(th), z: def.z - lx * Math.sin(th) + lz * Math.cos(th), r: 1.35, verso: verso || null });
     }
     const defs = [
-      { x: 44, z: -9.1, rot: 0, w: 3.2, d: 5, muro: '#c98a62', muroSopra: '#ebd3a8', tetto: '#4a3a86', nome: 'Forno', tendaA: '#f6e8cc', tendaB: '#c8553d', porta: 0, persiane: '#7a3f6a', tendaLarg: 2.6 },
+      { x: 44, z: -9.1, rot: 0, w: 3.2, d: 5, muro: '#c98a62', muroSopra: '#ebd3a8', tetto: '#4a3a86', nome: 'Forno', interno: 'forno', tendaA: '#f6e8cc', tendaB: '#c8553d', porta: 0, persiane: '#7a3f6a', tendaLarg: 2.6 },
       { x: -12, z: -9.1, rot: 0, w: 6.2, d: 5, muro: '#d98b6a', muroSopra: '#e6c9a0', tetto: '#2e3d8c', nome: 'Negozio TCG', senzaNome: true, tendaA: '#f1e6d0', tendaB: '#d9534f', porta: 0, persiane: '#2f4aa3', tendaLarg: 4.6 },
-      { x: 18, z: -9.1, rot: 0, w: 7.0, d: 5, muro: '#e8d6b6', muroSopra: '#f1e3c8', tetto: '#2a3a85', nome: 'Caffetteria', tendaA: '#f4ead6', tendaB: '#e0675c', porta: 0.3, abbaino: -1.9, persiane: '#2f6a78', tendaLarg: 5.2 },
+      { x: 18, z: -9.1, rot: 0, w: 7.0, d: 5, muro: '#e8d6b6', muroSopra: '#f1e3c8', tetto: '#2a3a85', nome: 'Caffetteria', interno: 'caffetteria', tendaA: '#f4ead6', tendaB: '#e0675c', porta: 0.3, abbaino: -1.9, persiane: '#2f6a78', tendaLarg: 5.2 },
       { x: -22, z: -9.1, rot: 0, w: 6.2, d: 5, muro: '#c98a62', muroSopra: '#ebd3a8', tetto: '#38307a', nome: 'Sala Giochi', insegnaGiochi: true, tendaA: '#f6e8cc', tendaB: '#c8553d', porta: -0.2, persiane: '#7a3f6a', tendaLarg: 4.6 },
       { x: -32, z: -9.1, rot: 0, w: 3.4, d: 4.4, muro: '#cdb08a', muroSopra: '#e9d6b0', tetto: '#4a3a86', nome: 'Casa', tendaA: '#f6e8cc', tendaB: '#4f8ab8', porta: 0, persiane: '#2f6a78', tendaLarg: 2.6 },
       { x: -27.7, z: -9.1, rot: 0, w: 3.2, d: 4.7, muro: '#bfc9d8', muroSopra: '#e3e8f0', tetto: '#2f5a4a', nome: 'Biblioteca', tendaA: '#f4ead6', tendaB: '#3f7a6a', porta: 0, persiane: '#4a3a6a', tendaLarg: 2.8 },
-      { x: 51.1, z: 50, rot: -PI / 2, w: 3.8, d: 4.6, muro: '#d8b4a0', muroSopra: '#f0dcc4', tetto: '#7a3a4a', nome: 'Fioraio', tendaA: '#f6e8cc', tendaB: '#e0675c', porta: 0, persiane: '#4f8a3a', tendaLarg: 3.0 },
-      { x: -51.1, z: 4, rot: PI / 2, w: 4.6, d: 5, muro: '#c9a77c', muroSopra: '#ecd9b4', tetto: '#6a3d2a', nome: 'Arredamenti', tendaA: '#f4ead6', tendaB: '#b0703c', porta: 0, persiane: '#3f6a8a', tendaLarg: 3.6 },
+      { x: 51.1, z: 50, rot: -PI / 2, w: 3.8, d: 4.6, muro: '#d8b4a0', muroSopra: '#f0dcc4', tetto: '#7a3a4a', nome: 'Fioraio', interno: 'fioraio', tendaA: '#f6e8cc', tendaB: '#e0675c', porta: 0, persiane: '#4f8a3a', tendaLarg: 3.0 },
+      { x: -51.1, z: 4, rot: PI / 2, w: 4.6, d: 5, muro: '#c9a77c', muroSopra: '#ecd9b4', tetto: '#6a3d2a', nome: 'Arredamenti', interno: 'arredamenti', tendaA: '#f4ead6', tendaB: '#b0703c', porta: 0, persiane: '#3f6a8a', tendaLarg: 3.6 },
       // la Casa degli Scacchi (src/borgo/casa-scacchi.js): bianca e nera, al centro della fila nord
+      // l'Ambulatorio del Borgo (22/11/2026): la dottoressa, la sala d'attesa, il segretario (src/borgo/interni.js)
+      { x: 31, z: -9.1, rot: 0, w: 6.2, d: 5, muro: '#eef4f6', muroSopra: '#ffffff', tetto: '#3f6a7a', nome: 'Ambulatorio', interno: 'ambulatorio', tendaA: '#ffffff', tendaB: '#3f8a9a', porta: 0, persiane: '#3f8a9a', tendaLarg: 4.6 },
       { x: 3, z: -9.1, rot: 0, w: 6.2, d: 5, muro: '#ece4d4', muroSopra: '#f6f0e4', tetto: '#24222c', nome: 'Casa degli Scacchi', insegnaScacchi: true, tendaA: '#f6f0e4', tendaB: '#2a2733', porta: 0, persiane: '#2a2733', tendaLarg: 4.6 },
       // le casette degli abitanti IA (src/borgo/casette-agenti.js), sul lato sud: la porta guarda la fontana
       ...Object.entries(B.CASETTE_AGENTI || {}).map(([id, c]) => ({ x: c.x, z: c.z, rot: Math.PI, w: 4.6, d: 5, muro: c.muro, muroSopra: c.muroSopra, tetto: c.tetto, nome: 'Casa di ' + c.chi, casetta: id, tendaA: '#f6e8cc', tendaB: c.tendaB, porta: 0, persiane: c.persiane, tendaLarg: 3.0 })),
       { x: -40, z: -9.1, rot: 0, w: 7.6, d: 5, muro: '#3b2f5c', muroSopra: '#51427a', tetto: '#1d1a3a', nome: 'Laugh Tale Collectibles', tendaA: '#f4ead6', tendaB: '#7a2fd6', porta: 0, persiane: '#e0b040', tendaLarg: 6.4, insegnaLtc: true }
     ];
-    defs.forEach(d => aggiungi(d, edificio(d), d.nome, d.nome === 'Casa' ? 'casa' : d.nome === 'Negozio TCG' ? 'negozio' : d.nome === 'Sala Giochi' ? 'sala' : d.insegnaLtc ? 'collectibles' : d.nome === 'Biblioteca' ? 'biblioteca' : d.insegnaScacchi ? 'scacchi' : d.casetta || null));
-    porte.forEach(p => { if (p.id === 'porta-Arredamenti') { p.arredi = true; p.testo = 'Entra nel negozio di arredi'; } });
+    defs.forEach(d => aggiungi(d, edificio(d), d.nome, d.nome === 'Casa' ? 'casa' : d.nome === 'Negozio TCG' ? 'negozio' : d.nome === 'Sala Giochi' ? 'sala' : d.insegnaLtc ? 'collectibles' : d.nome === 'Biblioteca' ? 'biblioteca' : d.insegnaScacchi ? 'scacchi' : d.casetta || d.interno || null));
+    // i negozi con l'interno (src/borgo/interni.js): si entra davvero, il bancone e' dentro
+    porte.forEach(p => { const d = B.INTERNI && B.INTERNI[p.verso]; if (d) { p.arrivo = { x: 0, z: (d.d || 10) / 2 - 1.4, yaw: PI }; p.testo = 'Entra: ' + d.nome; } });
     porte.forEach(p => { if (p.verso === 'sala') p.arrivo = { x: 0, z: 12.6, yaw: PI }; if (p.verso === 'negozio') p.arrivo = { x: 0, z: 6.2, yaw: PI }; if (p.verso === 'collectibles') p.arrivo = { x: 0, z: 13.5, yaw: PI }; if (p.verso === 'biblioteca') p.arrivo = { x: 0, z: 6.0, yaw: PI }; if (p.verso === 'scacchi') { p.arrivo = { x: 0, z: 7.0, yaw: PI }; p.testo = 'Entra nella Casa degli Scacchi'; } if (B.CASETTE_AGENTI && B.CASETTE_AGENTI[p.verso]) { p.arrivo = { x: 0, z: 2.4, yaw: PI }; p.testo = 'Entra nella casa di ' + B.CASETTE_AGENTI[p.verso].chi; } });
     // per i terreni del borgo (src/borgo/terreni.js): le case e i negozi costruiti dopo usano lo stesso edificio
     B.edificioPiazza = o => { const n = ostacoli.length, g = edificio(o); return { g, ost: ostacoli.slice(n) }; };

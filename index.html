@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="a18d20320a2c">
+  <meta name="versione" content="cb919e74b39d">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -7448,22 +7448,25 @@ window.CONFIG = {
       porte.push({ id: 'porta-' + nome, nome: def.senzaNome ? '' : nome, x: def.x + lx * Math.cos(th) + lz * Math.sin(th), z: def.z - lx * Math.sin(th) + lz * Math.cos(th), r: 1.35, verso: verso || null });
     }
     const defs = [
-      { x: 44, z: -9.1, rot: 0, w: 3.2, d: 5, muro: '#c98a62', muroSopra: '#ebd3a8', tetto: '#4a3a86', nome: 'Forno', tendaA: '#f6e8cc', tendaB: '#c8553d', porta: 0, persiane: '#7a3f6a', tendaLarg: 2.6 },
+      { x: 44, z: -9.1, rot: 0, w: 3.2, d: 5, muro: '#c98a62', muroSopra: '#ebd3a8', tetto: '#4a3a86', nome: 'Forno', interno: 'forno', tendaA: '#f6e8cc', tendaB: '#c8553d', porta: 0, persiane: '#7a3f6a', tendaLarg: 2.6 },
       { x: -12, z: -9.1, rot: 0, w: 6.2, d: 5, muro: '#d98b6a', muroSopra: '#e6c9a0', tetto: '#2e3d8c', nome: 'Negozio TCG', senzaNome: true, tendaA: '#f1e6d0', tendaB: '#d9534f', porta: 0, persiane: '#2f4aa3', tendaLarg: 4.6 },
-      { x: 18, z: -9.1, rot: 0, w: 7.0, d: 5, muro: '#e8d6b6', muroSopra: '#f1e3c8', tetto: '#2a3a85', nome: 'Caffetteria', tendaA: '#f4ead6', tendaB: '#e0675c', porta: 0.3, abbaino: -1.9, persiane: '#2f6a78', tendaLarg: 5.2 },
+      { x: 18, z: -9.1, rot: 0, w: 7.0, d: 5, muro: '#e8d6b6', muroSopra: '#f1e3c8', tetto: '#2a3a85', nome: 'Caffetteria', interno: 'caffetteria', tendaA: '#f4ead6', tendaB: '#e0675c', porta: 0.3, abbaino: -1.9, persiane: '#2f6a78', tendaLarg: 5.2 },
       { x: -22, z: -9.1, rot: 0, w: 6.2, d: 5, muro: '#c98a62', muroSopra: '#ebd3a8', tetto: '#38307a', nome: 'Sala Giochi', insegnaGiochi: true, tendaA: '#f6e8cc', tendaB: '#c8553d', porta: -0.2, persiane: '#7a3f6a', tendaLarg: 4.6 },
       { x: -32, z: -9.1, rot: 0, w: 3.4, d: 4.4, muro: '#cdb08a', muroSopra: '#e9d6b0', tetto: '#4a3a86', nome: 'Casa', tendaA: '#f6e8cc', tendaB: '#4f8ab8', porta: 0, persiane: '#2f6a78', tendaLarg: 2.6 },
       { x: -27.7, z: -9.1, rot: 0, w: 3.2, d: 4.7, muro: '#bfc9d8', muroSopra: '#e3e8f0', tetto: '#2f5a4a', nome: 'Biblioteca', tendaA: '#f4ead6', tendaB: '#3f7a6a', porta: 0, persiane: '#4a3a6a', tendaLarg: 2.8 },
-      { x: 51.1, z: 50, rot: -PI / 2, w: 3.8, d: 4.6, muro: '#d8b4a0', muroSopra: '#f0dcc4', tetto: '#7a3a4a', nome: 'Fioraio', tendaA: '#f6e8cc', tendaB: '#e0675c', porta: 0, persiane: '#4f8a3a', tendaLarg: 3.0 },
-      { x: -51.1, z: 4, rot: PI / 2, w: 4.6, d: 5, muro: '#c9a77c', muroSopra: '#ecd9b4', tetto: '#6a3d2a', nome: 'Arredamenti', tendaA: '#f4ead6', tendaB: '#b0703c', porta: 0, persiane: '#3f6a8a', tendaLarg: 3.6 },
+      { x: 51.1, z: 50, rot: -PI / 2, w: 3.8, d: 4.6, muro: '#d8b4a0', muroSopra: '#f0dcc4', tetto: '#7a3a4a', nome: 'Fioraio', interno: 'fioraio', tendaA: '#f6e8cc', tendaB: '#e0675c', porta: 0, persiane: '#4f8a3a', tendaLarg: 3.0 },
+      { x: -51.1, z: 4, rot: PI / 2, w: 4.6, d: 5, muro: '#c9a77c', muroSopra: '#ecd9b4', tetto: '#6a3d2a', nome: 'Arredamenti', interno: 'arredamenti', tendaA: '#f4ead6', tendaB: '#b0703c', porta: 0, persiane: '#3f6a8a', tendaLarg: 3.6 },
       // la Casa degli Scacchi (src/borgo/casa-scacchi.js): bianca e nera, al centro della fila nord
+      // l'Ambulatorio del Borgo (22/11/2026): la dottoressa, la sala d'attesa, il segretario (src/borgo/interni.js)
+      { x: 31, z: -9.1, rot: 0, w: 6.2, d: 5, muro: '#eef4f6', muroSopra: '#ffffff', tetto: '#3f6a7a', nome: 'Ambulatorio', interno: 'ambulatorio', tendaA: '#ffffff', tendaB: '#3f8a9a', porta: 0, persiane: '#3f8a9a', tendaLarg: 4.6 },
       { x: 3, z: -9.1, rot: 0, w: 6.2, d: 5, muro: '#ece4d4', muroSopra: '#f6f0e4', tetto: '#24222c', nome: 'Casa degli Scacchi', insegnaScacchi: true, tendaA: '#f6f0e4', tendaB: '#2a2733', porta: 0, persiane: '#2a2733', tendaLarg: 4.6 },
       // le casette degli abitanti IA (src/borgo/casette-agenti.js), sul lato sud: la porta guarda la fontana
       ...Object.entries(B.CASETTE_AGENTI || {}).map(([id, c]) => ({ x: c.x, z: c.z, rot: Math.PI, w: 4.6, d: 5, muro: c.muro, muroSopra: c.muroSopra, tetto: c.tetto, nome: 'Casa di ' + c.chi, casetta: id, tendaA: '#f6e8cc', tendaB: c.tendaB, porta: 0, persiane: c.persiane, tendaLarg: 3.0 })),
       { x: -40, z: -9.1, rot: 0, w: 7.6, d: 5, muro: '#3b2f5c', muroSopra: '#51427a', tetto: '#1d1a3a', nome: 'Laugh Tale Collectibles', tendaA: '#f4ead6', tendaB: '#7a2fd6', porta: 0, persiane: '#e0b040', tendaLarg: 6.4, insegnaLtc: true }
     ];
-    defs.forEach(d => aggiungi(d, edificio(d), d.nome, d.nome === 'Casa' ? 'casa' : d.nome === 'Negozio TCG' ? 'negozio' : d.nome === 'Sala Giochi' ? 'sala' : d.insegnaLtc ? 'collectibles' : d.nome === 'Biblioteca' ? 'biblioteca' : d.insegnaScacchi ? 'scacchi' : d.casetta || null));
-    porte.forEach(p => { if (p.id === 'porta-Arredamenti') { p.arredi = true; p.testo = 'Entra nel negozio di arredi'; } });
+    defs.forEach(d => aggiungi(d, edificio(d), d.nome, d.nome === 'Casa' ? 'casa' : d.nome === 'Negozio TCG' ? 'negozio' : d.nome === 'Sala Giochi' ? 'sala' : d.insegnaLtc ? 'collectibles' : d.nome === 'Biblioteca' ? 'biblioteca' : d.insegnaScacchi ? 'scacchi' : d.casetta || d.interno || null));
+    // i negozi con l'interno (src/borgo/interni.js): si entra davvero, il bancone e' dentro
+    porte.forEach(p => { const d = B.INTERNI && B.INTERNI[p.verso]; if (d) { p.arrivo = { x: 0, z: (d.d || 10) / 2 - 1.4, yaw: PI }; p.testo = 'Entra: ' + d.nome; } });
     porte.forEach(p => { if (p.verso === 'sala') p.arrivo = { x: 0, z: 12.6, yaw: PI }; if (p.verso === 'negozio') p.arrivo = { x: 0, z: 6.2, yaw: PI }; if (p.verso === 'collectibles') p.arrivo = { x: 0, z: 13.5, yaw: PI }; if (p.verso === 'biblioteca') p.arrivo = { x: 0, z: 6.0, yaw: PI }; if (p.verso === 'scacchi') { p.arrivo = { x: 0, z: 7.0, yaw: PI }; p.testo = 'Entra nella Casa degli Scacchi'; } if (B.CASETTE_AGENTI && B.CASETTE_AGENTI[p.verso]) { p.arrivo = { x: 0, z: 2.4, yaw: PI }; p.testo = 'Entra nella casa di ' + B.CASETTE_AGENTI[p.verso].chi; } });
     // per i terreni del borgo (src/borgo/terreni.js): le case e i negozi costruiti dopo usano lo stesso edificio
     B.edificioPiazza = o => { const n = ostacoli.length, g = edificio(o); return { g, ost: ostacoli.slice(n) }; };
@@ -10078,6 +10081,299 @@ window.B3_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAC3CAIAAABl
   }
 
   B.costruisciCasetta = costruisciCasetta;
+})();
+/* =====================================================================
+   THE BORG 3D - GLI INTERNI DEI NEGOZI E DEGLI EDIFICI DEL BORGO
+   Chiesto da Boris il 22/11/2026: "rendi tutto esplorabile e metti piu'
+   mestieri: ogni casa e mestiere deve funzionare". Prima la Caffetteria, il
+   Forno, il Fioraio, la Banca e i negozi costruiti sui terreni avevano solo
+   la facciata (Ada ha provato 9 volte a entrare nella Caffetteria).
+   Ogni interno ha la sua stanza, con le stesse misure che usa il servizio
+   degli agenti (agenti/interni.mjs): cosi' Ada, Teo e le persone vere si
+   vedono dentro allo stesso posto.
+   - Il bancone dei negozi lo disegna agenti-ia.js (viene dal servizio, con
+     chi ci lavora e il cliente); qui c'e' tutto il resto: forno a legna,
+     macchina del caffe', secchi di fiori, sportelli della banca, lettino
+     dell'ambulatorio... e la bacheca "Cerchiamo personale" (lavoro.js).
+   - Tipi: bar, forno, fiori, dolci, alimentari, bottega, banca, arredi,
+     ambulatorio. I negozi sui terreni usano il tipo del loro genere.
+   ===================================================================== */
+(function () {
+  'use strict';
+  const B = window.B3, T = B.T, M = B.M, mesh = B.mesh;
+  const PI = Math.PI;
+
+  // gli edifici della piazza che hanno un interno (porta = dove si esce in piazza; stesse misure di agenti/interni.mjs)
+  const INTERNI = {
+    caffetteria: { nome: 'Caffetteria', tipo: 'bar', fuori: { x: 18.3, z: -4.9, yaw: 0 } },
+    forno: { nome: 'Forno', tipo: 'forno', fuori: { x: 44, z: -4.9, yaw: 0 } },
+    fioraio: { nome: 'Fioraio', tipo: 'fiori', fuori: { x: 46.9, z: 50, yaw: -PI / 2 } },
+    arredamenti: { nome: 'Arredamenti', tipo: 'arredi', fuori: { x: -46.9, z: 4, yaw: PI / 2 } },
+    banca: { nome: 'Banca del Borgo', tipo: 'banca', w: 14, fuori: { x: 32, z: 43.4, yaw: PI } },
+    ambulatorio: { nome: 'Ambulatorio del Borgo', tipo: 'ambulatorio', fuori: { x: 31, z: -4.9, yaw: 0 } }
+  };
+  B.INTERNI = INTERNI;
+  // il genere dei negozi costruiti sui terreni (agenti/terreni.mjs GENERI) -> tipo di interno
+  B.tipoInterno = g => ({ bar: 'bar', forno: 'forno', fiori: 'fiori', dolci: 'dolci', alimentari: 'alimentari', bottega: 'bottega' })[g] || 'bottega';
+
+  const STILE = {
+    bar: { muro: '#f1e3c8', fascia: '#2f6a78', pav: 'scacchi', insegna: '☕' },
+    forno: { muro: '#f0dcc0', fascia: '#a0522d', pav: 'cotto', insegna: '🥖' },
+    fiori: { muro: '#eef2e6', fascia: '#4f8a3a', pav: 'pietra', insegna: '💐' },
+    dolci: { muro: '#f8e4ec', fascia: '#c05a7a', pav: 'scacchi', insegna: '🧁' },
+    alimentari: { muro: '#f2ead8', fascia: '#6a7a2f', pav: 'cotto', insegna: '🧺' },
+    bottega: { muro: '#ece0cc', fascia: '#7a4a2a', pav: 'legno', insegna: '🏺' },
+    banca: { muro: '#ece8de', fascia: '#2f4a6a', pav: 'marmo', insegna: '🏦' },
+    arredi: { muro: '#efe6d8', fascia: '#b0703c', pav: 'legno', insegna: '🛋️' },
+    ambulatorio: { muro: '#eef4f6', fascia: '#3f8a9a', pav: 'linoleum', insegna: '⚕️' }
+  };
+
+  function texPavimento(tipo) {
+    const [cv, x] = B.tela(256, 256);
+    if (tipo === 'scacchi') { for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { x.fillStyle = (i + j) % 2 ? '#2a2a30' : '#efe8da'; x.fillRect(i * 32, j * 32, 32, 32); } }
+    else if (tipo === 'cotto') { x.fillStyle = '#b8643c'; x.fillRect(0, 0, 256, 256); x.strokeStyle = '#8a4a2a'; x.lineWidth = 3; for (let i = 0; i <= 4; i++) { x.beginPath(); x.moveTo(i * 64, 0); x.lineTo(i * 64, 256); x.stroke(); x.beginPath(); x.moveTo(0, i * 64); x.lineTo(256, i * 64); x.stroke(); } for (let i = 0; i < 300; i++) { x.fillStyle = Math.random() < 0.5 ? '#c47450' : '#a85a34'; x.fillRect(Math.random() * 256, Math.random() * 256, 3, 2); } }
+    else if (tipo === 'pietra') { x.fillStyle = '#b9b4aa'; x.fillRect(0, 0, 256, 256); for (let i = 0; i < 40; i++) { x.fillStyle = ['#a8a398', '#c8c3b8', '#b0aa9e'][i % 3]; B.rr(x, (i % 6) * 43 + 2, Math.floor(i / 6) * 40 + 2, 39, 36, 6); x.fill(); } }
+    else if (tipo === 'marmo') { x.fillStyle = '#f2efe8'; x.fillRect(0, 0, 256, 256); x.strokeStyle = 'rgba(150,140,130,0.35)'; for (let i = 0; i < 14; i++) { x.beginPath(); x.moveTo(Math.random() * 256, 0); x.bezierCurveTo(Math.random() * 256, 90, Math.random() * 256, 170, Math.random() * 256, 256); x.stroke(); } x.strokeStyle = '#d8d2c4'; x.lineWidth = 2; x.strokeRect(0, 0, 128, 128); x.strokeRect(128, 128, 128, 128); }
+    else if (tipo === 'linoleum') { x.fillStyle = '#d8e6e2'; x.fillRect(0, 0, 256, 256); for (let i = 0; i < 400; i++) { x.fillStyle = Math.random() < 0.5 ? '#cddcd8' : '#e4eeea'; x.fillRect(Math.random() * 256, Math.random() * 256, 3, 3); } }
+    else return B.texParquet();
+    return B.tex(cv, true);
+  }
+  function insegnaTex(testo, fondo, bordo) {
+    const [cv, x] = B.tela(512, 128); B.rr(x, 4, 4, 504, 120, 22); x.fillStyle = fondo || '#2a1f33'; x.fill(); x.lineWidth = 8; x.strokeStyle = bordo || '#ffd36a'; x.stroke();
+    x.font = 'bold 58px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#fff4dc'; x.fillText(testo, 256, 66, 480);
+    return B.tex(cv);
+  }
+
+  /* def = { nome, tipo, w, d, fuori: {x, z, yaw}, verso } -> la stanza (stesso formato delle altre: ostacoli, porte, sedili, toccabili...) */
+  function costruisciInterno(scena, def) {
+    const W = def.w || 12, D = def.d || 10, X = W / 2, Z0 = -D / 2, Z1 = D / 2, st = STILE[def.tipo] || STILE.bottega;
+    const AREA = { x0: -X + 0.5, x1: X - 0.5, z0: Z0 + 0.6, z1: Z1 - 0.4 };
+    const sedili = [], ostacoli = [], anim = [], porte = [], toccabili = [], lampade = [], vetri = [], muri = [];
+    const gm = M('#fff').gradientMap;
+    const ostBox = (cx, cz, w, d) => ostacoli.push({ t: 'b', x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2 });
+    const scatola = (g, w, h, d, col, x, y, z, lb) => { const m = mesh(new T.BoxGeometry(w, h, d), typeof col === 'string' ? M(col) : col, { x, y, z, lb: lb === undefined ? 0.02 : lb }); g.add(m); return m; };
+    const cil = (g, r1, r2, h, col, x, y, z, seg, l) => { const m = mesh(new T.CylinderGeometry(r1, r2, h, seg || 12), typeof col === 'string' ? M(col) : col, { x, y, z, l: l === undefined ? 0.015 : l }); g.add(m); return m; };
+    const palla = (g, r, col, x, y, z) => { const m = new T.Mesh(new T.SphereGeometry(r, 10, 8), M(col)); m.position.set(x, y, z); g.add(m); return m; };
+    const siedi = (x, z, yaw, y) => { const s = { x, z, y: y || 0.46, yt: 0, yaw }; s.azione = { sedile: s, nome: 'Siediti', testo: 'Siediti' }; sedili.push(s); };
+    const info = (x, y, z, w, h, d, testo, fn) => { const p = new T.Mesh(new T.BoxGeometry(w, h, d), new T.MeshBasicMaterial()); p.position.set(x, y, z); p.visible = false; scena.add(p); toccabili.push(fn ? { obj: p, fn } : { obj: p, tipo: 'azione', testo }); return p; };
+    // le comparse (impiegate della banca, la dottoressa): avatar fermi, solo scena
+    const comparsa = (id, x, z, yaw, look) => {
+      const u = id && ((window.CONFIG || {}).utentiDemo || []).find(q => q.id === id); look = look || (u && u.look); if (!look || !B.creaAvatar) return;
+      try { const av = B.unisciAvatar ? B.unisciAvatar(B.creaAvatar(look)) : B.creaAvatar(look); av.root.position.set(x, 0, z); av.root.rotation.y = yaw || 0; scena.add(av.root); } catch (e) { /* solo scena */ }
+    };
+    const legno = '#a96f44', legnoS = '#6b4326', bianco = '#f4f1ea', acciaio = '#c8ccd2';
+    const sedia = (x, z, yaw, col) => {
+      const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = yaw; scena.add(g);
+      scatola(g, 0.44, 0.05, 0.44, col || legno, 0, 0.46, 0, 0.01); scatola(g, 0.44, 0.5, 0.05, col || legno, 0, 0.72, -0.2, 0.008);
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(q => scatola(g, 0.04, 0.46, 0.04, legnoS, q[0] * 0.19, 0.23, q[1] * 0.19, 0));
+      ostacoli.push({ t: 'c', x, z, r: 0.26 }); siedi(x, z, yaw + PI);
+    };
+    const tavolino = (x, z, col) => { cil(scena, 0.45, 0.45, 0.05, col || '#f4efe6', x, 0.74, z, 18, 0.012); cil(scena, 0.05, 0.05, 0.72, '#3a3a40', x, 0.37, z, 8, 0); cil(scena, 0.25, 0.25, 0.03, '#3a3a40', x, 0.02, z, 12, 0); ostacoli.push({ t: 'c', x, z, r: 0.5 }); };
+    const scaffale = (x, z, w, rot, col, roba) => {
+      const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = rot || 0; scena.add(g);
+      scatola(g, w, 2.2, 0.45, col || legno, 0, 1.1, 0, 0.015);
+      for (let i = 0; i < 4; i++) { scatola(g, w - 0.08, 0.04, 0.42, '#e8d8bc', 0, 0.35 + i * 0.52, 0.02, 0.006); if (roba) roba(g, 0.37 + i * 0.52, i); }
+      const c = Math.abs(Math.cos(rot || 0)) > 0.5; ostBox(x, z, c ? w : 0.55, c ? 0.55 : w); return g;
+    };
+
+    /* ---------- pavimento e pareti ---------- */
+    scena.add(mesh(new T.BoxGeometry(W + 0.4, 0.9, D + 0.4), M('#6f6485'), { y: -0.46, z: 0, lb: 0.05 }));
+    const tp = texPavimento(st.pav); tp.repeat.set(W / 4, D / 4);
+    const pav = new T.Mesh(new T.PlaneGeometry(W, D), new T.MeshToonMaterial({ map: tp, gradientMap: gm, color: new T.Color(st.pav === 'legno' ? '#e0c8a8' : '#ffffff') })); pav.rotation.x = -PI / 2; pav.position.y = 0.002; pav.receiveShadow = true; scena.add(pav);
+    const matVetro = () => { const m = new T.MeshToonMaterial({ color: new T.Color('#bfe3f2'), gradientMap: gm, emissive: new T.Color('#bfe3f2'), emissiveIntensity: 0.6 }); vetri.push(m); return m; };
+    function finestra(g, x, y, w, h) {
+      scatola(g, w + 0.3, h + 0.3, 0.12, bianco, x, y, 0.03);
+      const v = new T.Mesh(new T.PlaneGeometry(w, h), matVetro()); v.position.set(x, y, 0.1); g.add(v);
+      scatola(g, 0.06, h, 0.05, bianco, x, y, 0.13, 0); scatola(g, w + 0.5, 0.1, 0.3, '#e8dcc8', x, y - h / 2 - 0.18, 0.15, 0.012);
+    }
+    function parete(len, wx, wz, rotY, out, contenuto) {
+      const g = new T.Group(); g.position.set(wx, 0, wz); g.rotation.y = rotY; scena.add(g);
+      const corpo = mesh(new T.BoxGeometry(len, 3.4, 0.3), M(st.muro), { y: 1.7, z: -0.15, lb: 0.03 }); corpo.castShadow = false; g.add(corpo);
+      scatola(g, len, 0.9, 0.06, st.fascia, 0, 0.45, 0.03, 0.01);       // zoccolo colorato
+      scatola(g, len, 0.12, 0.08, legnoS, 0, 0.92, 0.05, 0.008);
+      if (contenuto) contenuto(g);
+      muri.push({ g, out, mats: [], lines: [], q: 1, ap: 1 });
+    }
+    parete(W + 0.6, 0, Z0, 0, [0, -1], g => {
+      const ins = new T.Mesh(new T.PlaneGeometry(3.2, 0.8), new T.MeshBasicMaterial({ map: insegnaTex(st.insegna + ' ' + def.nome, '#2a1f33', '#ffd36a') })); ins.position.set(0, 3.0, 0.1); g.add(ins);
+    });
+    parete(D + 0.3, -X, 0, PI / 2, [-1, 0], g => { finestra(g, -1.8, 2.0, 1.3, 1.1); finestra(g, 1.8, 2.0, 1.3, 1.1); });
+    parete(D + 0.3, X, 0, -PI / 2, [1, 0], g => { finestra(g, -1.8, 2.0, 1.3, 1.1); finestra(g, 1.8, 2.0, 1.3, 1.1); });
+    // la vetrina sul davanti (bassa: non copre la vista), con la porta in mezzo
+    [-1, 1].forEach(s => { scatola(scena, X - 1.0, 0.6, 0.2, st.fascia, s * (X + 1.0) / 2, 0.3, Z1 + 0.1, 0.012); ostBox(s * (X + 1.0) / 2, Z1 + 0.1, X - 1.0, 0.3); });
+    const usc = new T.Group(); usc.position.set(0, 0, Z1 + 0.15); scena.add(usc);
+    [-1, 1].forEach(s => scatola(usc, 0.16, 2.6, 0.2, legnoS, s * 0.85, 1.3, 0, 0.015)); scatola(usc, 1.86, 0.18, 0.2, legnoS, 0, 2.6, 0, 0.015);
+    const mt = new T.Mesh(new T.PlaneGeometry(1.6, 0.9), new T.MeshToonMaterial({ map: B.texTappeto(), gradientMap: gm })); mt.rotation.x = -PI / 2; mt.position.set(0, 0.014, Z1 - 0.6); scena.add(mt);
+    porte.push({ id: 'porta-uscita', nome: 'Esci in piazza', x: 0, z: Z1 - 0.7, r: 1.1, verso: def.verso || 'piazza', arrivo: def.fuori });
+
+    /* ---------- l'arredamento, secondo il tipo ---------- */
+    const t = def.tipo;
+    const banconeDietro = (col) => { scatola(scena, W - 4, 0.95, 0.6, col || legno, 0, 0.475, Z0 + 0.6, 0.015); scatola(scena, W - 3.9, 0.06, 0.66, '#5a5560', 0, 0.98, Z0 + 0.6, 0.01); ostBox(0, Z0 + 0.6, W - 3.8, 0.8); };
+    if (t === 'bar' || t === 'dolci') {
+      banconeDietro('#5a3a2a');
+      // macchina del caffe' (con il vapore) e macinino
+      const mc = new T.Group(); mc.position.set(-1.6, 1.0, Z0 + 0.55); scena.add(mc);
+      scatola(mc, 0.9, 0.5, 0.45, '#c8ccd2', 0, 0.25, 0, 0.01); scatola(mc, 0.9, 0.08, 0.5, '#2a2a30', 0, 0.54, 0, 0.006);
+      [-0.22, 0.22].forEach(dx => cil(mc, 0.05, 0.05, 0.12, '#2a2a30', dx, 0.08, 0.26, 8, 0));
+      cil(scena, 0.1, 0.12, 0.35, '#3a2a20', -0.6, 1.18, Z0 + 0.55, 10, 0.006);
+      const vap = new T.Mesh(new T.SphereGeometry(0.09, 8, 6), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 })); scena.add(vap);
+      anim.push(tt => { const k = (tt * 0.6) % 1; vap.position.set(-1.6, 1.7 + k * 0.6, Z0 + 0.75); vap.material.opacity = 0.4 * (1 - k); vap.scale.setScalar(1 + k); });
+      // tazzine e bottiglie sugli scaffali
+      scatola(scena, W - 4, 0.04, 0.3, '#e8d8bc', 0, 1.9, Z0 + 0.2, 0.006); scatola(scena, W - 4, 0.04, 0.3, '#e8d8bc', 0, 2.4, Z0 + 0.2, 0.006);
+      for (let i = 0; i < 14; i++) cil(scena, 0.05, 0.05, 0.28, ['#3a7a4a', '#7a2a2a', '#c8a040', '#2a4a7a'][i % 4], -3.4 + i * 0.5, 2.56, Z0 + 0.2, 8, 0);
+      for (let i = 0; i < 12; i++) cil(scena, 0.05, 0.04, 0.07, bianco, -2.8 + i * 0.5, 1.96, Z0 + 0.2, 8, 0);
+      // vetrina dei dolci a destra
+      const vx = 2.2, vz = Z0 + 0.6;
+      const vt = new T.Mesh(new T.BoxGeometry(1.6, 0.5, 0.5), new T.MeshBasicMaterial({ color: 0xcfefff, transparent: true, opacity: 0.35 })); vt.position.set(vx, 1.25, vz); scena.add(vt);
+      for (let i = 0; i < 6; i++) palla(scena, 0.08, ['#e0a040', '#a0522d', '#f4d0e0', '#6a3a2a'][i % 4], vx - 0.6 + i * 0.24, 1.08, vz + (i % 2 ? 0.1 : -0.1));
+      // lavagna con il menu
+      const [cv, x] = B.tela(256, 320); x.fillStyle = '#26302a'; x.fillRect(0, 0, 256, 320); x.fillStyle = '#f4f1ea'; x.font = 'bold 30px Georgia'; x.textAlign = 'center'; x.fillText(t === 'bar' ? 'MENU' : 'DOLCI', 128, 44);
+      x.font = '22px Georgia'; (t === 'bar' ? ['Caffe\'  6', 'Cappuccino  9', 'Cornetto  8', 'Cioccolata  10', 'Torta  18', 'Spremuta  9'] : ['Pasticcino  4', 'Cannolo  9', 'Tiramisu\'  14', 'Gelato  8', 'Torta  40']).forEach((r, i) => x.fillText(r, 128, 96 + i * 36));
+      const lav = new T.Mesh(new T.PlaneGeometry(1.0, 1.25), new T.MeshBasicMaterial({ map: B.tex(cv) })); lav.position.set(-X + 0.18, 2.0, -2.4); lav.rotation.y = PI / 2; scena.add(lav);
+      // tavolini con le sedie
+      [[-3.6, 1.4], [3.6, 1.4], [-3.6, -1.6], [3.6, -1.4]].forEach(p => { tavolino(p[0], p[1]); sedia(p[0] - 0.8, p[1], PI / 2); sedia(p[0] + 0.8, p[1], -PI / 2); });
+      info(-1.6, 1.3, Z0 + 0.6, 1.4, 1, 0.8, 'Macchina del caffè: il caffè lo fa chi è al bancone o il barista in turno');
+    } else if (t === 'forno') {
+      // il forno a legna, a cupola, con la bocca accesa
+      const fx = -3.4, fz = Z0 + 1.3;
+      scatola(scena, 2.2, 1.0, 2.0, '#b8a48a', fx, 0.5, fz, 0.02);
+      const cupola = new T.Mesh(new T.SphereGeometry(1.0, 18, 10, 0, PI * 2, 0, PI / 2), M('#c9805a')); cupola.position.set(fx, 1.0, fz); scena.add(cupola);
+      const bocca = new T.Mesh(new T.CircleGeometry(0.34, 16, 0, PI), new T.MeshBasicMaterial({ color: 0xff8a3a })); bocca.position.set(fx, 1.02, fz + 0.99); scena.add(bocca);
+      anim.push(tt => { const k = 0.75 + 0.25 * Math.sin(tt * 7) * Math.sin(tt * 3.1); bocca.material.color.setRGB(1, 0.45 + 0.15 * k, 0.15); });
+      cil(scena, 0.16, 0.16, 1.6, '#8a6a5a', fx, 2.4, fz - 0.4, 10, 0.01);
+      ostBox(fx, fz, 2.4, 2.2);
+      for (let i = 0; i < 5; i++) cil(scena, 0.07, 0.07, 0.9, '#7a5a3a', fx + 1.5 + (i % 3) * 0.16, 0.08 + Math.floor(i / 3) * 0.14, fz + 0.6, 8, 0).rotation.z = PI / 2;   // legna
+      banconeDietro('#8a5a36');
+      // ceste di pane sul bancone di dietro e scaffali pieni
+      scaffale(3.6, Z0 + 0.35, 2.4, 0, legno, (g, y, i) => { for (let k = 0; k < 5; k++) { const p = new T.Mesh(new T.SphereGeometry(0.14, 10, 6), M(i % 2 ? '#d89a50' : '#c07a3a')); p.scale.set(1.4, 0.7, 1); p.position.set(-0.9 + k * 0.45, y + 0.08, 0.05); g.add(p); } });
+      // sacchi di farina e impastatrice
+      [[4.8, 1.8], [4.8, 2.6], [4.2, 2.2]].forEach(p => { const s = cil(scena, 0.3, 0.34, 0.7, '#efe6d0', p[0], 0.35, p[1], 10, 0.01); s.scale.z = 0.7; ostacoli.push({ t: 'c', x: p[0], z: p[1], r: 0.34 }); });
+      cil(scena, 0.4, 0.3, 0.9, '#c8ccd2', -4.6, 0.45, 2.2, 14, 0.01); cil(scena, 0.42, 0.42, 0.3, acciaio, -4.6, 1.05, 2.2, 14, 0.01); ostacoli.push({ t: 'c', x: -4.6, z: 2.2, r: 0.5 });
+      info(fx, 1.2, fz, 2.2, 2, 2.2, 'Il forno a legna: il fornaio inforna il pane prima dell\'alba (turno da fornaio 5-12)');
+    } else if (t === 'fiori') {
+      banconeDietro('#6a8a4a');
+      // secchi di fiori lungo le pareti
+      const fiori = ['#e0405a', '#f4d03f', '#f4a0c0', '#9a6ad0', '#ff8a3a', '#ffffff'];
+      for (let i = 0; i < 9; i++) {
+        const x = -X + 0.7, z = -3.4 + i * 0.85, c = fiori[i % fiori.length];
+        cil(scena, 0.22, 0.18, 0.4, '#8a9aa0', x, 0.2, z, 12, 0.008);
+        for (let k = 0; k < 6; k++) { const a = k / 6 * PI * 2; cil(scena, 0.012, 0.012, 0.5, '#3f7a3a', x + Math.cos(a) * 0.1, 0.6, z + Math.sin(a) * 0.1, 4, 0); palla(scena, 0.07, c, x + Math.cos(a) * 0.12, 0.88, z + Math.sin(a) * 0.12); }
+      }
+      ostBox(-X + 0.7, 0, 0.6, 8);
+      scaffale(X - 0.35, -0.5, 4.0, -PI / 2, '#8a6a4a', (g, y, i) => { for (let k = 0; k < 6; k++) { cil(g, 0.12, 0.09, 0.2, '#c0603a', -1.6 + k * 0.64, y + 0.1, 0.02, 10, 0); palla(g, 0.14, i % 2 ? '#4f8a3a' : '#6aa04a', -1.6 + k * 0.64, y + 0.3, 0.02); } });
+      // piante grandi e annaffiatoio
+      [[-4.2, 3.2], [4.2, 3.2]].forEach(p => { const m = B.creaMobile ? B.creaMobile('pianta') : null; if (m) { m.position.set(p[0], 0, p[1]); scena.add(m); } ostacoli.push({ t: 'c', x: p[0], z: p[1], r: 0.45 }); });
+      cil(scena, 0.16, 0.18, 0.3, '#4a8ab0', 1.2, 1.15, Z0 + 0.6, 12, 0.008);
+      info(-X + 0.7, 0.6, 0, 0.8, 1.2, 8, 'I fiori freschi arrivano ogni mattina; i mazzi li compone il fioraio in turno (9-18)');
+    } else if (t === 'alimentari') {
+      banconeDietro('#7a6a3a');
+      // forme di formaggio e prosciutti appesi, cassette di frutta
+      for (let i = 0; i < 4; i++) { const f = cil(scena, 0.3, 0.3, 0.2, '#f0d070', -2.5 + i * 0.8, 1.1, Z0 + 0.6, 16, 0.008); void f; }
+      for (let i = 0; i < 4; i++) { const p = new T.Mesh(new T.SphereGeometry(0.2, 10, 8), M('#b0503a')); p.scale.set(0.8, 1.6, 0.8); p.position.set(1.0 + i * 0.6, 2.4, Z0 + 0.6); scena.add(p); cil(scena, 0.01, 0.01, 0.4, '#3a3a3a', 1.0 + i * 0.6, 2.95, Z0 + 0.6, 4, 0); }
+      scaffale(-X + 0.35, 0, 4.0, PI / 2, legno, (g, y, i) => { for (let k = 0; k < 6; k++) scatola(g, 0.3, 0.36, 0.25, ['#e05a3a', '#f4d03f', '#3f7a3a', '#2a4a7a'][(k + i) % 4], -1.6 + k * 0.64, y + 0.2, 0.02, 0.006); });
+      scaffale(X - 0.35, 0, 4.0, -PI / 2, legno, (g, y, i) => { for (let k = 0; k < 7; k++) cil(g, 0.08, 0.08, 0.3, ['#c8a040', '#3a7a4a', '#7a2a2a'][(k + i) % 3], -1.7 + k * 0.56, y + 0.16, 0.02, 8, 0); });
+      [[-2.5, 3.0], [-1.6, 3.0], [1.6, 3.0], [2.5, 3.0]].forEach((p, i) => { scatola(scena, 0.7, 0.35, 0.5, '#b08a5a', p[0], 0.18, p[1], 0.008); for (let k = 0; k < 4; k++) palla(scena, 0.09, ['#e0402a', '#f4a030', '#7ac040', '#f4e040'][i], p[0] - 0.2 + (k % 2) * 0.4, 0.42, p[1] - 0.1 + Math.floor(k / 2) * 0.2); ostBox(p[0], p[1], 0.8, 0.6); });
+    } else if (t === 'bottega') {
+      banconeDietro('#6a4a2a');
+      // banco da lavoro dell'artigiano, vasi, candele e lanterne
+      scatola(scena, 2.2, 0.85, 0.9, '#8a6a4a', 3.8, 0.43, -2.6, 0.015); ostBox(3.8, -2.6, 2.3, 1.0);
+      cil(scena, 0.35, 0.35, 0.12, '#5a5a60', 3.4, 0.92, -2.6, 16, 0.008); palla(scena, 0.16, '#c07a50', 3.4, 1.08, -2.6);   // tornio con l'argilla
+      scaffale(-X + 0.35, 0, 4.0, PI / 2, legno, (g, y, i) => { for (let k = 0; k < 5; k++) cil(g, 0.1, 0.16, 0.34, ['#c07a50', '#a0603a', '#d8b080'][(k + i) % 3], -1.5 + k * 0.75, y + 0.18, 0.02, 12, 0.006); });
+      for (let i = 0; i < 5; i++) { const l = new T.Mesh(new T.SphereGeometry(0.16, 10, 8), B.Mluce('#ffb45c', 0.8)); l.position.set(-2 + i * 1.0, 2.6, 0.5); scena.add(l); cil(scena, 0.008, 0.008, 0.6, '#3a3a3a', -2 + i * 1.0, 3.0, 0.5, 4, 0); }
+    } else if (t === 'banca') {
+      // gli sportelli con il vetro e l'impiegata dietro
+      scatola(scena, W - 2, 1.1, 0.7, '#5a4a3a', 0, 0.55, -2.2, 0.02); scatola(scena, W - 1.9, 0.06, 0.8, '#d8d2c4', 0, 1.13, -2.2, 0.01);
+      const vt = new T.Mesh(new T.BoxGeometry(W - 2, 1.0, 0.04), new T.MeshBasicMaterial({ color: 0xcfefff, transparent: true, opacity: 0.3 })); vt.position.set(0, 1.7, -2.2); scena.add(vt);
+      ostBox(0, -2.2, W - 1.8, 0.9);
+      [-2.5, 2.5].forEach((sx, i) => {
+        const [cv, x] = B.tela(256, 96); x.fillStyle = '#2f4a6a'; x.fillRect(0, 0, 256, 96); x.fillStyle = '#fff'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center'; x.fillText('Sportello ' + (i + 1), 128, 62);
+        const c = new T.Mesh(new T.PlaneGeometry(1.1, 0.42), new T.MeshBasicMaterial({ map: B.tex(cv) })); c.position.set(sx, 2.45, -2.17); scena.add(c);
+        comparsa(i === 0 ? 'u9' : 'u6', sx, -3.1, 0);
+        info(sx, 1.3, -1.6, 1.6, 1.8, 0.8, '', () => { if (B.Banca && B.Banca.apri) B.Banca.apri(); });
+      });
+      // il caveau e il bancomat
+      const cv = new T.Group(); cv.position.set(0, 1.6, Z0 + 0.25); scena.add(cv);
+      const porta = new T.Mesh(new T.CylinderGeometry(1.1, 1.1, 0.25, 28), M('#9aa0a8')); porta.rotation.x = PI / 2; cv.add(porta);
+      for (let i = 0; i < 6; i++) { const r = new T.Mesh(new T.BoxGeometry(0.06, 0.9, 0.06), M('#5a5a60')); r.rotation.z = i * PI / 6; r.position.z = 0.16; cv.add(r); }
+      scatola(scena, 0.8, 1.8, 0.5, '#3a4a5a', X - 0.6, 0.9, 1.8, 0.012); scatola(scena, 0.5, 0.35, 0.05, '#4fc3e8', X - 0.6, 1.4, 1.53, 0); ostBox(X - 0.6, 1.8, 0.9, 0.6);
+      info(X - 0.6, 1.0, 1.8, 0.9, 2, 0.8, '', () => { if (B.Banca && B.Banca.apri) B.Banca.apri(); });
+      // sala d'attesa
+      for (let i = 0; i < 4; i++) sedia(-4.6 + i * 0.8, 3.4, PI, '#2f4a6a');
+      [[-X + 0.7, 3.6], [X - 0.7, -3.6]].forEach(p => { const m = B.creaMobile ? B.creaMobile('pianta') : null; if (m) { m.position.set(p[0], 0, p[1]); scena.add(m); } ostacoli.push({ t: 'c', x: p[0], z: p[1], r: 0.45 }); });
+    } else if (t === 'arredi') {
+      // la sala mostra: un salotto e una camera da letto veri, e la cassa
+      const mobili = [['divano', -3.2, -2.6, 0], ['poltrona', -1.0, -2.4, 0], ['tavolino', -2.2, -0.9, 0], ['tappeto', -2.2, -1.2, 0], ['lampada', -4.8, -3.6, 0], ['libreria', -X + 0.4, 0.6, PI / 2], ['letto', 3.6, -2.4, 0], ['scrivania', 4.6, 0.6, -PI / 2], ['tv', 0.8, -4.3, 0], ['acquario', -4.4, 2.8, PI / 2], ['vaso', 1.6, 2.8, 0]];
+      mobili.forEach(([id, x, z, r]) => { if (!B.creaMobile) return; const m = B.creaMobile(id); m.position.set(x, 0, z); m.rotation.y = r; scena.add(m); const a = (B.ARREDI || []).find(q => q.id === id); if (a && id !== 'tappeto') { const c = Math.abs(Math.cos(r)) > 0.5; ostBox(x, z, (c ? a.w : a.d) * 0.9, (c ? a.d : a.w) * 0.9); } });
+      scatola(scena, 2.0, 0.95, 0.7, '#b0703c', 3.4, 0.475, 3.0, 0.015); scatola(scena, 2.1, 0.06, 0.8, '#e9d3a8', 3.4, 0.98, 3.0, 0.01); ostBox(3.4, 3.0, 2.1, 0.8);
+      const lab = B.etichetta('🛋️ Cassa: compra i mobili', { sfondo: '#fbf3dc', colore: '#3a2216', altezza: 0.34 }); lab.position.set(3.4, 1.6, 3.0); scena.add(lab);
+      info(3.4, 0.8, 3.0, 2.2, 1.6, 1.2, '', () => { if (B.NegozioArredi) B.NegozioArredi.apri(); });
+      siedi(-3.2, -2.5, 0, 0.5);
+    } else if (t === 'ambulatorio') {
+      // accettazione, sala d'attesa, studio della dottoressa con il lettino
+      scatola(scena, 3.2, 1.05, 0.7, '#e8eef0', -2.8, 0.53, -0.8, 0.015); scatola(scena, 3.3, 0.06, 0.8, '#3f8a9a', -2.8, 1.08, -0.8, 0.01); ostBox(-2.8, -0.8, 3.3, 0.8);
+      const lab = B.etichetta('Accettazione', { sfondo: '#3f8a9a', colore: '#ffffff', altezza: 0.3 }); lab.position.set(-2.8, 1.7, -0.8); scena.add(lab);
+      // tramezzo dello studio con la porta
+      scatola(scena, 0.12, 2.4, 3.2, '#dfe8ea', 1.6, 1.2, Z0 + 1.6, 0.015); ostBox(1.6, Z0 + 1.6, 0.2, 3.2);
+      scatola(scena, 3.0, 0.12 + 0, 0.5, '#f4f8fa', 3.6, 0.75, Z0 + 0.8, 0.01); cil(scena, 0.05, 0.05, 0.7, acciaio, 2.4, 0.37, Z0 + 0.8, 8, 0); cil(scena, 0.05, 0.05, 0.7, acciaio, 4.8, 0.37, Z0 + 0.8, 8, 0);   // lettino
+      scatola(scena, 0.6, 0.1, 0.45, '#ffffff', 4.8, 0.86, Z0 + 0.8, 0.006); ostBox(3.6, Z0 + 0.8, 3.1, 0.7);
+      scatola(scena, 1.4, 0.75, 0.7, '#e8eef0', 4.6, 0.38, -0.8, 0.012); ostBox(4.6, -0.8, 1.5, 0.8);   // scrivania della dottoressa
+      scatola(scena, 0.9, 2.0, 0.4, '#f4f8fa', X - 0.3, 1.0, Z0 + 2.6, 0.012); ostBox(X - 0.3, Z0 + 2.6, 0.5, 1.0);   // armadietto dei farmaci
+      const croce = new T.Group(); croce.position.set(X - 0.08, 1.4, Z0 + 2.6); croce.rotation.y = -PI / 2; scena.add(croce);
+      scatola(croce, 0.5, 0.15, 0.02, '#2fa04a', 0, 0, 0, 0); scatola(croce, 0.15, 0.5, 0.02, '#2fa04a', 0, 0, 0, 0);
+      comparsa(null, 4.6, -1.6, 0, { corpo: 1, pelle: 1, stile: 3, capelli: 5, occhi: 2, giacca: 1, dettagli: 0, abito: 0, pantaloni: 0, stivali: 0, accessorio: 0 });   // la Dottoressa Ferri
+      for (let i = 0; i < 5; i++) sedia(-4.8 + i * 0.8, 3.4, PI, '#3f8a9a');
+      info(4.2, 1.0, -1.2, 2.2, 2, 1.6, 'La Dottoressa Ferri riceve dal lunedì al sabato, 8-13 e 15-19. Visita 20 Starlight: chi sta male guarisce prima.');
+      info(-2.8, 1.0, -0.8, 3.3, 1.6, 1.0, 'Accettazione: se c\'è il segretario in turno la visita dura 15 minuti invece di 45');
+    }
+    // la bacheca del lavoro: chi cerca personale in questo posto (src/borgo/lavoro.js)
+    if (['caffetteria', 'forno', 'fioraio', 'ambulatorio'].includes(def.id)) {
+      const bx = X - 0.16, bz = 3.2;
+      const g = new T.Group(); g.position.set(bx, 1.6, bz); g.rotation.y = bx < 0 ? PI / 2 : -PI / 2; scena.add(g);
+      scatola(g, 1.0, 0.8, 0.05, '#a07a4a', 0, 0, 0, 0.01);
+      const [cv, x] = B.tela(256, 200); x.fillStyle = '#f4ead6'; x.fillRect(0, 0, 256, 200); x.fillStyle = '#5a3a22'; x.font = 'bold 30px sans-serif'; x.textAlign = 'center'; x.fillText('CERCHIAMO', 128, 70); x.fillText('PERSONALE', 128, 112); x.font = '22px sans-serif'; x.fillText('tocca qui', 128, 160);
+      const fg = new T.Mesh(new T.PlaneGeometry(0.86, 0.66), new T.MeshBasicMaterial({ map: B.tex(cv) })); fg.position.z = 0.03; g.add(fg);
+      info(bx + (bx < 0 ? 0.3 : -0.3), 1.6, bz, 0.6, 1.0, 1.2, '', () => { if (B.Lavoro) B.Lavoro.apri(def.id); });
+    }
+
+    /* ---------- luci ---------- */
+    const lampa = B.Mluce('#ffd9a0', 0.9);
+    [[-X / 2, -D / 4], [X / 2, -D / 4], [-X / 2, D / 4], [X / 2, D / 4]].forEach(p => {
+      const bu = new T.Mesh(new T.SphereGeometry(0.16, 8, 6), lampa); bu.position.set(p[0], 3.2, p[1]); scena.add(bu);
+      lampade.push({ x: p[0], y: 2.8, z: p[1] });
+    });
+
+    /* ---------- pareti che spariscono quando la camera e' dietro di loro ---------- */
+    muri.forEach(m => {
+      m.g.traverse(c => {
+        if (!c.isMesh) return;
+        const mm = c.material;
+        if (mm.isShaderMaterial || (mm.isMeshBasicMaterial && mm.side === T.BackSide)) { m.lines.push(c); return; }
+        const nuovo = mm.clone(), j = vetri.indexOf(mm); if (j >= 0) vetri[j] = nuovo;
+        c.material = nuovo; m.mats.push(nuovo);
+      });
+    });
+    function aggiornaMuri(az, dt) {
+      const cx = Math.sin(az), cz = Math.cos(az);
+      muri.forEach(m => {
+        const fuori = m.out[0] * cx + m.out[1] * cz > 0.2, target = fuori ? 0.0 : 1;
+        m.q += (target - m.q) * Math.min(1, dt * 9);
+        const q = Math.abs(m.q - target) < 0.02 ? target : m.q;
+        if (q === m.ap) return; m.ap = q;
+        m.mats.forEach(mm => { const tr = q < 0.99; if (mm.transparent !== tr) { mm.transparent = tr; mm.needsUpdate = true; } mm.opacity = q; mm.depthWrite = !tr; });
+        m.g.visible = q > 0.02;
+        m.lines.forEach(l => { l.visible = q >= 0.99; });
+      });
+    }
+    const COLORI = { giorno: ['#bfe3f2', 0.6], tramonto: ['#ffb878', 0.55], notte: ['#2c3a78', 0.5] };
+    function atm(nome) {
+      const c = COLORI[nome] || COLORI.giorno;
+      vetri.forEach(v => { v.color.set(c[0]); v.emissive.set(nome === 'notte' ? '#3a4a9a' : c[0]); v.emissiveIntensity = c[1]; });
+    }
+    const area = (x, z) => x > AREA.x0 && x < AREA.x1 && z > AREA.z0 && z < AREA.z1;
+    return { sedili, anim, ostacoli, porte, toccabili, lampade, area, aggiornaMuri, atm, limiti: AREA, w: W, d: D, rect: { x0: -X, x1: X, z0: Z0, z1: Z1 + 0.5 } };
+  }
+
+  B.costruisciInterno = costruisciInterno;
 })();
 
 </script>
@@ -30103,6 +30399,22 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
   // il tetto della torre e' un pezzo di piazza (stesso gruppo, stessa chat, gli amici ti vedono lassu')
   if (B.TettoTorre) { const tt = B.TettoTorre; stanze.tetto = { id: 'tetto', luogo: 'piazza', nome: tt.nome, pubblica: true, gruppo: gP, m: piazza, ostacoli: tt.ostacoli, porte: tt.porte, sedili: [], toccabili: [],
     area: tt.area, alt: tt.alt, zoom: 0.5, az: -PI / 2, spawn: tt.spawn, rect: stanze.piazza.rect, edifici: piazza.edifici, sfondo: stanze.piazza.sfondo }; }
+  // gli interni dei negozi e degli edifici (src/borgo/interni.js): un gruppo per interno.
+  // Quelli della piazza ci sono da subito; quelli dei negozi costruiti sui terreni si aggiungono quando servono.
+  const interni = {};
+  function aggiungiInterno(id, def) {
+    if (interni[id]) return stanze[id];
+    if (!B.costruisciInterno) return null;
+    const g = new T.Group(); g.visible = false; scene.add(g);
+    const m = B.costruisciInterno(g, Object.assign({ id }, def));
+    [g].forEach(q => { q.updateMatrix(); q.matrixAutoUpdate = false; q.matrixWorldNeedsUpdate = true; });
+    interni[id] = { g, m };
+    stanze[id] = { id, nome: def.nome, pubblica: true, interno: true, gruppo: g, m, ostacoli: m.ostacoli, porte: m.porte, sedili: m.sedili, toccabili: m.toccabili,
+      area: m.area, alt: () => 0, zoom: m.w > 12 ? 0.72 : 0.8, spawn: { x: 0, z: m.d / 2 - 1.4, yaw: PI }, rect: m.rect, edifici: [], sfondo: '#2a2040' };
+    if (G.stato.atmosfera) m.atm(G.stato.atmosfera);
+    return stanze[id];
+  }
+  Object.entries(B.INTERNI || {}).forEach(([id, def]) => aggiungiInterno(id, def));
   let stanza = stanze.piazza;
   const luci = piazza.luci;                       // 6 luci puntiformi condivise tra le stanze
   const LUCE_CASA = { giorno: 0.35, tramonto: 0.9, notte: 1.3 };
@@ -30151,7 +30463,7 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
     B.finestreMat.forEach(m => { m.emissiveIntensity = a.finestre; });
     const k = clamp(a.lampioni / 1.6, 0, 1) * 0.95;
     piazza.aloni.forEach(s => { s.material.opacity = k; });
-    casa.atm(nome); if (stanze.ospite) stanze.ospite.m.atm(nome); negozio.atm(nome); sala.atm(nome); coll.atm(nome); tcgR.atm(nome); bib.atm(nome); scac.atm(nome); Object.values(casette).forEach(c => c.m.atm(nome)); assegnaLuci();
+    casa.atm(nome); if (stanze.ospite) stanze.ospite.m.atm(nome); negozio.atm(nome); sala.atm(nome); coll.atm(nome); tcgR.atm(nome); bib.atm(nome); scac.atm(nome); Object.values(casette).forEach(c => c.m.atm(nome)); Object.values(interni).forEach(c => c.m.atm(nome)); assegnaLuci();
     piani.forEach(m => m.atm(nome));
   }
 
@@ -30318,7 +30630,7 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
   function entraStanza(id, arrivo) {
     stanza = stanze[id]; io.st = stanza; io.seduto = null; G.stato.stanzaId = id;
     if (stanza.m && stanza.m.alPiano && stanza.piano != null) stanza.m.alPiano(stanza.piano);   // piani della torre che condividono il gruppo
-    gP.visible = stanza.gruppo === gP; gTorre.forEach(g => { g.visible = stanza.gruppo === g; }); gC.visible = id === 'casa'; gN.visible = id === 'negozio'; gS.visible = id === 'sala'; gL.visible = id === 'collectibles'; gT.visible = id === 'tcg'; gB.visible = id === 'biblioteca'; gK.visible = id === 'scacchi'; gO.visible = id === 'ospite'; for (const [k, c] of Object.entries(casette)) c.g.visible = id === k;
+    gP.visible = stanza.gruppo === gP; gTorre.forEach(g => { g.visible = stanza.gruppo === g; }); gC.visible = id === 'casa'; gN.visible = id === 'negozio'; gS.visible = id === 'sala'; gL.visible = id === 'collectibles'; gT.visible = id === 'tcg'; gB.visible = id === 'biblioteca'; gK.visible = id === 'scacchi'; gO.visible = id === 'ospite'; for (const [k, c] of Object.entries(casette)) c.g.visible = id === k; for (const c of Object.values(interni)) c.g.visible = stanza.gruppo === c.g;
     const sp = arrivo || stanza.spawn;
     io.x = sp.x; io.z = sp.z; io.vx = io.vz = 0; io.yaw = sp.yaw === undefined ? 0 : sp.yaw; io.y = stanza.alt(io.x, io.z);
     C.azT = C.az = stanza.az === undefined ? PI / 4 : stanza.az; impostaZoom(stanza.zoom); if (stanza.elev) { C.elev = stanza.elev; C.elevAuto = true; } else if (C.elevAuto) { C.elev = 28; C.elevAuto = false; } C.tx = io.x; C.tz = io.z; C.ty = 1.0 + io.y;
@@ -30561,7 +30873,7 @@ Notazione: R re, D donna, T torre, A alfiere, C cavallo.</p>`, ['Ho capito']);
   { const bb = $('#btn-bici'); if (bb) bb.addEventListener('click', () => setBici(!io.bici)); }
   { const bc = $('#btn-corri'); if (bc) bc.addEventListener('click', () => { io.corre = !io.corre; bc.classList.toggle('attivo', io.corre); G.emetti('toast', io.corre ? 'Corsa attiva: ti muovi più veloce' : 'Si torna a camminare'); }); }
   B.app = {
-    io, gC, gP, piazza, libero, muovi, vistaAlto, assegnaLuci, ricostruisciCasa, casaOspite, setBici, creaBici, npc, C, cam, scene, renderer, stanze, G, joy, entraStanza, usaPorta, portaVicina, misura, atmosfera, impostaZoom,
+    aggiungiInterno, io, gC, gP, piazza, libero, muovi, vistaAlto, assegnaLuci, ricostruisciCasa, casaOspite, setBici, creaBici, npc, C, cam, scene, renderer, stanze, G, joy, entraStanza, usaPorta, portaVicina, misura, atmosfera, impostaZoom,
     inclina, emote, mostraBolla, ruota: d => { C.azT += d * PI / 2; setSegui(false); },
     stanza: () => stanza, gioco: () => giocoAttivo,
     rivesti: () => { if (G.stato.giocatore && io.av) costruisciIo(G.stato.giocatore.look); }
@@ -32013,18 +32325,21 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
   /* ---------- negozi: banconi, clienti demo, il tuo turno da venditore ---------- */
   const banconi = new Map(), ICONA = { caffetteria: '☕', forno: '🥖', fioraio: '💐' };
   let mioTurno = null, pannello = null, scelta = null, pingTimer = null, risposta = '';
+  // dal 22/11/2026 il bancone e' dentro il negozio (src/borgo/interni.js): n.stanza = l'interno; i negozi sui terreni portano anche n.interno
+  const stanzaBancone = n => { if (n.stanza && !app.stanze[n.stanza] && n.interno && app.aggiungiInterno) app.aggiungiInterno(n.stanza, { nome: n.interno.nome, tipo: B.tipoInterno ? B.tipoInterno(n.interno.tipo) : 'bottega', fuori: { x: n.interno.fuori.x, z: n.interno.fuori.z, yaw: PI } }); return (n.stanza && app.stanze[n.stanza]) || app.stanze.piazza; };
   function aggiornaNegozi(l) {
     l.forEach(n => {
       if (banconi.has(n.id)) return;
+      const st = stanzaBancone(n);
       const g = new T.Group(), r = (n.bancone.rot || 0) * PI / 180, legno = new T.MeshToonMaterial({ color: '#8a5a36' }), piano = new T.MeshToonMaterial({ color: '#e9d3a8' });
       const base = new T.Mesh(new T.BoxGeometry(2.4, 0.95, 0.7), legno); base.position.y = 0.475; base.castShadow = true; g.add(base);
       const top = new T.Mesh(new T.BoxGeometry(2.6, 0.08, 0.85), piano); top.position.y = 0.99; g.add(top);
       const lab = B.etichetta((n.icona || ICONA[n.id] || '🛒') + ' ' + n.nome, { sfondo: '#fbf3dc', colore: '#3a2216', altezza: 0.34 }); lab.position.y = 1.55; g.add(lab);
       const tocco = new T.Mesh(new T.BoxGeometry(2.6, 1.6, 1.2), new T.MeshBasicMaterial()); tocco.visible = false; tocco.position.y = 0.8; g.add(tocco);
-      g.position.set(n.bancone.x, 0, n.bancone.z); g.rotation.y = r; app.gP.add(g);
+      g.position.set(n.bancone.x, 0, n.bancone.z); g.rotation.y = r; st.gruppo.add(g); g.updateMatrixWorld(true);
       const c = Math.abs(Math.cos(r)), sn = Math.abs(Math.sin(r)), hx = (2.6 * c + 0.85 * sn) / 2, hz = (2.6 * sn + 0.85 * c) / 2;
-      app.piazza.ostacoli.push({ t: 'b', x0: n.bancone.x - hx, x1: n.bancone.x + hx, z0: n.bancone.z - hz, z1: n.bancone.z + hz, bancone: true });
-      banconi.set(n.id, { id: n.id, g, tocco });
+      st.ostacoli.push({ t: 'b', x0: n.bancone.x - hx, x1: n.bancone.x + hx, z0: n.bancone.z - hz, z1: n.bancone.z + hz, bancone: true });
+      banconi.set(n.id, { id: n.id, g, tocco, stanza: st.id });
     });
     // il mio turno: il servizio dice se sono ancora al bancone
     const io = mioNick();
@@ -32033,11 +32348,29 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     if (pannello) disegnaBancone();
   }
   // i clienti sono gli abitanti demo della piazza: camminano fino al bancone e restano li' finche' non hanno deciso
-  const ospiti = new Map();
+  const ospiti = new Map(), dentro = new Map();
+  // dentro un negozio il cliente e' una persona del borgo che entra e si mette al bancone (la sua copia in piazza resta fuori)
+  function clienteDentro(n, o) {
+    const k = n.id, c = dentro.get(k);
+    if (c && (!o || c.demo !== o.demo || o.servito)) { if (c.av.root.parent) c.av.root.parent.remove(c.av.root); B.liberaAvatar && B.liberaAvatar(c.av); dentro.delete(k); }
+    if (!o || o.servito || dentro.has(k)) return dentro.get(k);
+    const u = ((window.CONFIG || {}).utentiDemo || []).find(q => q.id === o.demo), st = app.stanze[n.stanza]; if (!u || !st) return null;
+    const av = B.unisciAvatar(B.creaAvatar(u.look || {})); av.root.position.set(n.cliente.x, 0, n.cliente.z); av.root.rotation.y = Math.atan2(n.bancone.x - n.cliente.x, n.bancone.z - n.cliente.z);
+    st.gruppo.add(av.root); av.root.updateMatrixWorld(true);
+    const e = { demo: o.demo, av, x: n.cliente.x, z: n.cliente.z, y: 0, nick: u.nick }; dentro.set(k, e); return e;
+  }
   function clientiFrame(dt) {
     const l = (A.dati && A.dati.negozi) || [], vivi = new Set();
     l.forEach(n => {
-      const o = n.ospite; if (!o) return;
+      const o = n.ospite;
+      if (n.stanza) {
+        const e = clienteDentro(n, o); if (!o) return; vivi.add(o.demo);
+        if (e) { e.av.aggiorna(dt, 0, performance.now() / 1000); B.Bolle.aggiorna(e, dt); }
+        const k = o.detto && o.detto.t;
+        if (e && k && ospiti.get(o.demo) !== k && stanzaIo() === n.stanza) { ospiti.set(o.demo, k); app.mostraBolla(e, o.detto.testo, 5); }
+        return;
+      }
+      if (!o) return;
       vivi.add(o.demo);
       const p = (app.npc || []).find(q => q.id === o.demo); if (!p) return;
       const sp = n.cliente, d = Math.hypot(p.x - sp.x, p.z - sp.z);
@@ -32071,7 +32404,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     if (mio && corpo.querySelector('.bn-testo') && corpo.dataset.cl === (o && !o.servito ? o.id : '')) { const c = corpo.querySelector('.bn-cliente'); if (c) c.innerHTML = clienteHtml(o); return; }
     corpo.dataset.cl = o && !o.servito ? o.id : '';
     let h = `<div style="font-size:20px;font-weight:700">${n.icona || ICONA[n.id] || '🛒'} ${esc(n.nome)}</div>
-      <div style="opacity:.8;font-size:12px;margin:2px 0 8px">Listino: ${n.prodotti.map(p => esc(p[0]) + ' ' + p[1]).join(' · ')}</div>`;
+      <div style="opacity:.8;font-size:12px;margin:2px 0 8px">Listino: ${n.prodotti.map(p => esc(p[0]) + ' ' + p[1] + (n.scorte && n.scorte[p[0]] != null ? ` <span style="opacity:.75">(${n.scorte[p[0]] > 0 ? n.scorte[p[0]] + ' sullo scaffale' : 'finito'})</span>` : '')).join(' · ')}</div>`;
     if (!mio) {
       h += n.chi ? `<div>Al bancone c'è <b>${esc(n.chi.nome)}</b>${n.chi.vero ? '' : ' 🤖'} fino alle ${new Date(n.chi.fine).toTimeString().slice(0, 5)}.</div>` + (o ? `<div style="margin-top:6px">Sta servendo <b>${esc(o.nome)}</b>.</div>` : '')
         : n.proprietario && !(n.proprietario.vero && mioNick() && n.proprietario.nome.toLowerCase() === mioNick().toLowerCase()) ? `<div>È il negozio di <b>${esc(n.proprietario.nome)}</b>${n.proprietario.vero ? '' : ' 🤖'}: al bancone lavora solo chi ne è proprietario. Ora è chiuso.</div>`
@@ -32083,7 +32416,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     }
     h += `<div class="bn-cliente" style="background:#1f1729;border-radius:10px;padding:8px 10px">${clienteHtml(o)}</div>`;
     if (o && !o.servito) {
-      h += `<div style="margin-top:8px;font-weight:700">Cosa gli proponi?</div><div class="bn-prod">${n.prodotti.map(p => `<button data-p="${esc(p[0])}" data-l="${p[1]}" style="margin:3px 4px 3px 0;padding:6px 9px;border-radius:10px;border:0;background:${scelta === p[0] ? '#f2c76e' : '#3d3355'};color:${scelta === p[0] ? '#2a1a2e' : '#ffe9c4'};font-size:13px;cursor:pointer">${esc(p[0])}</button>`).join('')}</div>
+      h += `<div style="margin-top:8px;font-weight:700">Cosa gli proponi?</div><div class="bn-prod">${n.prodotti.filter(p => !(n.scorte && n.scorte[p[0]] === 0)).map(p => `<button data-p="${esc(p[0])}" data-l="${p[1]}" style="margin:3px 4px 3px 0;padding:6px 9px;border-radius:10px;border:0;background:${scelta === p[0] ? '#f2c76e' : '#3d3355'};color:${scelta === p[0] ? '#2a1a2e' : '#ffe9c4'};font-size:13px;cursor:pointer">${esc(p[0])}</button>`).join('')}</div>
         <div style="display:flex;gap:6px;align-items:center;margin-top:6px">Prezzo <input class="bn-prezzo" type="number" inputmode="numeric" min="1" style="width:70px;padding:6px;border-radius:8px;border:0;font-size:16px"> Starlight</div>
         <textarea class="bn-testo" maxlength="300" rows="2" placeholder="Cosa gli dici per convincerlo?" style="width:100%;box-sizing:border-box;margin-top:6px;padding:8px 10px;border-radius:10px;border:0;font-size:16px;font-family:inherit"></textarea>` + btn('bn-proponi', '🗣️ Proponi', true);
     }
@@ -32109,7 +32442,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
   }
   async function iniziaTurno(n) {
     if (!mioNick()) return nota('Prima scegli il tuo nome nel gioco.');
-    if (stanzaIo() !== 'piazza') return nota('Devi essere in piazza.');
+    if (stanzaIo() !== (n.stanza || 'piazza')) return nota('Devi essere dentro ' + n.nome + '.');
     nota('Vado al bancone...');
     try {
       const r = await chiama('/turno', { negozio: n.id, on: true });
@@ -32122,7 +32455,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
         if (!mioTurno) { clearInterval(pingTimer); return; }
         const q = (A.dati.negozi || []).find(x => x.id === mioTurno);
         // se te ne vai dal bancone il turno finisce
-        if (!q || stanzaIo() !== 'piazza' || Math.hypot(app.io.x - q.venditore.x, app.io.z - q.venditore.z) > 4) { smettiTurno(mioTurno, 'Ti sei allontanato dal bancone: turno finito'); return; }
+        if (!q || stanzaIo() !== (q.stanza || 'piazza') || Math.hypot(app.io.x - q.venditore.x, app.io.z - q.venditore.z) > 4) { smettiTurno(mioTurno, 'Ti sei allontanato dal bancone: turno finito'); return; }
         chiama('/turno', { negozio: mioTurno, on: true }).catch(() => { });
       }, 90000);
       G.emetti('toast', (n.icona || ICONA[n.id] || '🛒') + ' Sei al bancone di ' + n.nome + ': aspetta i clienti!');
@@ -32147,7 +32480,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
       nota(risposta); setTimeout(chiedi, 100);
     } catch (e) { nota('Il borgo degli agenti non risponde, riprova tra poco.'); }
   }
-  G.su('stanza', () => { if (mioTurno) smettiTurno(mioTurno, 'Sei uscito dalla piazza: turno finito'); });
+  G.su('stanza', () => { if (mioTurno) smettiTurno(mioTurno, 'Sei uscito dal negozio: turno finito'); });
 
   /* ---------- le cose costruite ---------- */
   function geometria(f) {
@@ -32369,7 +32702,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
   function chiudiScheda() { if (A.scheda) { A.scheda.remove(); A.scheda = null; } A.voci = null; chiudiBancone(); }
   G.su('stanza', () => { chiudiScheda(); if (app) setTimeout(chiedi, 50); });
   B.agentiToccabili = () => [...A.agenti.values()].filter(e => e.av.root.visible && e.s && qui(e.s)).map(e => ({ obj: e.av.proxy, fn: () => apriScheda(e.id) }))
-    .concat(app && app.gioco() && stanzaIo() === 'piazza' ? [...banconi.values()].map(b => ({ obj: b.tocco, fn: () => apriBancone(b.id) })) : [])
+    .concat(app && app.gioco() ? [...banconi.values()].filter(b => b.stanza === stanzaIo()).map(b => ({ obj: b.tocco, fn: () => apriBancone(b.id) })) : [])
     .concat(app && app.gioco() && stanzaIo() === 'piazza' && B.Terreni ? B.Terreni.toccabili() : []);
 
   A.frame = frame; A.apriScheda = apriScheda; A.applica = applica; A.apriBancone = apriBancone; A.mioNick = mioNick; A.chiama = chiama; A.aggiorna = () => setTimeout(chiedi, 200);
@@ -32386,8 +32719,9 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
    c'e' la scheda del lotto: compra, scegli cosa costruire, guarda il cantiere.
    - La casa finita di una persona vera e' l'ingresso in piazza della sua casa
      del gioco; quella di un abitante IA diventa la sua casa.
-   - Il negozio finito ha un bancone davanti (lo disegna agenti-ia.js come gli
-     altri banconi): ci lavora solo il proprietario e tiene l'80%.
+   - Il negozio finito ha l'interno (src/borgo/interni.js) con il bancone dentro
+     (lo disegna agenti-ia.js come gli altri): ci lavora solo il proprietario e
+     tiene l'80%.
    ===================================================================== */
 (function () {
   'use strict';
@@ -32511,7 +32845,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     // la porta dell'edificio finito
     let porta = null;
     if (p && p.finito) {
-      porta = { id: 'porta-' + l.id, nome: p.nome, x: geo.porta.x, z: geo.porta.z, r: 1.35, testo: !l.chi ? 'All\'asta: ' + p.nome : abitazione(p.tipo) ? (sonoIo(l.chi) ? 'Entra in casa tua' : 'Bussa a ' + p.nome) : 'Guarda ' + p.nome, fn: () => portaLotto(l.id) };
+      porta = { id: 'porta-' + l.id, nome: p.nome, x: geo.porta.x, z: geo.porta.z, r: 1.35, testo: !l.chi ? 'All\'asta: ' + p.nome : abitazione(p.tipo) ? (sonoIo(l.chi) ? 'Entra in casa tua' : 'Bussa a ' + p.nome) : 'Entra: ' + p.nome, fn: () => portaLotto(l.id) };
       app.piazza.porte.push(porta);
     }
     return { g, tocco, ost: ost.concat(edificio ? edificio.ost : []), edificio, porta };
@@ -32536,7 +32870,12 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     const l = S.dati.find(q => q.id === id); if (!l || !l.progetto) return;
     const p = l.progetto, app = S.app, geo = l.geo;
     if (!l.chi) return apri(id);
-    if (p.tipo === 'negozio') { const b = (B.AgentiIA && B.AgentiIA.apriBancone); if (b) b(id); return; }
+    // il negozio ha l'interno (src/borgo/interni.js): si entra e il bancone e' dentro
+    if (p.tipo === 'negozio') {
+      const sid = 'bottega_' + id, st = app.stanze[sid] || (app.aggiungiInterno && app.aggiungiInterno(sid, { nome: p.nome, tipo: B.tipoInterno ? B.tipoInterno(p.genere) : 'bottega', fuori: { x: geo.ritorno.x, z: geo.ritorno.z, yaw: PI } }));
+      if (st) { G.emetti('transizione', () => app.entraStanza(sid, { x: 0, z: 3.6, yaw: PI })); return; }
+      const b = (B.AgentiIA && B.AgentiIA.apriBancone); if (b) b(id); return;
+    }
     if (sonoIo(l.chi)) {
       // la mia casa: si entra nella casa del gioco e uscendo si torna qui
       entraCasaDa('piazza', { x: geo.ritorno.x, z: geo.ritorno.z, yaw: PI });
@@ -32720,7 +33059,9 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     const fz = E.z - E.d / 2;
     g.add(mesh(new T.BoxGeometry(E.w - 0.6, 0.18, 1.0), M('#d8d2c4'), { x: E.x, y: 0.09, z: fz - 0.5, lb: 0.012 }));
     [-1, 1].forEach(sg => [1.6, 3.1].forEach(dx => g.add(mesh(new T.CylinderGeometry(0.2, 0.24, 2.5, 14), M('#f4efe2'), { x: E.x + sg * dx, y: 1.35, z: fz - 0.35, l: 0.012 }))));
-    app.piazza.porte.push({ id: 'porta-banca', nome: E.nome, x: E.porta.x, z: E.porta.z, r: 1.4, testo: '🏦 Entra in banca', fn: () => apri() });
+    // si entra davvero (src/borgo/interni.js): gli sportelli sono dentro, si tocca lo sportello per il conto, il mutuo e il prestito
+    if (app.stanze.banca) app.piazza.porte.push({ id: 'porta-banca', nome: E.nome, x: E.porta.x, z: E.porta.z, r: 1.4, testo: '🏦 Entra in banca', verso: 'banca', arrivo: { x: 0, z: 3.6, yaw: PI } });
+    else app.piazza.porte.push({ id: 'porta-banca', nome: E.nome, x: E.porta.x, z: E.porta.z, r: 1.4, testo: '🏦 Entra in banca', fn: () => apri() });
   }
 
   /* ---------- dati ---------- */
@@ -32938,6 +33279,152 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
   function entraAppartamento() { const a = mioAppartamento(); if (a && B.Terreni && B.Terreni.entraCasaDa) B.Terreni.entraCasaDa(a.id, { x: 5.4, z: -4.5, yaw: PI }); }
 
   B.Banca = { applica, apri, chiudi, stato: S, vociAscensore, entraAppartamento, mioAppartamento };
+})();
+/* =====================================================================
+   THE BORG 3D - IL LAVORO DA DIPENDENTE (anche per le persone vere)
+   Chiesto da Boris il 22/11/2026: "metti piu' mestieri, ogni casa e
+   mestiere deve funzionare". I mestieri e i loro effetti stanno nel servizio
+   degli agenti (agenti/vita/mestieri.mjs e agenti/lavori.mjs): fornaio,
+   pasticcere, barista, fioraio, facchino, bibliotecario, spazzino,
+   giardiniere, muratore, segretario dell'Ambulatorio. Valgono uguali per
+   Ada, Teo e chi gioca: il pane che sforni finisce davvero sugli scaffali
+   del Forno, la piazza che pulisci torna pulita per tutti.
+   - La bacheca "Cerchiamo personale" dentro Caffetteria, Forno, Fioraio e
+     Ambulatorio (src/borgo/interni.js) e quella in piazza, accanto alla
+     Porta del Borgo, aprono questa scheda.
+   - Un turno dura 20 minuti veri; si resta nel posto di lavoro. Paga
+     4 Starlight al minuto (80 a turno), il tempo davvero lavorato.
+   - In piazza compaiono le cartacce quando nessuno la pulisce.
+   ===================================================================== */
+(function () {
+  'use strict';
+  const B = window.B3, T = B.T, M = B.M, G = window.Gioco, PI = Math.PI;
+  const S = { el: null, dove: null, mio: null, ping: null, timer: null, cartacce: null, nCart: -1, bacheca: false, nota: '' };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const SL = () => (B.ECONOMIA ? B.ECONOMIA.moneta.nome : 'Starlight');
+  const A = () => B.AgentiIA || {};
+  const app = () => B.app;
+  const dati = () => (A().dati && A().dati.lavori) || null;
+  const stanzaIo = () => { const st = app() && app().stanza(); return st ? st.luogo || st.id : ''; };
+  const ICONE = { fornaio: '🥖', pasticcere: '🥐', barista: '☕', fioraio: '💐', facchino: '📦', bibliotecario: '📚', spazzino: '🧹', giardiniere: '🌱', muratore: '🧱', segretario: '🗂️' };
+  const ora = () => +new Date().toLocaleString('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false }) % 24;
+
+  /* ---------- la scheda ---------- */
+  function chiudi() { if (S.el) { S.el.remove(); S.el = null; } }
+  function apri(dove) {
+    chiudi(); S.dove = dove || null;
+    const el = document.createElement('div'); el.id = 'lavoro-scheda';
+    el.style.cssText = 'position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(92vw,440px);max-height:66vh;overflow:auto;z-index:60;background:#2a1f36;color:#ffe9c4;border:2px solid #f2c76e;border-radius:16px;padding:14px 16px;font-family:sans-serif;font-size:14px;line-height:1.35;box-shadow:0 8px 30px rgba(0,0,0,.45)';
+    el.innerHTML = '<button aria-label="Chiudi" class="lv-x" style="position:absolute;right:8px;top:6px;background:none;border:0;color:#ffe9c4;font-size:22px;cursor:pointer">×</button><div class="lv-corpo"></div>';
+    el.querySelector('.lv-x').addEventListener('click', chiudi);
+    ['pointerdown', 'touchstart'].forEach(ev => el.addEventListener(ev, e => e.stopPropagation(), { passive: true }));
+    (document.getElementById('app') || document.body).appendChild(el);
+    S.el = el; disegna();
+  }
+  const btn = (cls, txt, pieno, extra) => `<button class="${cls}" ${extra || ''} style="margin-top:6px;width:100%;padding:8px;border-radius:10px;border:${pieno ? '0' : '2px solid #f2c76e'};background:${pieno ? '#f2c76e' : 'none'};color:${pieno ? '#2a1a2e' : '#ffe9c4'};font-weight:700;font-size:14px;cursor:pointer">${txt}</button>`;
+  function disegna() {
+    const el = S.el; if (!el) return;
+    const d = dati(), corpo = el.querySelector('.lv-corpo');
+    if (!d) { corpo.innerHTML = '<div style="font-size:18px;font-weight:700">📋 Cerchiamo personale</div><p>Il borgo degli agenti non risponde: riprova tra poco.</p>'; return; }
+    const tutti = Object.entries(d.mestieri), qui = S.dove ? tutti.filter(([, m]) => m.stanza === S.dove) : tutti;
+    const h = ora();
+    let s = `<div style="font-size:19px;font-weight:700">📋 Cerchiamo personale${S.dove && app().stanze[S.dove] ? ' · ' + esc(app().stanze[S.dove].nome) : ''}</div>
+      <div style="opacity:.85;font-size:12px;margin:2px 0 8px">Turno di ${d.turnoGiocatoreMin} minuti, paga ${d.pagaGiocatoreMin} ${SL()} al minuto (${d.turnoGiocatoreMin * d.pagaGiocatoreMin} a turno). Quello che fai resta nel borgo, per tutti: lo vedono anche Ada e Teo. Orari di Roma.</div>`;
+    if (S.mio) {
+      const m = d.mestieri[S.mio.mestiere], resta = Math.max(0, Math.ceil((S.mio.fine - Date.now()) / 60000));
+      s += `<div style="background:#1f1729;border-radius:10px;padding:8px 10px;margin-bottom:6px">${ICONE[S.mio.mestiere] || '🧰'} Stai lavorando da <b>${esc(m ? m.nome : S.mio.mestiere)}</b>: mancano ${resta} minuti. Non allontanarti.</div>` + btn('lv-smetti', 'Smetti (ti pagano il tempo lavorato)', false);
+    }
+    qui.forEach(([k, m]) => {
+      const oggi = !m.giorni || m.giorni.includes(new Date().getDay());
+      const aperto = m.aperto && oggi && h >= m.dalle && h < m.alle, pieno = m.occupati >= m.posti;
+      const stato = !m.aperto ? 'nessun cantiere aperto' : !oggi ? 'oggi è chiuso' : !aperto ? `si lavora dalle ${m.dalle} alle ${m.alle}` : pieno ? 'posto occupato' : `${m.posti - m.occupati} post${m.posti - m.occupati > 1 ? 'i liberi' : 'o libero'}`;
+      s += `<div style="border-top:1px solid #4a3d5e;margin-top:8px;padding-top:8px"><b>${ICONE[k] || '🧰'} ${esc(m.nome)}</b> <span style="opacity:.75;font-size:12px">· ${esc(m.luogo)} · ${m.dalle}-${m.alle}${m.giorni ? ' lun-sab' : ''}</span>
+        <div style="font-size:13px;opacity:.9">${esc(m.descrizione)}</div><div style="font-size:12px;opacity:.75">${esc(stato)}</div>` +
+        (!S.mio && aperto && !pieno ? btn('lv-inizia', '🧑‍🔧 Fai un turno da ' + esc(m.nome), true, `data-m="${k}"`) : '') + '</div>';
+    });
+    if (!S.dove) s += `<div style="margin-top:10px;font-size:12px;opacity:.8">${d.sporcizia >= 45 ? '🧹 La piazza è sporca (' + d.sporcizia + '/100): serve uno spazzino.' : '✨ La piazza è pulita (' + d.sporcizia + '/100).'}</div>`;
+    s += `<div class="lv-nota" style="font-size:13px;margin-top:8px">${esc(S.nota)}</div>`;
+    corpo.innerHTML = s;
+    corpo.querySelectorAll('.lv-inizia').forEach(b => b.addEventListener('click', () => inizia(b.dataset.m)));
+    const sm = corpo.querySelector('.lv-smetti'); if (sm) sm.addEventListener('click', () => finisci(false, 'Hai smesso di lavorare'));
+  }
+  const nota = t => { S.nota = t; const x = S.el && S.el.querySelector('.lv-nota'); if (x) x.textContent = t; };
+
+  /* ---------- il turno ---------- */
+  // dove si lavora: dentro l'edificio giusto, oppure in piazza per i mestieri all'aperto
+  const postoGiusto = m => (m.stanza ? stanzaIo() === m.stanza : stanzaIo() === 'piazza');
+  async function inizia(k) {
+    const d = dati(), m = d && d.mestieri[k]; if (!m) return;
+    if (!A().mioNick || !A().mioNick()) return nota('Prima scegli il tuo nome nel gioco.');
+    if (!postoGiusto(m)) return nota(m.stanza ? `Per fare il ${m.nome} devi essere dentro: ${m.luogo}.` : `Il ${m.nome} lavora in piazza: esci prima.`);
+    nota('...');
+    let r; try { r = await A().chiama('/dipendente', { mestiere: k, on: true }); } catch (e) { return nota('Il borgo degli agenti non risponde, riprova tra poco.'); }
+    if (!r || !r.ok) return nota((r && r.motivo) || 'Non si può, riprova.');
+    S.mio = { mestiere: k, fine: r.fine, stanza: stanzaIo() };
+    G.emetti('toast', `${ICONE[k] || '🧰'} Turno da ${m.nome} iniziato: ${d.turnoGiocatoreMin} minuti`);
+    clearInterval(S.ping); clearTimeout(S.timer);
+    S.ping = setInterval(() => {
+      if (!S.mio) return clearInterval(S.ping);
+      if (stanzaIo() !== S.mio.stanza) return finisci(false, 'Ti sei allontanato dal lavoro: turno finito');
+      A().chiama('/dipendente', { mestiere: S.mio.mestiere, on: true }).catch(() => { });
+      disegna();
+    }, 90000);
+    S.timer = setTimeout(() => finisci(true, 'Turno finito!'), Math.max(1000, r.fine - (Date.now() + (A().scarto || 0))));
+    nota(''); disegna();
+    if (A().aggiorna) A().aggiorna();
+  }
+  async function finisci(completo, msg) {
+    if (!S.mio) return;
+    const k = S.mio.mestiere; S.mio = null; clearInterval(S.ping); clearTimeout(S.timer);
+    let r = null; try { r = await A().chiama('/dipendente', completo ? { mestiere: k, fine: true } : { mestiere: k, on: false }); } catch (e) { /* pazienza */ }
+    if (r && r.ok && r.paga > 0 && B.Eco) B.Eco.add(r.paga, 'piazza');
+    G.emetti('toast', `${ICONE[k] || '🧰'} ${msg}` + (r && r.paga ? ` +${r.paga} ${SL()}` : '') + (r && r.effetto ? ' · ' + r.effetto : ''));
+    nota(r && r.effetto ? r.effetto : ''); disegna();
+    if (A().aggiorna) A().aggiorna();
+  }
+  G.su && G.su('stanza', () => { if (S.mio && stanzaIo() !== S.mio.stanza) finisci(false, 'Sei uscito dal posto di lavoro: turno finito'); if (S.el) chiudi(); });
+
+  /* ---------- in piazza: la bacheca accanto alla Porta del Borgo e le cartacce ---------- */
+  function bacheca(a) {
+    if (S.bacheca || !a || !a.piazza) return; S.bacheca = true;
+    let x = 4.6, z = 37.2; for (const p of [[4.6, 37.2], [-4.6, 37.2], [5.5, 35.5], [-5.5, 35.5]]) if (a.libero(a.stanze.piazza, p[0], p[1], 0.8)) { x = p[0]; z = p[1]; break; }
+    const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = x > 0 ? -0.5 : 0.5; a.gP.add(g);
+    [-0.55, 0.55].forEach(dx => g.add(B.mesh(new T.BoxGeometry(0.1, 1.8, 0.1), M('#6b4326'), { x: dx, y: 0.9, z: 0, l: 0.01 })));
+    g.add(B.mesh(new T.BoxGeometry(1.4, 1.0, 0.08), M('#a07a4a'), { y: 1.45, z: 0, lb: 0.012 }));
+    const [cv, c] = B.tela(256, 180); c.fillStyle = '#f4ead6'; c.fillRect(0, 0, 256, 180); c.fillStyle = '#5a3a22'; c.textAlign = 'center'; c.font = 'bold 30px sans-serif'; c.fillText('LAVORO', 128, 58); c.font = 'bold 22px sans-serif'; c.fillText('Cerchiamo personale', 128, 100); c.font = '20px sans-serif'; c.fillText('fornaio · spazzino · muratore…', 128, 140);
+    const f = new T.Mesh(new T.PlaneGeometry(1.26, 0.88), new T.MeshBasicMaterial({ map: B.tex(cv) })); f.position.set(0, 1.45, 0.05); g.add(f);
+    const tocco = new T.Mesh(new T.BoxGeometry(1.5, 2, 0.6), new T.MeshBasicMaterial()); tocco.visible = false; tocco.position.y = 1; g.add(tocco);
+    g.updateMatrixWorld(true);
+    a.piazza.ostacoli.push({ t: 'c', x, z, r: 0.6 });
+    a.piazza.toccabili.push({ obj: tocco, fn: () => apri(null) });
+    a.piazza.porte.push({ id: 'porta-bacheca-lavoro', nome: 'Bacheca del lavoro', x: x + (x > 0 ? -0.4 : 0.4), z: z + 0.9, r: 1.0, testo: '📋 Cerchiamo personale', fn: () => apri(null) });
+  }
+  function cartacce(a, n) {
+    n = Math.max(0, Math.min(40, Math.round(n)));
+    if (n === S.nCart) return; S.nCart = n;
+    if (!S.cartacce) {
+      S.cartacce = new T.Group(); a.gP.add(S.cartacce);
+      // sempre negli stessi posti (seme fisso), solo dove si cammina
+      let k = 7; const rnd = () => { k = (k * 16807) % 2147483647; return k / 2147483647; };
+      const colori = ['#f4f1ea', '#e8d8a0', '#c8d8e8', '#e0b0a0', '#a8c890'];
+      for (let i = 0, prove = 0; i < 40 && prove < 600; prove++) {
+        const x = -40 + rnd() * 80, z = 2 + rnd() * 62; if (!a.libero(a.stanze.piazza, x, z, 0.3)) continue;
+        const m = new T.Mesh(i % 3 ? new T.PlaneGeometry(0.22, 0.16) : new T.CircleGeometry(0.1, 6), new T.MeshBasicMaterial({ color: colori[i % colori.length], side: T.DoubleSide }));
+        m.rotation.x = -PI / 2 + (rnd() - 0.5) * 0.4; m.rotation.z = rnd() * PI * 2; m.position.set(x, 0.03, z); m.visible = false; S.cartacce.add(m); i++;
+      }
+    }
+    S.cartacce.children.forEach((m, i) => { m.visible = i < n; });
+    S.cartacce.updateMatrixWorld(true);
+  }
+  function frame() {
+    const a = app(); if (!a || !a.gP) return;
+    bacheca(a);
+    const d = dati(); if (d) cartacce(a, d.sporcizia >= 30 ? (d.sporcizia - 25) / 75 * 40 : 0);
+    if (S.el && !S.mio) disegna();
+  }
+  setInterval(frame, 5000);
+  setTimeout(frame, 1500);
+  B.Lavoro = { apri, chiudi, stato: S };
 })();
 </script>
 <script>

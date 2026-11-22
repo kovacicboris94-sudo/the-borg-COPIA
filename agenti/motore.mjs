@@ -19,6 +19,9 @@ import { cosaDi, manuale, merceDi, mobileDi, portafoglio, SEDUTE } from './borgo
 import { NEGOZI, CLIENTI, REGOLE_NEGOZI as RN, negozioDi, prodottoDi, decide } from './negozi.mjs';
 import { LOTTI, lottoDi, geometria, compraLotto, avviaCantiere, passoCantieri, negoziDeiLotti, vistaTerreni, listinoTerreni, terrenoDi, costoProgetto, PROGETTI, GENERI, faseDi, finePrevista, REGOLE_TERRENI as RT, tipoDi, abitazione, UN, APPARTAMENTI, appartamentoDato, appartamentoDi, compraAppartamento, immobileDi, prezzoAppartamento, vistaAppartamenti } from './terreni.mjs';
 import { BANCA, REGOLE_BANCA as RB, passoBanca, maturaGiocatore, chiediMutuo, chiediPrestito, rimborsa, vistaConto, vistaBanca, pianoMutuo, contoDi } from './banca.mjs';
+import { INTERNI, SPORTELLO, internoBottega, idBottega } from './interni.mjs';
+import { passoBorgo, passoDipendenti, effettoMestiere, disponibile, togliScorta, scorteDi, descriviPiazza, vistaLavori, giocatoreDipendente as dipendenteDelGioco, inTurno } from './lavori.mjs';
+import { MESTIERI, cercaMestiere } from './vita/mestieri.mjs';
 import { passoVita, azioneVita, occupato, percezioneAgente, routineVita, normalizzaAzioneVita, promptVita, TIPI_VITA, bisognoUrgente, pianoPerMotore, vistaVita } from './vita/aggancio.mjs';
 export const MODELLO = 'claude-haiku-5-5';
 
@@ -79,7 +82,8 @@ export const LUOGHI = [
   { nome: 'Laugh Tale Collectibles', x: -40, z: -3 },
   { nome: 'Fioraio', x: 47, z: 50 },
   { nome: 'Arredamenti', x: -47, z: 4 },
-  { nome: 'Banca del Borgo', x: 32, z: 43 }
+  { nome: 'Banca del Borgo', x: 32, z: 43 },
+  { nome: 'Ambulatorio', x: 31, z: -3 }
 ];
 // Gli edifici in cui si puo' entrare (stesse misure del gioco, src/borgo/programma-principale.js).
 // Dentro, x e z sono quelle della stanza. "porta": dove si entra (in piazza, o dentro la stanza "da").
@@ -102,7 +106,10 @@ export const STANZE = [
     arrivo: { x: -50.5, z: 30.2 }, uscita: { x: -51.1, z: 30.2 }, ritorno: { x: 5.4, z: -4.5 }, asc: { x: -51.1, z: 30.2 }, ascArrivo: { x: -50.5, z: 30.2 } },
   // le casette degli abitanti, sul lato sud della piazza (src/borgo/casette-agenti.js e agenti/vita/casa.mjs): ci entra solo chi ci abita
   { id: 'casa_ada', nome: 'Casa di Ada', casa: 'ada', porta: { x: -22, z: 59.6 }, rect: { x0: -4, x1: 4, z0: -3.5, z1: 3.5 }, arrivo: { x: 0, z: 2.4 }, uscita: { x: 0, z: 2.6 }, ritorno: { x: -22, z: 58.6 } },
-  { id: 'casa_teo', nome: 'Casa di Teo', casa: 'teo', porta: { x: 22, z: 59.6 }, rect: { x0: -4, x1: 4, z0: -3.5, z1: 3.5 }, arrivo: { x: 0, z: 2.4 }, uscita: { x: 0, z: 2.6 }, ritorno: { x: 22, z: 58.6 } }
+  { id: 'casa_teo', nome: 'Casa di Teo', casa: 'teo', porta: { x: 22, z: 59.6 }, rect: { x0: -4, x1: 4, z0: -3.5, z1: 3.5 }, arrivo: { x: 0, z: 2.4 }, uscita: { x: 0, z: 2.6 }, ritorno: { x: 22, z: 58.6 } },
+  // dal 22/11/2026 si entra anche in Caffetteria, Forno, Fioraio, Arredamenti, Banca e nel nuovo Ambulatorio (agenti/interni.mjs);
+  // i negozi costruiti sui terreni ("bottega_lottoN") si aggiungono in sincronizzaTerreni
+  ...INTERNI
 ];
 export const stanzaDi = id => STANZE.find(q => q.id === id) || null;
 function cercaStanza(nome) {
@@ -122,7 +129,7 @@ const PROTETTE = [
   { x: -38, z: 40, r: 5 }, { x: -35, z: 58, r: 7 }, { x: -46, z: 26, r: 8.5 },
   { x: -13.5, z: 5, r: 3.5 }, { x: -6.5, z: 5, r: 3.5 }, { x: 6.5, z: 5, r: 3.5 }, { x: 13.5, z: 5, r: 3.5 },
   ...[44, -12, 18, -22, -32, -27.7, 3, -40].map(x => ({ x, z: -4, r: 3.5 })),
-  { x: 48, z: 50, r: 4 }, { x: -48, z: 4, r: 4 }
+  { x: 48, z: 50, r: 4 }, { x: -48, z: 4, r: 4 }, { x: 31, z: -4, r: 3.5 }, { x: 32, z: 44, r: 3 }
 ];
 
 export const FORME = ['cubo', 'cilindro', 'sfera', 'cono', 'piramide'];
@@ -375,7 +382,11 @@ export async function passo(stato, adesso, cervello, opz = {}) {
   const agenti = Object.values(stato.agenti);
 
   // 0) la vita vera: il corpo consuma, digerisce, ha sete e sonno; il fuoco brucia, il cibo invecchia, si pagano le bollette
-  if (regole.vita) passoVita(stato, adesso);
+  const evVita = regole.vita ? passoVita(stato, adesso) : [];
+  // il lavoro fatto cambia il borgo (pane sugli scaffali, cantieri, piazza pulita...): agenti/lavori.mjs
+  passoBorgo(stato, adesso, dt);
+  for (const e of evVita || []) if (e.tipo === 'lavoro_finito' && e.mestiere) lavoroFatto(stato, e.chi, e.mestiere, e.ore, adesso, e.lotto);
+  for (const f of passoDipendenti(stato, adesso)) if (f.effetto) { const prima = stato.ora; stato.ora = adesso; evento(stato, { chi: f.chi, tipo: 'usa', testo: f.effetto, x: 0, z: 30 }); stato.ora = prima; }
   sincronizzaTerreni(stato);
   for (const id of passoCantieri(stato, adesso, dt)) cantiereFinito(stato, id, adesso);
   for (const f of passoBanca(stato, adesso, id => stato.agenti[id] && !stato.agenti[id].morto ? portafoglio(stato.agenti[id]) : null)) fattoBanca(stato, f, adesso);
@@ -507,6 +518,8 @@ function eseguiVita(stato, ag, a, adesso, regole) {
     ag.abitudineDopo = Math.max(ag.abitudineDopo || 0, adesso + 30 * 60000);
     return 'cammina';
   }
+  // il turno da dipendente dentro un edificio: si va al proprio posto (il forno, la macchina del caffe', l'accettazione)
+  if (r.ok && a.tipo === 'turno') { const M = MESTIERI[cercaMestiere(a.nome || a.luogo)]; if (M && M.posto && M.stanza === ag.stanza) { ag.x = ag.tx = M.posto.x; ag.z = ag.tz = M.posto.z; ag.ancora = { x: M.posto.x, z: M.posto.z }; } }
   if (!a.auto && r.esito) esito(ag, a.tipo + ': ' + r.esito);
   if (r.ok && r.esito && !a.auto) annota(ag, adesso, `${a.tipo}${a.nome ? ' ' + a.nome : ''}: ${r.esito}`);
   if (r.ok && !a.auto) evento(stato, { chi: ag.id, tipo: 'vita', testo: a.tipo + (a.nome || a.cosa ? ' ' + (a.nome || a.cosa) : ''), x: ag.x, z: ag.z });
@@ -754,7 +767,9 @@ function usa(stato, ag, a, adesso, regole) {
     ag.coda.unshift(Object.assign({}, a, { inCammino: true })); return 'cammina';
   }
   ag.meta = null; ag.ancora = { x: p.x, z: p.z };
-  const L = { tipo: 'usa', id: c.id, nome: c.nome, icona: c.icona, richiesta: a.richiesta || '', inizio: adesso, fine: adesso + c.min * 60000 };
+  const chiuso = c.aperto && c.aperto(stato, adesso); if (chiuso) return esito(ag, `usa ${c.nome}: ${chiuso}`);
+  const min = c.minuti ? c.minuti(stato) : c.min;
+  const L = { tipo: 'usa', id: c.id, nome: c.nome, icona: c.icona, richiesta: a.richiesta || '', inizio: adesso, fine: adesso + min * 60000 };
   // scacchi: se un altro abitante e' gia' al tavolo, si gioca insieme e la partita riparte per tutti e due
   if (c.id === 'scacchi') {
     const altro = Object.values(stato.agenti).find(q => q !== ag && q.stanza === ag.stanza && q.lavoro && q.lavoro.id === 'scacchi' && !q.lavoro.compagno);
@@ -767,7 +782,7 @@ function usa(stato, ag, a, adesso, regole) {
   }
   ag.lavoro = L;
   evento(stato, { chi: ag.id, tipo: 'usa', testo: c.nome, x: ag.x, z: ag.z });
-  return esito(ag, `usa ${c.nome}: iniziato, ci vorranno ${c.min} minuti`);
+  return esito(ag, `usa ${c.nome}: iniziato, ci vorranno ${min} minuti`);
 }
 function fineUso(stato, ag, L, adesso) {
   if (L.oggetto) { const r = `Sei rimasto seduto un po' su ${L.nome}, poi ti sei alzato.`; esito(ag, `usa ${L.id}: finito. ${r}`); annota(ag, adesso, r); return; }
@@ -880,6 +895,13 @@ function descriviLavoro(L) {
   if (L.tipo === 'usa') return L.nome ? `, sta usando: ${L.nome}` : ', e\' occupato';
   return ', e\' occupato';
 }
+// quello che vedi entrando in un negozio: il bancone, chi ci lavora, cosa c'e' sugli scaffali
+function descriviNegozio(stato, neg) {
+  const t = chiLavora(stato, neg.id), sc = scorteDi(stato, neg.id), b = neg.bancone;
+  const lav = Object.entries(MESTIERI).filter(([, m]) => m.stanza === neg.stanza).map(([k, m]) => { const q = inTurno(stato, k).map(id => nomeDi(stato, id)); return q.length ? `${q.join(' e ')} fa ${m.nome}` : ''; }).filter(Boolean);
+  return `IN QUESTO NEGOZIO: il bancone e' a x=${b.x} z=${b.z}` + (t ? `, ci sta ${nomeDi(stato, t[0])} fino alle ${oraBreve(t[1].fine)}` : ', libero (puoi fare un turno con "lavora")') + '.' + (lav.length ? ' Al lavoro: ' + lav.join(', ') + '.' : '') +
+    ' Listino: ' + neg.prodotti.map(p => { const m = disponibile(stato, neg, p); return p[0] + ' ' + p[1] + (sc && sc[p[0]] != null ? ` (${sc[p[0]]} sullo scaffale)` : m ? ' (ora non si fa)' : ''); }).join(', ') + '.';
+}
 export function percezione(stato, ag, adesso, regole = REGOLE) {
   const b = budget(ag, adesso, regole), vicino = luogoVicino(ag);
   const righe = [];
@@ -892,7 +914,8 @@ export function percezione(stato, ag, adesso, regole = REGOLE) {
   const qui = ag.stanza && stanzaDi(ag.stanza);
   if (qui) righe.push(`DOVE SEI: dentro ${qui.nome}, x=${Math.round(ag.x)} z=${Math.round(ag.z)} (la stanza va da x=${qui.rect.x0} a ${qui.rect.x1} e da z=${qui.rect.z0} a ${qui.rect.z1}; la porta per uscire e' a x=${qui.uscita.x} z=${qui.uscita.z}).` +
     (STANZE.some(q => q.da === qui.id) ? ` Da qui si entra anche in ${STANZE.filter(q => q.da === qui.id).map(q => q.nome).join(', ')}.` : '') + ' Chi e\' in piazza non ti vede e non ti sente.');
-  else righe.push(`DOVE SEI: in piazza, x=${Math.round(ag.x)} z=${Math.round(ag.z)}, ${vicino.d <= 4 ? 'a' : 'vicino a'} ${vicino.nome}.` + (ag.bici ? ' Sei in bici.' : '') + (ag.lavoro ? (ag.lavoro.tipo === 'usa' ? ` Stai usando: ${ag.lavoro.nome}.` : ' Stai ancora lavorando.') : ''));
+  else righe.push(`DOVE SEI: in piazza, x=${Math.round(ag.x)} z=${Math.round(ag.z)}, ${vicino.d <= 4 ? 'a' : 'vicino a'} ${vicino.nome}.` + (ag.bici ? ' Sei in bici.' : '') + (ag.lavoro ? (ag.lavoro.tipo === 'usa' ? ` Stai usando: ${ag.lavoro.nome}.` : ' Stai ancora lavorando.') : '') + (descriviPiazza(stato) ? ' ' + descriviPiazza(stato) : ''));
+  if (qui) { const neg = NEGOZI.find(n => n.stanza === qui.id); if (neg) righe.push(descriviNegozio(stato, neg)); }
   const tu = (stato.turni || {})[ag.id];
   if (tu) {
     const neg = negozioDi(tu.negozio), cl = clienteDi(stato, neg.id), cc = cl && CLIENTI.find(q => q.demo === cl.demo);
@@ -1131,7 +1154,8 @@ function fineTurno(stato, chi, adesso, perche) {
 function lavora(stato, ag, a, adesso, regole) {
   if (a.smetti) { if (!(stato.turni || {})[ag.id]) return esito(ag, 'lavora: non stai lavorando'); fineTurno(stato, ag.id, adesso, 'hai smesso'); return; }
   const neg = negozioDi(a.negozio);
-  if (ag.stanza) { ag.coda.unshift(a); return esegui(stato, ag, { tipo: 'esci', auto: true }, adesso, regole); }
+  // il bancone e' dentro il negozio: prima si entra (o si esce da dove si e')
+  if ((ag.stanza || null) !== (neg.stanza || null)) { ag.coda.unshift(a); return esegui(stato, ag, neg.stanza ? { tipo: 'entra', stanza: neg.stanza, auto: true, inCammino: true } : { tipo: 'esci', auto: true }, adesso, regole); }
   if (neg.proprietario && neg.proprietario !== ag.id) return esito(ag, `lavora ${neg.nome}: rifiutata, e' il negozio di ${nomeDi(stato, neg.proprietario)}: ci lavora solo chi ne e' proprietario`);
   const altro = chiLavora(stato, neg.id);
   if (altro && altro[0] !== ag.id) return esito(ag, `lavora ${neg.nome}: rifiutata, al bancone c'e' gia' ${nomeDi(stato, altro[0])}`);
@@ -1156,16 +1180,18 @@ function proponi(stato, chi, neg, d, adesso) {
   if (!c) return { ok: false, motivo: 'Al bancone non c\'e\' nessun cliente.' };
   const cc = CLIENTI.find(q => q.demo === c.demo), prod = prodottoDi(neg, d.prodotto);
   if (!prod) return { ok: false, motivo: `${neg.nome} non vende "${d.prodotto}". Listino: ${neg.prodotti.map(p => p[0]).join(', ')}.` };
+  const manca = disponibile(stato, neg, prod); if (manca) return { ok: false, motivo: manca };
   const prezzo = Math.round(lim(d.prezzo == null || !isFinite(d.prezzo) ? prod[1] : d.prezzo, Math.ceil(prod[1] * RN.prezzoMin), Math.floor(prod[1] * RN.prezzoMax)));
   c.tentativi++;
   const r = decide(Object.assign({}, cc, { soldi: c.soldi }), neg, prod, prezzo, d.testo, c.tentativi);
   const prima = stato.ora; stato.ora = adesso;
-  if (d.testo) evento(stato, { chi, tipo: 'parla', testo: d.testo, x: neg.venditore.x, z: neg.venditore.z });
+  if (d.testo) evento(stato, { chi, tipo: 'parla', testo: d.testo, x: neg.venditore.x, z: neg.venditore.z, stanza: neg.stanza || null });
   c.detto = { testo: r.frase, t: adesso };
-  evento(stato, { chi: 'd:' + c.nome, tipo: 'parla', testo: r.frase, x: neg.cliente.x, z: neg.cliente.z });
+  evento(stato, { chi: 'd:' + c.nome, tipo: 'parla', testo: r.frase, x: neg.cliente.x, z: neg.cliente.z, stanza: neg.stanza || null });
   stato.ora = prima;
   let guadagno = 0;
   if (r.compra) {
+    togliScorta(stato, neg, prod);
     guadagno = Math.max(1, Math.round(prezzo * (neg.proprietario === chi ? RT.quotaProprietario : RN.quota))); c.servito = true; c.comprato = prod[0]; c.via = adesso + 20000;
     const t = stato.turni[chi]; if (t) { t.vendite = (t.vendite || 0) + 1; t.guadagno = (t.guadagno || 0) + guadagno; }
   } else if (c.tentativi >= RN.tentativi) { c.servito = true; c.via = adesso + 20000; }
@@ -1191,7 +1217,7 @@ function passoNegozi(stato, adesso, regole) {
     const ag = stato.agenti[chi], v = negozioDi(t.negozio).venditore;
     if (adesso > t.fine) fineTurno(stato, chi, adesso, 'turno finito');
     else if (!ag && adesso - (t.ping || 0) > RN.pingGiocatoreMs) fineTurno(stato, chi, adesso, 'non c\'eri piu\'');
-    else if (ag && (ag.stanza || ag.lavoro || Math.hypot(ag.x - v.x, ag.z - v.z) > 3)) fineTurno(stato, chi, adesso, 'te ne sei andato');
+    else if (ag && ((ag.stanza || null) !== (negozioDi(t.negozio).stanza || null) || ag.lavoro || Math.hypot(ag.x - v.x, ag.z - v.z) > 3)) fineTurno(stato, chi, adesso, 'te ne sei andato');
   }
   const C = stato.clienti || (stato.clienti = []), P = stato.prossimoCliente || (stato.prossimoCliente = {}), V = stato.clientiVisti || (stato.clientiVisti = {});
   for (let i = C.length - 1; i >= 0; i--) {
@@ -1210,7 +1236,7 @@ function passoNegozi(stato, adesso, regole) {
       soldi: Math.max(5, Math.round(q.soldi * (0.6 + Math.random() * 0.8))), detto: { testo: caso(['Buongiorno!', 'Ciao! Cosa c\'e\' di buono?', 'Salve...', 'Eccomi!']), t: adesso } };
     C.push(c);
     const prima = stato.ora; stato.ora = adesso;
-    evento(stato, { chi: 'd:' + q.nome, tipo: 'parla', testo: c.detto.testo, x: neg.cliente.x, z: neg.cliente.z });
+    evento(stato, { chi: 'd:' + q.nome, tipo: 'parla', testo: c.detto.testo, x: neg.cliente.x, z: neg.cliente.z, stanza: neg.stanza || null });
     stato.ora = prima;
     const ag = stato.agenti[t[0]]; if (ag) { annota(ag, adesso, `Al bancone di ${neg.nome} e' arrivato un cliente: ${q.nome}.`); svegliaPerVoce(ag, adesso, regole); }
   }
@@ -1230,7 +1256,7 @@ export function giocatoreTurno(stato, nick, negozio, on, adesso) {
   if (!T[chi]) {
     T[chi] = { negozio: neg.id, inizio: adesso, fine: adesso + RN.turnoGiocatoreMin * 60000, vendite: 0, guadagno: 0 };
     const P = stato.prossimoCliente || (stato.prossimoCliente = {}); if (!P[neg.id] || P[neg.id] > adesso + 60000) P[neg.id] = adesso + (20 + Math.random() * 30) * 1000;
-    const prima = stato.ora; stato.ora = adesso; evento(stato, { chi, tipo: 'usa', testo: 'turno al bancone di ' + neg.nome, x: neg.venditore.x, z: neg.venditore.z }); stato.ora = prima;
+    const prima = stato.ora; stato.ora = adesso; evento(stato, { chi, tipo: 'usa', testo: 'turno al bancone di ' + neg.nome, x: neg.venditore.x, z: neg.venditore.z, stanza: neg.stanza || null }); stato.ora = prima;
   }
   T[chi].ping = adesso;
   return { ok: true, fine: T[chi].fine };
@@ -1259,12 +1285,14 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
     oggetti: stato.oggetti,
     negozi: NEGOZI.map(n => { const t = chiLavora(stato, n.id), c = clienteDi(stato, n.id);
       return { id: n.id, nome: n.nome, icona: n.icona || null, proprietario: n.proprietario ? { id: n.proprietario, nome: nomeDi(stato, n.proprietario), vero: n.proprietario.indexOf('g:') === 0 } : null, bancone: n.bancone, venditore: n.venditore, cliente: n.cliente, prodotti: n.prodotti.map(p => [p[0], p[1]]),
+        stanza: n.stanza || null, interno: n.interno || null, scorte: scorteDi(stato, n.id),
         chi: t ? { id: t[0], nome: nomeDi(stato, t[0]), vero: t[0].indexOf('g:') === 0, fine: t[1].fine } : null,
         ospite: c ? { id: c.id, demo: c.demo, nome: c.nome, vede: (CLIENTI.find(q => q.demo === c.demo) || {}).vede, soldi: c.soldi, tentativi: c.tentativi, via: c.via, detto: c.detto, servito: !!c.servito } : null }; }),
     giochi: (stato.giochi || []).filter(g => !g.finito || adesso - (g.fineVera || g.fine) < 60000).map(g => ({ id: g.id, chi: nomeDi(stato, g.chi), forma: g.forma, testo: g.testo, x: g.forma === 'quiz' ? null : g.x, z: g.forma === 'quiz' ? null : g.z, dove: g.dove, fine: g.fine, finito: g.finito, vincitore: g.vincitore })),
     terreni: vistaTerreni(stato, adesso), listinoTerreni: listinoTerreni(), appartamenti: vistaAppartamenti(stato), banca: vistaBanca(stato),
     classifica: Object.entries(stato.punti || {}).sort((a, b) => b[1] - a[1]).slice(0, 10),
     vita: vistaVita(stato),
+    lavori: vistaLavori(stato, adesso),
     eventi: stato.eventi.slice(-30),
     // i messaggi da lontano scambiati con le persone vere (il gioco mostra a ognuno i suoi)
     messaggi: stato.eventi.filter(e => e.tipo === 'scrivi' && ((e.a || '').indexOf('g:') === 0 || e.chi.indexOf('g:') === 0)).slice(-30).map(e => ({ t: e.t, da: nomeDi(stato, e.chi), a: nomeDi(stato, e.a), agente: e.chi.indexOf('g:') === 0 ? e.a : e.chi, testo: e.testo }))
@@ -1284,7 +1312,11 @@ export function cronaca(stato, da = 0, max = 300) {
 // la casa finita di un abitante diventa la sua casa: la porta della sua stanza si sposta li'.
 export function sincronizzaTerreni(stato) {
   for (let i = NEGOZI.length - 1; i >= 0; i--) if (NEGOZI[i].lotto) NEGOZI.splice(i, 1);
-  NEGOZI.push(...negoziDeiLotti(stato));
+  NEGOZI.push(...negoziDeiLotti(stato).map(n => { const st = internoBottega(n.id, n.nome, n.genere, geometria(lottoDi(n.id), 'negozio'));
+    return Object.assign(n, { stanza: st.id, bancone: { x: 0, z: -1.6, rot: 0 }, venditore: { x: 0, z: -2.8 }, cliente: { x: 0, z: -0.3 }, interno: { id: st.id, nome: st.nome, tipo: st.tipo, fuori: st.ritorno } }); }));
+  // l'interno di ogni negozio sui terreni e' una stanza come le altre (si entra dalla porta dell'edificio)
+  for (let i = STANZE.length - 1; i >= 0; i--) if (STANZE[i].lotto && STANZE[i].id.indexOf('bottega_') === 0) STANZE.splice(i, 1);
+  for (const n of NEGOZI) if (n.lotto) STANZE.push(internoBottega(n.id, n.nome, n.genere, geometria(lottoDi(n.id), 'negozio')));
   const torre = stanzaDi('torre0');
   for (const st of STANZE) {
     if (!st.casa) continue;
@@ -1303,6 +1335,26 @@ export function sincronizzaTerreni(stato) {
     const k = stato.vita && stato.vita.case && stato.vita.case[st.casa];
     if (k) k.porta = app ? { x: torre.porta.x, z: torre.porta.z } : { x: st.porta.x, z: st.porta.z };   // per la vita: dove si va per tornare a casa (in piazza)
   }
+}
+// un turno da dipendente finito (agente o persona vera): quello che si e' prodotto va nel borgo (agenti/lavori.mjs)
+function lavoroFatto(stato, chi, mestiere, ore, adesso, lotto) {
+  const r = effettoMestiere(stato, mestiere, ore, adesso, { lotto });
+  const ag = stato.agenti[chi];
+  if (r && ag) annota(ag, adesso, r);
+  if (lotto && stato.terreni && stato.terreni[lotto] && stato.terreni[lotto].progetto && stato.terreni[lotto].progetto.finito === adesso) cantiereFinito(stato, lotto, adesso);
+  return r;
+}
+// Una persona vera fa un turno da dipendente dal gioco (fornaio, barista, spazzino...): stesso lavoro, stessi effetti.
+// d = { mestiere, on: true|false, fine: true }. Alla fine restituisce la paga (la da' il gioco) e cosa ha prodotto.
+export function giocatoreDipendente(stato, nick, d, adesso) {
+  d = d || {};
+  const n = testo(nick, 20).replace(/[^\p{L}\p{N}_ .-]/gu, '');
+  if (!n) return { ok: false, motivo: 'Serve il tuo nome nel gioco.' };
+  const chi = 'g:' + n, t = (stato.dipendenti || {})[chi];
+  const r = dipendenteDelGioco(stato, chi, n, { mestiere: String(d.mestiere || '').slice(0, 20), on: d.on !== false, fine: !!d.fine }, adesso);
+  if (r.ok && !t && d.on !== false && !d.fine) { const M = MESTIERI[d.mestiere], prima = stato.ora; stato.ora = adesso; evento(stato, { chi, tipo: 'usa', testo: 'turno da ' + M.nome, x: M.x, z: M.z }); stato.ora = prima; }
+  if (t && t.lotto && r.paga !== undefined && stato.terreni && stato.terreni[t.lotto] && stato.terreni[t.lotto].progetto && stato.terreni[t.lotto].progetto.finito === adesso) cantiereFinito(stato, t.lotto, adesso);
+  return r;
 }
 function cantiereFinito(stato, id, adesso) {
   const t = stato.terreni[id], p = t.progetto, l = lottoDi(id), ag = stato.agenti[t.chi];
@@ -1370,7 +1422,7 @@ function percezioneTerreni(stato, ag, adesso) {
 }
 function percezioneBanca(stato, ag, adesso) {
   const c = vistaConto(stato, ag.id), w = portafoglio(ag);
-  let s = `BANCA (${BANCA.nome}, x=${BANCA.x} z=${BANCA.z - 5}): `;
+  let s = `BANCA (${BANCA.nome}, si entra dalla porta a x=${BANCA.porta.x} z=${BANCA.porta.z}; gli sportelli sono dentro): `;
   if (!c.prestiti.length) s += 'non hai debiti.';
   else s += c.prestiti.map(L => L.tipo === 'debito' ? `devi ancora ${L.scaduto} S alla banca dopo il pignoramento`
     : `${L.tipo} ${L.bene ? 'per ' + L.bene + ' ' : ''}: debito residuo ${L.residuo} S, rata ${L.rata} S al giorno (${L.pagate} pagate su ${L.n}), prossima rata ${dataBreve(L.prossima)}` + (L.scaduto > 0.5 ? `, NON PAGATE ${L.insolute} rate (${L.scaduto} S)` : '')).join('; ') + '. La banca prende le rate dal tuo conto ogni giorno, se ci sono i soldi.' + (c.segnalato ? ' SEI SEGNALATO COME CATTIVO PAGATORE: niente nuovi prestiti finche\' non paghi tutto.' : '');
@@ -1381,8 +1433,9 @@ function percezioneBanca(stato, ag, adesso) {
 }
 // la banca: si va allo sportello di persona
 function bancaAgente(stato, ag, a, adesso, regole) {
-  const w = portafoglio(ag), dove = BANCA.sportello, nomeA = { appartamento: 'appartamento', mutuo: 'mutuo', prestito: 'prestito', rimborsa: 'rimborsa' }[a.tipo];
-  if (ag.stanza) { ag.coda.unshift(a); return esegui(stato, ag, { tipo: 'esci', auto: true }, adesso, regole); }
+  const w = portafoglio(ag), dove = SPORTELLO, nomeA = { appartamento: 'appartamento', mutuo: 'mutuo', prestito: 'prestito', rimborsa: 'rimborsa' }[a.tipo];
+  // si entra in banca e si va allo sportello (dal 22/11/2026 la banca ha l'interno)
+  if (ag.stanza !== 'banca') { ag.coda.unshift(a); return esegui(stato, ag, { tipo: 'entra', stanza: 'banca', auto: true, inCammino: true }, adesso, regole); }
   if (Math.hypot(ag.x - dove.x, ag.z - dove.z) > 2) {
     if (!a.inCammino) esito(ag, `${nomeA}: in cammino verso la ${BANCA.nome}`);
     ag.tx = dove.x; ag.tz = dove.z; ag.ancora = null; ag.esplora = null; ag.meta = BANCA.nome; ag.bici = false;
@@ -1451,9 +1504,9 @@ export function giocatoreTerreno(stato, nick, d, adesso) {
               : { ok: false, motivo: 'Azione sconosciuta.' };
   if (r.ok) {
     const prima = stato.ora; stato.ora = adesso;
-    const l = r.lotto ? lottoDi(r.lotto) : null, dove = l ? { x: l.x, z: l.z } : { x: BANCA.sportello.x, z: BANCA.sportello.z };
+    const l = r.lotto ? lottoDi(r.lotto) : null, dove = l ? { x: l.x, z: l.z } : { x: SPORTELLO.x, z: SPORTELLO.z, stanza: 'banca' };
     const cosa = { compra: 'ha comprato ' + (l && l.nome), costruisci: r.nome, appartamento: 'ha comprato ' + r.nome, mutuo: 'ha firmato un mutuo per ' + r.nomeBene }[d.azione];
-    if (cosa) evento(stato, { chi, tipo: d.azione === 'costruisci' ? 'costruisce' : 'usa', testo: cosa, x: dove.x, z: dove.z });
+    if (cosa) evento(stato, { chi, tipo: d.azione === 'costruisci' ? 'costruisce' : 'usa', testo: cosa, x: dove.x, z: dove.z, stanza: dove.stanza || null });
     stato.ora = prima;
     if (d.azione === 'compra' || d.azione === 'appartamento') r.spesa = r.prezzo;
     if (d.azione === 'costruisci') r.spesa = r.costo;

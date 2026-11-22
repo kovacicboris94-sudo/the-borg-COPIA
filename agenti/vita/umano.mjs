@@ -12,7 +12,7 @@
 // =====================================================================
 import { metDi } from './corpo.mjs';
 
-export const BAGNI = ['biblioteca', 'sala', 'scacchi', 'negozio', 'collectibles', 'torre0'];   // edifici con un bagno (e acqua calda)
+export const BAGNI = ['biblioteca', 'sala', 'scacchi', 'negozio', 'collectibles', 'torre0', 'caffetteria', 'banca', 'ambulatorio'];   // edifici con un bagno (e acqua calda)
 
 export function nuovoUmano() {
   return { vescica: 0.1, igiene: 0.9, solitudine: 0.2, noia: 0.2, umore: 0.3, soddisfazioni: 0 };

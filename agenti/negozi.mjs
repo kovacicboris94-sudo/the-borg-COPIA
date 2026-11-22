@@ -1,6 +1,6 @@
 // =====================================================================
 //  NEGOZI E MESTIERI DEL BORGO
-//  Tre negozi della piazza hanno un bancone: Caffetteria, Forno, Fioraio.
+//  Tre negozi della piazza hanno un bancone: Caffetteria, Forno, Fioraio (dentro, dal 22/11/2026).
 //  Chi fa un turno al bancone (un agente con "lavora", o una persona vera dal gioco)
 //  vede arrivare i clienti: gli abitanti demo della piazza, ognuno con il suo carattere.
 //  I clienti non comprano in automatico: decidono loro, secondo il carattere,
@@ -10,15 +10,36 @@
 //  I prodotti sono cibo e fiori: per ora finiscono nello zaino (il motore della
 //  "vita vera" potra' usarli piu' avanti come cibo, senza cambiare niente qui).
 // =====================================================================
+import { BANCONE } from './interni.mjs';
 
+// Dal 22/11/2026 il bancone e' DENTRO il negozio (agenti/interni.mjs): stanza = l'interno, coordinate della stanza.
 export const NEGOZI = [
-  { id: 'caffetteria', nome: 'Caffetteria', bancone: { x: 18, z: -1.6, rot: 0 }, venditore: { x: 18, z: -2.8 }, cliente: { x: 18, z: -0.3 },
+  { id: 'caffetteria', nome: 'Caffetteria', stanza: 'caffetteria', ...BANCONE,
     prodotti: [['Caffe\'', 6, 'caffe'], ['Cappuccino', 9, 'caffe dolci'], ['Cornetto', 8, 'dolci'], ['Cioccolata calda', 10, 'dolci caldo'], ['Fetta di torta', 18, 'dolci'], ['Spremuta', 9, 'sano fresco']] },
-  { id: 'forno', nome: 'Forno', bancone: { x: 44, z: -1.6, rot: 0 }, venditore: { x: 44, z: -2.8 }, cliente: { x: 44, z: -0.3 },
+  { id: 'forno', nome: 'Forno', stanza: 'forno', ...BANCONE,
     prodotti: [['Pane', 5, 'pane'], ['Focaccia', 9, 'pane salato'], ['Pizza al taglio', 14, 'salato'], ['Biscotti', 12, 'dolci'], ['Pane integrale', 7, 'pane sano'], ['Crostata', 22, 'dolci']] },
-  { id: 'fioraio', nome: 'Fioraio', bancone: { x: 46.6, z: 50, rot: 90 }, venditore: { x: 47.8, z: 50 }, cliente: { x: 45.3, z: 50 },
+  { id: 'fioraio', nome: 'Fioraio', stanza: 'fioraio', ...BANCONE,
     prodotti: [['Rosa', 8, 'fiori regalo'], ['Girasole', 12, 'fiori'], ['Mazzo di fiori', 35, 'fiori regalo'], ['Pianta grassa', 20, 'piante'], ['Bonsai', 60, 'piante'], ['Lavanda', 10, 'fiori profumo']] }
 ];
+
+// LE SCORTE: quello che c'e' davvero sugli scaffali (solo i tre negozi del borgo; nei negozi sui terreni
+// la merce la prepara il proprietario). Ogni mattina alle 6 arriva una piccola consegna da fuori;
+// il grosso lo fa chi ci lavora: il fornaio sforna il pane, il pasticcere i dolci, il fioraio compone i mazzi.
+// Il caffe' e le bevande si fanno al momento: servono le mani di qualcuno (chi e' al bancone o il barista in turno).
+// Il pane del giorno prima non si vende: al mattino quello avanzato va via (diventa pane secco per chi lo vuole).
+export const SCORTE = {
+  caffetteria: { alMomento: ['Caffe\'', 'Cappuccino', 'Cioccolata calda', 'Spremuta'], consegna: { Cornetto: 4, 'Fetta di torta': 2 }, freschi: ['Cornetto'] },
+  forno: { consegna: { Pane: 6, Focaccia: 2, 'Pizza al taglio': 2, Biscotti: 3, 'Pane integrale': 2, Crostata: 1 }, freschi: ['Pane', 'Focaccia', 'Pizza al taglio', 'Pane integrale'] },
+  fioraio: { consegna: { Rosa: 10, Girasole: 4, 'Mazzo di fiori': 1, 'Pianta grassa': 2, Bonsai: 1, Lavanda: 5 }, freschi: [] }
+};
+// cosa produce chi lavora, per ogni ora di turno (pezzi): stessi nomi dei prodotti
+export const PRODUZIONE = {
+  fornaio: { forno: { Pane: 16, Focaccia: 4, 'Pizza al taglio': 3, 'Pane integrale': 4 } },
+  pasticcere: { caffetteria: { Cornetto: 10, 'Fetta di torta': 3 }, forno: { Biscotti: 4, Crostata: 1 } },
+  fioraio: { fioraio: { 'Mazzo di fiori': 2, Rosa: 4 } }
+};
+export const SCORTE_MAX = 3;   // al massimo tre volte la consegna del giorno (non si accumula all'infinito)
+
 export const negozioDi = nome => { const n = String(nome || '').toLowerCase().trim(); return NEGOZI.find(q => q.id === n || q.nome.toLowerCase() === n) || NEGOZI.find(q => n && (n.includes(q.id) || q.nome.toLowerCase().includes(n))) || null; };
 export const prodottoDi = (neg, nome) => { const n = String(nome || '').toLowerCase().replace(/'/g, '').trim(); const l = neg.prodotti; return l.find(p => p[0].toLowerCase().replace(/'/g, '') === n) || l.find(p => n && (p[0].toLowerCase().replace(/'/g, '').includes(n) || n.includes(p[0].toLowerCase().replace(/'/g, '')))) || null; };
 
