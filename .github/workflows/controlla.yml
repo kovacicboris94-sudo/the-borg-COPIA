@@ -22,6 +22,7 @@ jobs:
       - run: node test/scacchi.test.mjs
       - run: node test/sito.test.mjs
       - run: node test/agenti.test.mjs
+      - run: node test/giochi-agenti.test.mjs
       - run: node test/vita.test.mjs
       - run: node test/registro.test.mjs
       - run: node test/terreni.test.mjs

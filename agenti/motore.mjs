@@ -23,6 +23,7 @@ import { INTERNI, SPORTELLO, internoBottega, idBottega } from './interni.mjs';
 import { passoBorgo, passoDipendenti, effettoMestiere, disponibile, togliScorta, scorteDi, descriviPiazza, vistaLavori, giocatoreDipendente as dipendenteDelGioco, inTurno } from './lavori.mjs';
 import { MESTIERI, cercaMestiere } from './vita/mestieri.mjs';
 import { passoVita, azioneVita, occupato, percezioneAgente, routineVita, normalizzaAzioneVita, promptVita, TIPI_VITA, bisognoUrgente, pianoPerMotore, vistaVita } from './vita/aggancio.mjs';
+import { avviaPartita, passoPartite, promptMossa, SCHEMA_MOSSA, REGOLE_GIOCHI, rigaGiochi, vistaPartite } from './giochi/index.mjs';
 export const MODELLO = 'claude-haiku-5-5';
 
 // Prezzi di Claude Haiku 5.5 in dollari per milione di token (prompt fino a 100.000 token).
@@ -56,6 +57,7 @@ export const REGOLE = {
   ambientamentoMaxMin: 3,
   giochi: false,              // i giochi inventati dagli agenti (quiz, tesoro, gara): accesi solo quando Boris dice si'
   giocoMin: 10,               // quanto dura un gioco inventato da un agente (quiz, tesoro, gara)
+  partite: true,              // i minigiochi giocati davvero (agenti/giochi/): le mosse le sceglie l'agente. Deciso da Boris il 22/11/2026
   vita: true                  // la vita vera (agenti/vita/): corpo, fame, sete, sonno, casa, soldi, lavoro. Deciso da Boris il 21/11/2026
 };
 
@@ -394,6 +396,10 @@ export async function passo(stato, adesso, cervello, opz = {}) {
   for (const ag of agenti) avanza(stato, ag, dt, adesso, regole);
   controllaGiochi(stato, adesso, regole);
   passoNegozi(stato, adesso, regole);
+  // le partite ai minigiochi: a ogni scelta si chiede la mossa a chi gioca (domanda corta, agenti/giochi/)
+  if (regole.partite) await passoPartite(stato, adesso, aiutoPartite(stato, cervello, regole));
+  // chi sta giocando pensa alla partita, non al resto (finita la partita ci ripensa subito)
+  for (const ag of agenti) if (ag.partita && ag.prossimoPensiero <= adesso) ag.prossimoPensiero = adesso + 2 * 60000;
 
   // 2) chi deve pensare pensa (uno alla volta, cosi' le azioni sono sfalsate)
   // chi e' morto non pensa piu'; chi dorme (o e' svenuto, o sta lavorando) pensa quando ha finito
@@ -731,6 +737,7 @@ function siedi(stato, ag, a, adesso, regole) {
   const n = String(a.oggetto).toLowerCase();
   const o = stato.oggetti.find(q => q.id === n) || stato.oggetti.filter(q => sedile(q) && q.nome.toLowerCase() === n).sort((u, v) => dist(u, ag) - dist(v, ag))[0];
   if (!o) return esito(ag, `usa ${a.oggetto}: rifiutata, in piazza non c'e' (vedi gli oggetti intorno a te)`);
+  if (regole.partite && o.modello === 'arcade' && o.pronto) return usa(stato, ag, { tipo: 'usa', cosa: 'bubble', richiesta: '' }, adesso, regole);
   if (!sedile(o)) return esito(ag, `usa ${o.id} "${o.nome}": rifiutata, non e' un mobile su cui sedersi`);
   const occupati = Object.values(stato.agenti).filter(q => q !== ag && q.lavoro && q.lavoro.oggetto && q.lavoro.id === o.id).map(q => q.lavoro.posto);
   const posti = SEDUTE[o.modello], posto = [...Array(posti).keys()].find(i => !occupati.includes(i));
@@ -755,6 +762,7 @@ function usa(stato, ag, a, adesso, regole) {
     ag.bici = !ag.bici; annota(ag, adesso, ag.bici ? 'Sono salito in bici.' : 'Sono sceso dalla bici.');
     return esito(ag, ag.bici ? 'usa Bici: sei in bici' : 'usa Bici: sei sceso');
   }
+  if (c.cabinato) return cabinato(stato, ag, a, c, adesso, regole);
   if ((ag.stanza || null) !== c.dove) {
     ag.coda.unshift(a);
     // "entra" sa gia' la strada (uscire da dove sei, passare da un altro edificio, prendere l'ascensore)
@@ -768,6 +776,13 @@ function usa(stato, ag, a, adesso, regole) {
   }
   ag.meta = null; ag.ancora = { x: p.x, z: p.z };
   const chiuso = c.aperto && c.aperto(stato, adesso); if (chiuso) return esito(ag, `usa ${c.nome}: ${chiuso}`);
+  // un minigioco: comincia una partita vera (agenti/giochi/)
+  if (regole.partite && c.gioco) {
+    ag.bici = false;
+    const r = avviaPartita(stato, ag, c.gioco, a.richiesta, adesso, aiutoPartite(stato, null, regole));
+    evento(stato, { chi: ag.id, tipo: 'usa', testo: c.nome, x: ag.x, z: ag.z });
+    return esito(ag, `usa ${c.nome}: ${r}`);
+  }
   const min = c.minuti ? c.minuti(stato) : c.min;
   const L = { tipo: 'usa', id: c.id, nome: c.nome, icona: c.icona, richiesta: a.richiesta || '', inizio: adesso, fine: adesso + min * 60000 };
   // scacchi: se un altro abitante e' gia' al tavolo, si gioca insieme e la partita riparte per tutti e due
@@ -784,7 +799,49 @@ function usa(stato, ag, a, adesso, regole) {
   evento(stato, { chi: ag.id, tipo: 'usa', testo: c.nome, x: ag.x, z: ag.z });
   return esito(ag, `usa ${c.nome}: iniziato, ci vorranno ${min} minuti`);
 }
+// Borg Bubble si gioca a un Cabinato arcade posato in piazza (si compra ai Mobili usati)
+function cabinato(stato, ag, a, c, adesso, regole) {
+  if (ag.stanza) { ag.coda.unshift(a); return esegui(stato, ag, { tipo: 'esci', auto: true }, adesso, regole); }
+  const o = stato.oggetti.filter(q => q.pronto && q.modello === 'arcade').sort((u, v) => dist(u, ag) - dist(v, ag))[0];
+  if (!o) return esito(ag, `usa ${c.nome}: in piazza non c'e' nessun Cabinato arcade (si compra ai Mobili usati e si posa con "metti")`);
+  const p = davanti(o);
+  if (Math.hypot(ag.x - p.x, ag.z - p.z) > 1.5) {
+    if (!a.inCammino) esito(ag, `usa ${c.nome}: in cammino verso il cabinato ${o.id}`);
+    ag.tx = p.x; ag.tz = p.z; ag.ancora = null; ag.esplora = null; ag.meta = c.nome;
+    ag.coda.unshift(Object.assign({}, a, { inCammino: true })); return 'cammina';
+  }
+  ag.meta = null; ag.ancora = { x: p.x, z: p.z }; ag.bici = false;
+  const r = avviaPartita(stato, ag, c.gioco, a.richiesta, adesso, aiutoPartite(stato, null, regole));
+  evento(stato, { chi: ag.id, tipo: 'usa', testo: c.nome, x: ag.x, z: ag.z });
+  return esito(ag, `usa ${c.nome}: ${r}`);
+}
+
+// cosa serve alle partite dal motore: la mossa pensata (con il budget), i premi, il diario, la cronaca
+function aiutoPartite(stato, cervello, regole) {
+  return {
+    nomeDi, esito, annota, evento,
+    guadagna: (ag, n) => { if (!n) return ''; portafoglio(ag).starlight += n; return ` +${n} Starlight (ora ne hai ${ag.starlight}).`; },
+    puoGiocare: ag => !ag.morto && !(regole.vita && occupato(stato, ag)),
+    // una mossa: domanda corta, risposta corta. Senza chiave o senza budget si gioca d'istinto (gratis)
+    async pensaMossa(ag, p, d, G) {
+      if (!cervello || ag.modo === 'automatico') return null;
+      const { system, messaggio } = promptMossa(ag, p, d, G);
+      const stima = (Math.ceil((system.length + messaggio.length) / 3) * PREZZI.ingresso + REGOLE_GIOCHI.maxTokens * PREZZI.uscita) / 1e6;
+      if (budget(ag, stato.ora, regole).resto < stima) return null;
+      let r;
+      try { r = await cervello({ system, messaggio, sforzo: 'low', maxTokens: REGOLE_GIOCHI.maxTokens, schema: SCHEMA_MOSSA, agente: ag.id, mossa: true, domanda: d }); }
+      catch (e) { ag.ultimoErrore = testo(e && e.message, 200); return null; }
+      const costo = costoDi(r.usage), s = spesaMese(ag, stato.ora);
+      s.usd += costo; s.mosse = (s.mosse || 0) + 1; s.usdMosse = (s.usdMosse || 0) + costo;
+      s.ingresso += (r.usage && r.usage.input_tokens) || 0; s.uscita += (r.usage && r.usage.output_tokens) || 0;
+      try { const m = /\{[\s\S]*\}/.exec(r.testo || ''); const v = JSON.parse(m ? m[0] : r.testo); return { pensiero: v.pensiero, mossa: v.mossa, costo }; }
+      catch (e) { return null; }
+    }
+  };
+}
+
 function fineUso(stato, ag, L, adesso) {
+  if (L.partita) { if (ag.partita === L.partita) ag.partita = null; return; }   // tempo scaduto: la partita la chiude agenti/giochi/ (abbandonata)
   if (L.oggetto) { const r = `Sei rimasto seduto un po' su ${L.nome}, poi ti sei alzato.`; esito(ag, `usa ${L.id}: finito. ${r}`); annota(ag, adesso, r); return; }
   const c = cosaDi(L.id); if (!c) return;
   const r = c.fai({ ag, stato, adesso, momento: momento(adesso), compagno: L.compagno ? stato.agenti[L.compagno] : null, risultato: L.risultato, richiesta: L.richiesta, nomeDi, luogoVicino });
@@ -892,6 +949,7 @@ Scrivi "memoria_nuova" solo quando te lo chiedo: e' la tua memoria riscritta e r
 function descriviLavoro(L) {
   if (L.tipo === 'costruisci') return ', sta costruendo';
   if (L.tipo === 'rimuovi') return ', sta smontando qualcosa';
+  if (L.tipo === 'usa' && L.partita) return `, sta giocando a ${L.nome}`;
   if (L.tipo === 'usa') return L.nome ? `, sta usando: ${L.nome}` : ', e\' occupato';
   return ', e\' occupato';
 }
@@ -906,9 +964,10 @@ export function percezione(stato, ag, adesso, regole = REGOLE) {
   const b = budget(ag, adesso, regole), vicino = luogoVicino(ag);
   const righe = [];
   righe.push(`ORA: ${FMT_ORA.format(new Date(adesso))} (${momento(adesso)}).`);
-  righe.push(`BUDGET: questo mese hai speso ${dollari(b.spesi)} su ${dollari(b.tetto)} in ${b.pensieri} pensieri; restano ${dollari(b.resto)} per ${b.giorni} giorni (circa ${dollari(b.alGiorno)} al giorno).` + (ag.costoUltimo ? ` Il tuo ultimo pensiero e' costato ${dollari(ag.costoUltimo)}.` : '') + previsione(b, ag, adesso));
+  righe.push(`BUDGET: questo mese hai speso ${dollari(b.spesi)} su ${dollari(b.tetto)} in ${b.pensieri} pensieri${spesaMese(ag, adesso).mosse ? ` e ${spesaMese(ag, adesso).mosse} mosse nelle partite (${dollari(spesaMese(ag, adesso).usdMosse || 0)})` : ''}; restano ${dollari(b.resto)} per ${b.giorni} giorni (circa ${dollari(b.alGiorno)} al giorno).` + (ag.costoUltimo ? ` Il tuo ultimo pensiero e' costato ${dollari(ag.costoUltimo)}.` : '') + previsione(b, ag, adesso));
   { const w = portafoglio(ag), el = o => Object.entries(o || {}).map(([n, k]) => k > 1 ? n + ' x' + k : n).join(', '), sec = {}; (w.secchio || []).forEach(f => { sec[f.n] = (sec[f.n] || 0) + 1; });
     righe.push(`STARLIGHT: ne hai ${w.starlight}.` + (w.secchio && w.secchio.length ? ` Secchio: ${el(sec)}.` : '') + (w.zaino && Object.keys(w.zaino).length ? ` Zaino: ${el(w.zaino)}.` : '') + (w.carte ? ` Carte di Belinverse: ${Object.values(w.carte).reduce((a, b) => a + b, 0)}.` : '')); }
+  if (rigaGiochi(ag)) righe.push(rigaGiochi(ag));
   if (ag.abitudine) righe.push(`LA TUA ABITUDINE: ${descriviAbitudine(ag.abitudine)} (la segui da solo, gratis; puoi cambiarla quando vuoi).`);
   if (inAmbientamento(ag, adesso, regole)) righe.push(`SEI NEL BORGO DA POCO: per i primi ${Math.round(regole.ambientamentoOre / 24)} giorni ripenserai al massimo ogni ${regole.ambientamentoMaxMin} minuti, per conoscere il posto e capire chi sei. Poi deciderai di nuovo tu il ritmo.`);
   const qui = ag.stanza && stanzaDi(ag.stanza);
@@ -1278,7 +1337,7 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
     agenti: Object.values(stato.agenti).map(a => {
       const b = budget(a, adesso, regole);
       return { id: a.id, nome: a.nome, look: a.look, x: a.x, z: a.z, tx: a.tx, tz: a.tz, stanza: a.stanza || null,
-        lavoro: a.lavoro ? { tipo: a.lavoro.tipo, id: a.lavoro.id, nome: a.lavoro.nome, icona: a.lavoro.icona, inizio: a.lavoro.inizio, fine: a.lavoro.fine, oggetto: !!a.lavoro.oggetto, posto: a.lavoro.posto || 0 } : null, bici: !!a.bici, starlight: portafoglio(a).starlight, zaino: a.zaino || {},
+        lavoro: a.lavoro ? { tipo: a.lavoro.tipo, id: a.lavoro.id, nome: a.lavoro.nome, icona: a.lavoro.icona, inizio: a.lavoro.inizio, fine: a.lavoro.fine, oggetto: !!a.lavoro.oggetto, posto: a.lavoro.posto || 0, partita: a.lavoro.partita || null } : null, giochi: a.giochi || {}, bici: !!a.bici, starlight: portafoglio(a).starlight, zaino: a.zaino || {},
         detto: a.detto, gesto: a.gesto || null, pensiero: a.ultimoPensiero, memoria: a.memoria, modo: a.modo, motivo: a.motivo || null,
         prossimo: a.prossimoPensiero, morto: a.morto || null, budget: { spesi: b.spesi, tetto: b.tetto, resto: b.resto, giorni: b.giorni, pensieri: b.pensieri } };
     }),
@@ -1292,6 +1351,7 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
     terreni: vistaTerreni(stato, adesso), listinoTerreni: listinoTerreni(), appartamenti: vistaAppartamenti(stato), banca: vistaBanca(stato),
     classifica: Object.entries(stato.punti || {}).sort((a, b) => b[1] - a[1]).slice(0, 10),
     vita: vistaVita(stato),
+    partite: vistaPartite(stato, adesso),
     lavori: vistaLavori(stato, adesso),
     eventi: stato.eventi.slice(-30),
     // i messaggi da lontano scambiati con le persone vere (il gioco mostra a ognuno i suoi)

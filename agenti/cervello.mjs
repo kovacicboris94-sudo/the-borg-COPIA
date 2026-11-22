@@ -35,7 +35,13 @@ export function cervelloFinto(seme = 1) {
   let s = seme;
   const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
   const luoghi = ['Fontana', 'Belvedere', 'Mercatino', 'Laghetto', 'Torre della Cometa', 'Ingresso del borgo'];
-  return async function pensa({ messaggio }) {
+  return async function pensa({ messaggio, mossa, domanda }) {
+    // una mossa in una partita: la prima scelta che l'esempio suggerisce (o la prima dell'elenco)
+    if (mossa) {
+      const f = /"([^"]+)"/.exec((domanda && domanda.formato) || ''), o = domanda && domanda.opzioni && /^(\d+)\)/.exec(domanda.opzioni[0] || '');
+      const m = o ? String(1 + Math.floor(rnd() * Math.min(3, domanda.opzioni.length))) : f ? f[1] : '1';
+      return { testo: JSON.stringify({ pensiero: 'Prova: gioco ' + m, mossa: m }), usage: { input_tokens: Math.ceil(messaggio.length / 3) + 150, output_tokens: 40 }, stop_reason: 'end_turn' };
+    }
     const m = /DOVE SEI: x=(-?\d+) z=(-?\d+)/.exec(messaggio), x = m ? +m[1] : 0, z = m ? +m[2] : 40;
     const az = [], k = rnd();
     if (k < 0.35) az.push({ tipo: 'vai', luogo: luoghi[Math.floor(rnd() * luoghi.length)] });
