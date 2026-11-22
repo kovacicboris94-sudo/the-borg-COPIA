@@ -59,6 +59,17 @@ export const GENERI = {
   alimentari: { nome: 'Alimentari', icona: '🧺', prodotti: [['Frutta di stagione', 7, 'sano fresco'], ['Formaggio', 15, 'salato'], ['Prosciutto', 18, 'salato'], ['Uova', 6, 'fresco'], ['Olio buono', 25, 'sano regalo'], ['Marmellata', 11, 'dolci regalo']] },
   bottega: { nome: 'Bottega artigiana', icona: '🏺', prodotti: [['Vaso di argilla', 25, 'regalo'], ['Candela', 10, 'regalo'], ['Sciarpa di lana', 30, 'regalo caldo'], ['Cartolina del borgo', 3, 'regalo'], ['Lanterna', 35, 'regalo'], ['Statuina', 45, 'regalo']] }
 };
+// Come lo vuoi (Boris 22/11/2026: "non puoi scegliere la tua insegna... come sara' strutturato, i prezzi"):
+// i colori della facciata (6 tavolozze, le disegna src/borgo/terreni.js), lo stile dell'insegna, l'arredo dentro
+// e il listino: i prezzi li decide il proprietario, tra la meta' e il triplo del prezzo normale del borgo.
+export const INSEGNE = { legno: 'Legno e oro', neon: 'Neon', lavagna: 'Lavagna', pastello: 'Pastello', nera: 'Nera elegante' };
+export const ARREDI = { rustico: 'Rustico (legno e cotto)', moderno: 'Moderno (bianco e piastrelle)', elegante: 'Elegante (marmo e ottone)' };
+export const PREZZO_MIN = 0.5, PREZZO_MAX = 3;
+export function listinoDi(genere, prezzi) {
+  const g = GENERI[genere] || GENERI.bottega;
+  return g.prodotti.map(q => { const v = prezzi && +prezzi[q[0]]; return [q[0], v > 0 ? Math.max(1, Math.round(Math.min(q[1] * PREZZO_MAX, Math.max(q[1] * PREZZO_MIN, v)))) : q[1], q[2], q[1]]; });   // [nome, prezzo del proprietario, gusti, prezzo normale del borgo]
+}
+const scelta = (v, lista, def) => Object.prototype.hasOwnProperty.call(lista, v) ? v : def;
 export const UN = { casa: 'una casa', villa: 'una villa', negozio: 'un negozio' };
 export const tipoDi = n => { const s = String(n || '').toLowerCase(); return s.includes('vill') ? 'villa' : s.includes('neg') || s.includes('bottega') ? 'negozio' : s.includes('cas') ? 'casa' : null; };
 export const abitazione = tipo => tipo === 'casa' || tipo === 'villa';
@@ -183,7 +194,10 @@ export function avviaCantiere(stato, chi, d, soldi, adesso) {
   const costo = costoProgetto(tipo);
   if (soldi != null && soldi < costo) return { ok: false, motivo: `Costruire ${UN[tipo]} costa ${costo} Starlight e ne hai ${soldi}.` };
   const nome = pulito(d.nome, 28) || (tipo === 'negozio' ? GENERI[genere].nome + ' di ' + t.nomeChi : PROGETTI[tipo].nome + ' di ' + t.nomeChi);
-  t.progetto = { tipo, nome, genere, costo, ore: PROGETTI[tipo].ore, fatte: 0, inizio: adesso, finito: null, colore: Math.abs(hash(id + chi + adesso)) % 6 };
+  const colore = Number.isInteger(+d.colore) && +d.colore >= 0 && +d.colore < 6 && d.colore !== null && d.colore !== '' ? +d.colore : Math.abs(hash(id + chi + adesso)) % 6;
+  t.progetto = { tipo, nome, genere, costo, ore: PROGETTI[tipo].ore, fatte: 0, inizio: adesso, finito: null, colore,
+    insegna: scelta(d.insegna, INSEGNE, 'legno'), arredo: scelta(d.arredo, ARREDI, 'rustico') };
+  if (genere) t.progetto.prezzi = Object.fromEntries(listinoDi(genere, d.prezzi).map(q => [q[0], q[1]]));
   return { ok: true, lotto: id, tipo, nome, costo, ore: PROGETTI[tipo].ore, fine: finePrevista(PROGETTI[tipo].ore, adesso) };
 }
 function hash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
@@ -206,7 +220,7 @@ export const faseDi = p => !p ? null : p.finito ? 'finito' : p.fatte < p.ore * 0
 export function negoziDeiLotti(stato) {
   return Object.entries(stato.terreni || {}).filter(([, t]) => t.progetto && t.progetto.finito && t.progetto.tipo === 'negozio').map(([id, t]) => {
     const l = lottoDi(id), g = geometria(l, 'negozio'), gen = GENERI[t.progetto.genere] || GENERI.bottega;
-    return { id, nome: t.progetto.nome, bancone: g.bancone, venditore: g.venditore, cliente: g.cliente, prodotti: gen.prodotti, proprietario: t.chi, genere: t.progetto.genere, icona: gen.icona, lotto: true };
+    return { id, nome: t.progetto.nome, bancone: g.bancone, venditore: g.venditore, cliente: g.cliente, prodotti: listinoDi(t.progetto.genere, t.progetto.prezzi), proprietario: t.chi, genere: t.progetto.genere, icona: gen.icona, lotto: true };
   });
 }
 
@@ -216,7 +230,7 @@ export function vistaTerreni(stato, adesso) {
     const t = (stato.terreni || {})[l.id], asta = (stato.aste || {})[l.id], p = t ? t.progetto : asta && asta.progetto;
     return { id: l.id, nome: l.nome, x: l.x, z: l.z, w: LOTTO.w, d: LOTTO.d, prezzo: prezzoLotto(stato, l.id), asta: asta ? { era: asta.era } : null, geo: geometria(l, p && p.tipo),
       chi: t ? { id: t.chi, nome: t.nomeChi, vero: t.chi.indexOf('g:') === 0 } : null,
-      progetto: p ? { tipo: p.tipo, nome: p.nome, genere: p.genere, icona: p.genere ? GENERI[p.genere].icona : p.tipo === 'villa' ? '🏡' : '🏠', costo: p.costo, ore: p.ore, fatte: Math.round(p.fatte * 10) / 10, fase: faseDi(p), finito: p.finito, colore: p.colore || 0,
+      progetto: p ? { tipo: p.tipo, nome: p.nome, genere: p.genere, icona: p.genere ? GENERI[p.genere].icona : p.tipo === 'villa' ? '🏡' : '🏠', costo: p.costo, ore: p.ore, fatte: Math.round(p.fatte * 10) / 10, fase: faseDi(p), finito: p.finito, colore: p.colore || 0, insegna: p.insegna || 'legno', arredo: p.arredo || 'rustico', listino: p.genere ? listinoDi(p.genere, p.prezzi).map(q => [q[0], q[1]]) : null, inizio: p.inizio,
         fine: p.finito || finePrevista(p.ore - p.fatte, adesso) } : null };
   });
 }
@@ -224,4 +238,11 @@ export function vistaAppartamenti(stato) {
   return APPARTAMENTI.map(q => { const a = (stato.appartamenti || {})[q.id], asta = (stato.aste || {})[q.id];
     return { id: q.id, piano: q.piano, nome: q.nome, m2: q.m2, prezzo: prezzoAppartamento(stato, q.id), asta: !!asta, chi: a ? { id: a.chi, nome: a.nomeChi, vero: a.chi.indexOf('g:') === 0 } : null }; });
 }
-export const listinoTerreni = () => ({ progetti: Object.fromEntries(Object.entries(PROGETTI).map(([k, p]) => [k, { nome: p.nome, ore: p.ore, operai: p.operai, materiali: p.materiali, costo: costoProgetto(k), descr: p.descr }])), generi: Object.fromEntries(Object.entries(GENERI).map(([k, g]) => [k, { nome: g.nome, icona: g.icona, prodotti: g.prodotti.map(q => [q[0], q[1]]) }])) });
+export const listinoTerreni = () => ({ progetti: Object.fromEntries(Object.entries(PROGETTI).map(([k, p]) => [k, { nome: p.nome, ore: p.ore, operai: p.operai, materiali: p.materiali, costo: costoProgetto(k), descr: p.descr }])), generi: Object.fromEntries(Object.entries(GENERI).map(([k, g]) => [k, { nome: g.nome, icona: g.icona, prodotti: g.prodotti.map(q => [q[0], q[1]]) }])), insegne: INSEGNE, arredi: ARREDI, prezzoMin: PREZZO_MIN, prezzoMax: PREZZO_MAX, orari: { giorni: REGOLE_TERRENI.giorniLavoro, ore: REGOLE_TERRENI.oreLavoro } });
+// Il proprietario cambia i prezzi del suo negozio (anche quando e' gia' aperto)
+export function cambiaListino(stato, chi, prezzi) {
+  const e = terrenoDi(stato, chi), p = e && e[1].progetto;
+  if (!p || p.tipo !== 'negozio') return { ok: false, motivo: 'Non hai un negozio.' };
+  p.prezzi = Object.fromEntries(listinoDi(p.genere, Object.assign({}, p.prezzi, prezzi)).map(q => [q[0], q[1]]));
+  return { ok: true, lotto: e[0], listino: listinoDi(p.genere, p.prezzi).map(q => [q[0], q[1]]) };
+}

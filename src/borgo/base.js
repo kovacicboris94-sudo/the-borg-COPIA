@@ -116,12 +116,22 @@
     for (let i = 0; i < n; i++) { x.fillStyle = i % 2 ? c2 : c1; x.beginPath(); x.moveTo(i * w, 0); x.lineTo((i + 1) * w, 0); x.lineTo((i + 1) * w, 24); x.arc(i * w + w / 2, 24, w / 2, 0, Math.PI); x.closePath(); x.fill(); }
     const t = tex(cv, false); return t;
   }
-  function texInsegna(testo, w, h) {
+  // stile: lo sceglie chi costruisce un negozio sul suo terreno (legno, neon, lavagna, pastello, nera); senza = legno e oro
+  const STILI_INSEGNA = {
+    legno: { fondo: '#6a3f27', bordo: '#3a2216', filo: 'rgba(242,199,110,0.8)', testo: '#f6d27a', contorno: '#2b180f', font: 'Georgia, serif' },
+    neon: { fondo: '#1a1230', bordo: '#ff4fd8', filo: 'rgba(79,227,255,0.9)', testo: '#7ff3ff', contorno: '#ff4fd8', font: '"Trebuchet MS", sans-serif', alone: '#4fe3ff' },
+    lavagna: { fondo: '#2f4a3a', bordo: '#8a5a35', filo: 'rgba(255,255,255,0.35)', testo: '#f4f1e6', contorno: '#2f4a3a', font: '"Comic Sans MS", "Chalkboard SE", cursive' },
+    pastello: { fondo: '#fbefe0', bordo: '#e8a0b4', filo: 'rgba(120,180,200,0.7)', testo: '#c0507a', contorno: '#fff8ee', font: 'Georgia, serif' },
+    nera: { fondo: '#141414', bordo: '#c8a25a', filo: 'rgba(200,162,90,0.8)', testo: '#e8c878', contorno: '#000', font: '"Didot", "Bodoni MT", Georgia, serif' }
+  };
+  function texInsegna(testo, w, h, stile) {
+    const S = STILI_INSEGNA[stile] || STILI_INSEGNA.legno;
     const [cv, x] = tela(w, h);
-    rr(x, 3, 3, w - 6, h - 6, 14); x.fillStyle = '#6a3f27'; x.fill(); x.lineWidth = 6; x.strokeStyle = '#3a2216'; x.stroke();
-    x.strokeStyle = 'rgba(242,199,110,0.8)'; x.lineWidth = 3; rr(x, 14, 14, w - 28, h - 28, 8); x.stroke();
-    x.font = 'bold ' + Math.floor(h * 0.46) + 'px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.lineWidth = 7; x.strokeStyle = '#2b180f'; x.strokeText(testo, w / 2, h / 2 + 3); x.fillStyle = '#f6d27a'; x.fillText(testo, w / 2, h / 2 + 3);
+    rr(x, 3, 3, w - 6, h - 6, 14); x.fillStyle = S.fondo; x.fill(); x.lineWidth = 6; x.strokeStyle = S.bordo; x.stroke();
+    x.strokeStyle = S.filo; x.lineWidth = 3; rr(x, 14, 14, w - 28, h - 28, 8); x.stroke();
+    x.font = 'bold ' + Math.floor(h * 0.46) + 'px ' + S.font; x.textAlign = 'center'; x.textBaseline = 'middle';
+    if (S.alone) { x.shadowColor = S.alone; x.shadowBlur = 18; }
+    x.lineWidth = 7; x.strokeStyle = S.contorno; x.strokeText(testo, w / 2, h / 2 + 3); x.fillStyle = S.testo; x.fillText(testo, w / 2, h / 2 + 3);
     return tex(cv);
   }
   function texStendardo() {

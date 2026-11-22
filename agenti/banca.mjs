@@ -199,7 +199,7 @@ export function chiediMutuo(stato, chi, nomeChi, d, soldi, adesso) {
   if (app) { r = compraAppartamento(stato, chi, nomeChi, app.id, null, adesso); nomeBene = app.nome; }
   else {
     if (!mioLotto) { r = compraLotto(stato, chi, nomeChi, l.id, null, adesso); if (!r.ok) return r; }
-    if (tipo) { r = avviaCantiere(stato, chi, { tipo, nome: d.nome, genere }, null, adesso); }
+    if (tipo) { r = avviaCantiere(stato, chi, { tipo, nome: d.nome, genere, colore: d.colore, insegna: d.insegna, arredo: d.arredo, prezzi: d.prezzi }, null, adesso); }
     nomeBene = l.nome;
   }
   if (!r || !r.ok) return r || { ok: false, motivo: 'Non si puo\'.' };

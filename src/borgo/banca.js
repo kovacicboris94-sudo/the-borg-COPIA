@@ -79,7 +79,7 @@
   function chiudi() { if (S.el) { S.el.remove(); S.el = null; } }
   function apri(o) {
     chiudi(); if (B.Terreni && B.Terreni.chiudi) B.Terreni.chiudi();
-    if (o && o.bene) { S.scheda = 'mutuo'; S.mutuo.bene = o.bene; if (o.tipo) S.mutuo.tipo = o.tipo; S.mutuo.anticipo = 0; }
+    if (o && o.bene) { S.scheda = 'mutuo'; S.mutuo.bene = o.bene; if (o.tipo) S.mutuo.tipo = o.tipo; S.mutuo.anticipo = 0; S.mutuo.bozza = o.bozza || null; if (o.bozza) { if (o.bozza.genere) S.mutuo.genere = o.bozza.genere; if (o.bozza.nome) S.mutuo.nome = o.bozza.nome; } }
     else if (o && o.scheda) S.scheda = o.scheda;
     const el = document.createElement('div'); el.id = 'banca-scheda';
     el.style.cssText = 'position:absolute;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(94vw,460px);max-height:76vh;overflow:auto;z-index:61;background:#18233a;color:#eef3ff;border:2px solid #d9b45a;border-radius:16px;padding:12px 14px;font-family:sans-serif;font-size:14px;line-height:1.4;box-shadow:0 8px 30px rgba(0,0,0,.5)';
@@ -223,11 +223,12 @@
     disegna();
     const m = S.mutuo, n = Math.round(+S.el.querySelector('.bk-anticipo').value || 0);
     nota('Il direttore legge le carte...');
-    const r = await paga(n, { azione: 'mutuo', bene: m.bene, tipo: m.tipo, genere: m.genere, nome: m.nome, anticipo: n, durata: m.durata });
+    const bz = m.bozza && m.bozza.tipo === m.tipo ? m.bozza : {};
+    const r = await paga(n, { azione: 'mutuo', bene: m.bene, tipo: m.tipo, genere: m.genere, nome: m.nome, anticipo: n, durata: m.durata, colore: bz.colore, insegna: bz.insegna, arredo: bz.arredo, prezzi: bz.prezzi });
     if (!r.ok) return nota(r.motivo || 'Non si può, riprova.');
     G.emetti('toast', `🏦 Mutuo firmato! Rata ${fmt(r.rata)} ${SL()} al giorno`);
     nota(`Fatto: ${r.nomeBene} è tuo. Rata ${fmt(r.rata)} ${SL()} al giorno per ${r.durata} giorni.`);
-    S.mutuo.nome = ''; S.scheda = 'conto'; if (A().aggiorna) A().aggiorna(); await aggiornaConto();
+    S.mutuo.nome = ''; S.mutuo.bozza = null; S.scheda = 'conto'; if (A().aggiorna) A().aggiorna(); await aggiornaConto();
   }
   async function chiediPrestito() {
     if (!mioNick()) return nota('Prima scegli il tuo nome nel gioco.');

@@ -44,6 +44,12 @@
     ambulatorio: { muro: '#eef4f6', fascia: '#3f8a9a', pav: 'linoleum', insegna: '⚕️' }
   };
 
+  // l'arredo scelto da chi costruisce un negozio sul suo terreno (agenti/terreni.mjs ARREDI)
+  const ARREDO = {
+    rustico: { pav: 'cotto' },
+    moderno: { muro: '#f6f6f2', pav: 'linoleum' },
+    elegante: { muro: '#efe8dc', fascia: '#2a2a2a', pav: 'marmo' }
+  };
   function texPavimento(tipo) {
     const [cv, x] = B.tela(256, 256);
     if (tipo === 'scacchi') { for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { x.fillStyle = (i + j) % 2 ? '#2a2a30' : '#efe8da'; x.fillRect(i * 32, j * 32, 32, 32); } }
@@ -62,7 +68,7 @@
 
   /* def = { nome, tipo, w, d, fuori: {x, z, yaw}, verso } -> la stanza (stesso formato delle altre: ostacoli, porte, sedili, toccabili...) */
   function costruisciInterno(scena, def) {
-    const W = def.w || 12, D = def.d || 10, X = W / 2, Z0 = -D / 2, Z1 = D / 2, st = STILE[def.tipo] || STILE.bottega;
+    const W = def.w || 12, D = def.d || 10, X = W / 2, Z0 = -D / 2, Z1 = D / 2, st = Object.assign({}, STILE[def.tipo] || STILE.bottega, ARREDO[def.arredo] || {});
     const AREA = { x0: -X + 0.5, x1: X - 0.5, z0: Z0 + 0.6, z1: Z1 - 0.4 };
     const sedili = [], ostacoli = [], anim = [], porte = [], toccabili = [], lampade = [], vetri = [], muri = [];
     const gm = M('#fff').gradientMap;

@@ -105,7 +105,7 @@ export function persuasione(cl, neg, prod, prezzo, testo, tentativo = 1) {
   if (/ (grazie|per favore|prego) /.test(t)) p += 0.04;
   if (String(testo || '').trim().length < 12) p -= 0.15;          // una proposta di due parole non convince nessuno
   if (tentativo > 1 && !buone) p -= 0.08;                          // insistere senza argomenti stanca
-  const r = prezzo / prod[1];
+  const r = prezzo / (prod[3] || prod[1]);   // i clienti confrontano con il prezzo normale del borgo
   if (r > 1) { p -= (r - 1) * (0.25 + cl.tirchio); if (r > 1.3) motivo = 'prezzo'; } else p += (1 - r) * cl.tirchio * 0.6;
   if (cattive) motivo = 'parole';
   return { p: Math.max(0.03, Math.min(0.95, p)), motivo };
