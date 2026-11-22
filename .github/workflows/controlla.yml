@@ -25,6 +25,7 @@ jobs:
       - run: node test/giochi-agenti.test.mjs
       - run: node test/vita.test.mjs
       - run: node test/registro.test.mjs
+      - run: node test/azioni.test.mjs
       - run: node test/terreni.test.mjs
       - run: node test/interni.test.mjs
       - run: node test/banca.test.mjs
