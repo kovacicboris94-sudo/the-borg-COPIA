@@ -17,7 +17,7 @@
 
 import { cosaDi, manuale, merceDi, mobileDi, portafoglio, SEDUTE } from './borgo-cose.mjs';
 import { NEGOZI, CLIENTI, REGOLE_NEGOZI as RN, negozioDi, prodottoDi, decide } from './negozi.mjs';
-import { LOTTI, lottoDi, geometria, compraLotto, avviaCantiere, passoCantieri, negoziDeiLotti, vistaTerreni, listinoTerreni, terrenoDi, costoProgetto, PROGETTI, GENERI, faseDi, finePrevista, REGOLE_TERRENI as RT, tipoDi, abitazione, UN, APPARTAMENTI, appartamentoDato, appartamentoDi, compraAppartamento, immobileDi, prezzoAppartamento, vistaAppartamenti } from './terreni.mjs';
+import { LOTTI, lottoDi, geometria, compraLotto, avviaCantiere, passoCantieri, negoziDeiLotti, vistaTerreni, listinoTerreni, terrenoDi, costoProgetto, PROGETTI, GENERI, faseDi, finePrevista, REGOLE_TERRENI as RT, cambiaListino, PREZZO_MAX, tipoDi, abitazione, UN, APPARTAMENTI, appartamentoDato, appartamentoDi, compraAppartamento, immobileDi, prezzoAppartamento, vistaAppartamenti } from './terreni.mjs';
 import { BANCA, REGOLE_BANCA as RB, passoBanca, maturaGiocatore, chiediMutuo, chiediPrestito, rimborsa, vistaConto, vistaBanca, pianoMutuo, contoDi } from './banca.mjs';
 import { INTERNI, SPORTELLO, internoBottega, idBottega } from './interni.mjs';
 import { passoBorgo, passoDipendenti, effettoMestiere, disponibile, togliScorta, scorteDi, descriviPiazza, vistaLavori, giocatoreDipendente as dipendenteDelGioco, inTurno } from './lavori.mjs';
@@ -1181,7 +1181,7 @@ function proponi(stato, chi, neg, d, adesso) {
   const cc = CLIENTI.find(q => q.demo === c.demo), prod = prodottoDi(neg, d.prodotto);
   if (!prod) return { ok: false, motivo: `${neg.nome} non vende "${d.prodotto}". Listino: ${neg.prodotti.map(p => p[0]).join(', ')}.` };
   const manca = disponibile(stato, neg, prod); if (manca) return { ok: false, motivo: manca };
-  const prezzo = Math.round(lim(d.prezzo == null || !isFinite(d.prezzo) ? prod[1] : d.prezzo, Math.ceil(prod[1] * RN.prezzoMin), Math.floor(prod[1] * RN.prezzoMax)));
+  const prezzo = Math.round(lim(d.prezzo == null || !isFinite(d.prezzo) ? prod[1] : d.prezzo, Math.ceil((prod[3] || prod[1]) * RN.prezzoMin), Math.floor((prod[3] || prod[1]) * Math.max(RN.prezzoMax, prod[3] ? PREZZO_MAX : 0))));
   c.tentativi++;
   const r = decide(Object.assign({}, cc, { soldi: c.soldi }), neg, prod, prezzo, d.testo, c.tentativi);
   const prima = stato.ora; stato.ora = adesso;
@@ -1313,7 +1313,7 @@ export function cronaca(stato, da = 0, max = 300) {
 export function sincronizzaTerreni(stato) {
   for (let i = NEGOZI.length - 1; i >= 0; i--) if (NEGOZI[i].lotto) NEGOZI.splice(i, 1);
   NEGOZI.push(...negoziDeiLotti(stato).map(n => { const st = internoBottega(n.id, n.nome, n.genere, geometria(lottoDi(n.id), 'negozio'));
-    return Object.assign(n, { stanza: st.id, bancone: { x: 0, z: -1.6, rot: 0 }, venditore: { x: 0, z: -2.8 }, cliente: { x: 0, z: -0.3 }, interno: { id: st.id, nome: st.nome, tipo: st.tipo, fuori: st.ritorno } }); }));
+    return Object.assign(n, { stanza: st.id, bancone: { x: 0, z: -1.6, rot: 0 }, venditore: { x: 0, z: -2.8 }, cliente: { x: 0, z: -0.3 }, interno: { id: st.id, nome: st.nome, tipo: st.tipo, fuori: st.ritorno, arredo: (stato.terreni[n.id].progetto || {}).arredo || 'rustico' } }); }));
   // l'interno di ogni negozio sui terreni e' una stanza come le altre (si entra dalla porta dell'edificio)
   for (let i = STANZE.length - 1; i >= 0; i--) if (STANZE[i].lotto && STANZE[i].id.indexOf('bottega_') === 0) STANZE.splice(i, 1);
   for (const n of NEGOZI) if (n.lotto) STANZE.push(internoBottega(n.id, n.nome, n.genere, geometria(lottoDi(n.id), 'negozio')));
@@ -1496,9 +1496,10 @@ export function giocatoreTerreno(stato, nick, d, adesso) {
     return { ok: true, conto: c, accredito: acc, fatti: fatti.map(f => f.testo), immobile: immobileDi(stato, chi) };
   }
   const r = d.azione === 'compra' ? compraLotto(stato, chi, n, d.lotto, soldi, adesso)
-    : d.azione === 'costruisci' ? avviaCantiere(stato, chi, { tipo: d.tipo, nome: testo(d.nome, 28), genere: testo(d.genere, 20) }, soldi, adesso)
+    : d.azione === 'costruisci' ? avviaCantiere(stato, chi, Object.assign({ tipo: d.tipo, nome: testo(d.nome, 28), genere: testo(d.genere, 20) }, sceltePersona(d)), soldi, adesso)
+      : d.azione === 'listino' ? cambiaListino(stato, chi, prezziPuliti(d.prezzi))
       : d.azione === 'appartamento' ? compraAppartamento(stato, chi, n, 'piano ' + num(d.piano, 0), soldi, adesso)
-        : d.azione === 'mutuo' ? chiediMutuo(stato, chi, n, { bene: testo(d.bene, 30), progetto: testo(d.tipo, 12), genere: testo(d.genere, 20), nome: testo(d.nome, 28), anticipo: num(d.anticipo, 0), durata: num(d.durata, 240) }, soldi, adesso)
+        : d.azione === 'mutuo' ? chiediMutuo(stato, chi, n, { bene: testo(d.bene, 30), progetto: testo(d.tipo, 12), genere: testo(d.genere, 20), nome: testo(d.nome, 28), anticipo: num(d.anticipo, 0), durata: num(d.durata, 240), ...sceltePersona(d) }, soldi, adesso)
           : d.azione === 'prestito' ? chiediPrestito(stato, chi, n, num(d.importo, 0), num(d.durata, 24), adesso)
             : d.azione === 'paga' || d.azione === 'rimborsa' ? rimborsa(stato, chi, num(d.importo, 0), soldi, adesso, d.azione === 'paga')
               : { ok: false, motivo: 'Azione sconosciuta.' };
@@ -1516,6 +1517,9 @@ export function giocatoreTerreno(stato, nick, d, adesso) {
   }
   return r;
 }
+// come vuole il suo edificio chi lo costruisce: colori della facciata, insegna, arredo, prezzi
+const prezziPuliti = p => (p && typeof p === 'object') ? Object.fromEntries(Object.entries(p).slice(0, 12).map(([k, v]) => [testo(k, 30), num(v, 0)])) : null;
+const sceltePersona = d => ({ colore: d.colore == null ? null : num(d.colore, null), insegna: testo(d.insegna, 12), arredo: testo(d.arredo, 12), prezzi: prezziPuliti(d.prezzi) });
 // Una persona vera e' riconosciuta da una chiave segreta che il suo gioco si inventa la prima volta (resta nel suo telefono):
 // cosi' nessuno puo' fare debiti o comprare case a nome di un altro.
 function chiaveOk(stato, nick, chiave) {

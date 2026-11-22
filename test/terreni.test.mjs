@@ -2,7 +2,8 @@
 //   node test/terreni.test.mjs
 import assert from 'node:assert/strict';
 import { nuovoStato, passo, percezione, vistaPubblica, normalizzaAzione, giocatoreTerreno, giocatoreTurno, giocatoreVende, promptDiSistema, SCHEMA, STANZE, sincronizzaTerreni } from '../agenti/motore.mjs';
-import { LOTTI, LOTTO, geometria, costoProgetto, cantiereAperto, finePrevista, passoCantieri, PROGETTI, REGOLE_TERRENI } from '../agenti/terreni.mjs';
+import { LOTTI, LOTTO, geometria, costoProgetto, cantiereAperto, finePrevista, passoCantieri, PROGETTI, REGOLE_TERRENI, listinoDi, negoziDeiLotti, vistaTerreni, PREZZO_MAX } from '../agenti/terreni.mjs';
+import { CLIENTI, persuasione } from '../agenti/negozi.mjs';
 import { NEGOZI } from '../agenti/negozi.mjs';
 
 let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -106,5 +107,33 @@ async function scorri(s, da, minuti, passoS = 30) { let t = da; for (let i = 0; 
   ok(!ada.stanza && Math.abs(ada.x - g.ritorno.x) < 4 && Math.abs(ada.z - g.ritorno.z) < 4, 'esce davanti alla casa nuova');
   // stato vuoto: le porte tornano quelle delle casette del borgo
   sincronizzaTerreni(nuovoStato(t)); ok(STANZE.find(q => q.id === 'casa_ada').porta.z === 59.6, 'senza terreno la porta e\' quella della casetta');
+}
+
+// Il negozio come lo vuole il proprietario: colori, insegna, arredo e listino
+{
+  const s = nuovoStato(ROMA(23, 9));
+  ok(giocatoreTerreno(s, 'Mara', { azione: 'compra', lotto: 'lotto1', soldi: 50000 }, ROMA(23, 9)).ok, 'compra il lotto');
+  const r = giocatoreTerreno(s, 'Mara', { azione: 'costruisci', tipo: 'negozio', genere: 'bar', nome: 'Bar Mara', colore: 3, insegna: 'neon', arredo: 'elegante', prezzi: { 'Caffe\'': 9, 'Cappuccino': 999 }, soldi: 99999 }, ROMA(23, 9));
+  ok(r.ok, 'apre il cantiere del bar: ' + r.motivo);
+  const p = s.terreni.lotto1.progetto;
+  ok(p.colore === 3 && p.insegna === 'neon' && p.arredo === 'elegante', 'colori, insegna e arredo scelti');
+  ok(p.prezzi['Caffe\''] === 9 && p.prezzi['Cappuccino'] === 27, 'il prezzo esagerato si ferma al triplo del normale');
+  const v = vistaTerreni(s, ROMA(23, 9)).find(l => l.id === 'lotto1').progetto;
+  ok(v.insegna === 'neon' && v.arredo === 'elegante' && v.listino[0][1] === 9 && v.inizio, 'il gioco vede le scelte e il listino');
+  // scelte sbagliate: si torna ai valori normali
+  const s2 = nuovoStato(ROMA(23, 9)); giocatoreTerreno(s2, 'Lia', { azione: 'compra', lotto: 'lotto1', soldi: 50000 }, ROMA(23, 9));
+  giocatoreTerreno(s2, 'Lia', { azione: 'costruisci', tipo: 'casa', colore: 'blu', insegna: '<script>', arredo: 'oro', soldi: 99999 }, ROMA(23, 9));
+  const q = s2.terreni.lotto1.progetto; ok(q.insegna === 'legno' && q.arredo === 'rustico' && q.colore >= 0 && q.colore < 6 && !q.prezzi, 'valori strani: insegna di legno, arredo rustico');
+  // finito il negozio, il listino si cambia e i clienti lo vedono
+  p.fatte = p.ore; p.finito = ROMA(30, 12);
+  let c = giocatoreTerreno(s, 'Mara', { azione: 'listino', prezzi: { 'Cornetto': 4 } }, ROMA(30, 13));
+  ok(c.ok && c.listino.find(x => x[0] === 'Cornetto')[1] === 4 && c.listino.find(x => x[0] === 'Caffe\'')[1] === 9, 'cambia un prezzo, gli altri restano');
+  ok(!giocatoreTerreno(s2, 'Lia', { azione: 'listino', prezzi: { 'Pane': 3 } }, ROMA(30, 13)).ok, 'chi ha una casa non ha un listino');
+  const neg = negoziDeiLotti(s).find(n => n.id === 'lotto1'), caffe = neg.prodotti.find(x => x[0] === 'Caffe\'');
+  ok(caffe[1] === 9 && caffe[3] === 6, 'al bancone si vende al prezzo del proprietario, il normale resta noto');
+  // piu' caro del normale = i clienti si convincono meno
+  const dante = CLIENTI.find(x => x.nome === 'Dante') || CLIENTI[0], frase = 'Ciao, caffe buonissimo, un vero affare per te!';
+  ok(persuasione(dante, neg, caffe, 9, frase).p < persuasione(dante, neg, [caffe[0], 6, caffe[2], 6], 6, frase).p, 'il prezzo alto convince meno');
+  ok(listinoDi('bar', { Panino: 1 }).find(x => x[0] === 'Panino')[1] === 6 && PREZZO_MAX === 3, 'non meno della meta\' del normale');
 }
 console.log(`terreni: ${n} controlli passati`);

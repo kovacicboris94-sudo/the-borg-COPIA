@@ -297,7 +297,7 @@
   const banconi = new Map(), ICONA = { caffetteria: '☕', forno: '🥖', fioraio: '💐' };
   let mioTurno = null, pannello = null, scelta = null, pingTimer = null, risposta = '';
   // dal 22/11/2026 il bancone e' dentro il negozio (src/borgo/interni.js): n.stanza = l'interno; i negozi sui terreni portano anche n.interno
-  const stanzaBancone = n => { if (n.stanza && !app.stanze[n.stanza] && n.interno && app.aggiungiInterno) app.aggiungiInterno(n.stanza, { nome: n.interno.nome, tipo: B.tipoInterno ? B.tipoInterno(n.interno.tipo) : 'bottega', fuori: { x: n.interno.fuori.x, z: n.interno.fuori.z, yaw: PI } }); return (n.stanza && app.stanze[n.stanza]) || app.stanze.piazza; };
+  const stanzaBancone = n => { if (n.stanza && !app.stanze[n.stanza] && n.interno && app.aggiungiInterno) app.aggiungiInterno(n.stanza, { nome: n.interno.nome, tipo: B.tipoInterno ? B.tipoInterno(n.interno.tipo) : 'bottega', arredo: n.interno.arredo, fuori: { x: n.interno.fuori.x, z: n.interno.fuori.z, yaw: PI } }); return (n.stanza && app.stanze[n.stanza]) || app.stanze.piazza; };
   function aggiornaNegozi(l) {
     l.forEach(n => {
       if (banconi.has(n.id)) return;
