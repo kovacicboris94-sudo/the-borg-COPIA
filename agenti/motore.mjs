@@ -37,7 +37,7 @@ export const REGOLE = {
   // finche' 1 euro vale almeno 1 dollaro, quindi il tetto di 5 euro e' sempre rispettato.
   tettoUsd: 5,
   maxTokens: 1600,            // tetto della singola risposta (pensiero + azioni)
-  maxTokensIngresso: 20000,   // mai mandare prompt enormi (sopra 100.000 il prezzo sale)
+  maxTokensIngresso: 40000,   // mai mandare prompt enormi (sopra 100.000 il prezzo sale). Era 20.000: il 22/11 i prompt veri erano gia' ~17.000 token
   pausaMinimaMs: 60 * 1000,   // un agente non pensa mai piu' di una volta al minuto
   risveglioDaVoceMs: 3 * 60 * 1000, // se qualcuno gli parla si sveglia prima, al massimo ogni 3 minuti
   vista: 20,                  // metri: cosa vede e cosa sente
@@ -1070,6 +1070,7 @@ async function pensa(stato, ag, adesso, cervello, regole) {
   ag.errori = 0;
   const costo = costoDi(r.usage), s = spesaMese(ag, adesso);
   s.usd += costo; s.pensieri++; s.ingresso += (r.usage && r.usage.input_tokens) || 0; s.uscita += (r.usage && r.usage.output_tokens) || 0;
+  s.cache = (s.cache || 0) + ((r.usage && r.usage.cache_read_input_tokens) || 0);   // token letti dalla cache (costano un decimo)
   ag.costoUltimo = costo; ag.ultimaVolta = adesso; ag.esiti = [];
   if (ag.meseInizio !== meseDi(adesso)) { ag.meseInizio = meseDi(adesso); ag.tInizio = adesso; }   // da quando pensa in questo mese (per la previsione)
 
@@ -1092,7 +1093,7 @@ async function pensa(stato, ag, adesso, cervello, regole) {
   ag.prossimoPensiero = Math.max(adesso + regole.pausaMinimaMs, adesso + minuti * 60000);
   const azioni = Array.isArray(v.azioni) ? v.azioni.slice(0, regole.maxAzioni) : [];
   // la decisione intera, per l'archivio dell'esperimento (agenti/registro.mjs): non entra nel prompt
-  ag.ultimaDecisione = { t: adesso, pensiero: ag.ultimoPensiero, azioni, ricorda: testo(v.ricorda || '', 600), minuti, costo, ingresso: (r.usage && r.usage.input_tokens) || 0, uscita: (r.usage && r.usage.output_tokens) || 0 };
+  ag.ultimaDecisione = { t: adesso, pensiero: ag.ultimoPensiero, azioni, ricorda: testo(v.ricorda || '', 600), minuti, costo, ingresso: (r.usage && r.usage.input_tokens) || 0, cache: (r.usage && r.usage.cache_read_input_tokens) || 0, uscita: (r.usage && r.usage.output_tokens) || 0 };
   // nuove decisioni: la coda vecchia si butta (il lavoro gia' iniziato invece continua)
   // ...tranne quello che il corpo sta facendo per un bisogno urgente (bere, il bagno, dormire): prima si finisce quello
   const riflessiInCorso = regole.vita ? ag.coda.filter(q => q.riflesso && !ag.morto) : [];

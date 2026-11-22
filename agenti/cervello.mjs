@@ -4,6 +4,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import { MODELLO } from './motore.mjs';
 
 // Restituisce la funzione che il motore chiama per far pensare un agente.
+// Cache del prompt (22/11/2026): il prompt di sistema di un agente (~7.000 token, sempre uguale)
+// si salva nella cache di Anthropic per 5 minuti. Se l'agente ripensa entro 5 minuti (quasi sempre:
+// di solito ripensa ogni 3) quei token costano 0,01 $ al milione invece di 0,10. Il modello legge
+// lo stesso identico testo: cambia solo il prezzo. Sotto i 512 token la cache non scatta e non costa nulla in piu'.
 export function cervelloClaude(apiKey) {
   if (!apiKey) return null;
   const client = new Anthropic({ apiKey, maxRetries: 1, timeout: 60 * 1000 });
@@ -12,7 +16,7 @@ export function cervelloClaude(apiKey) {
     const richiesta = (conSchema) => ({
       model: MODELLO,
       max_tokens: maxTokens,
-      system,
+      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: messaggio }],
       output_config: conSchema ? { effort: sforzo, format: { type: 'json_schema', schema } } : { effort: sforzo }
     });

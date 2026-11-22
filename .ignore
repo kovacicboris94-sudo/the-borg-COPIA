@@ -1,0 +1,9 @@
+# Esclusi dalle ricerche (ripgrep, Grep e Glob di Claude Code): file generati, pesanti o di terzi.
+# Restano nel repo e nel gioco. Per cercarci dentro apposta: rg --no-ignore
+index.html
+src/librerie/
+src/dati/
+img/
+modelli/*.glb
+agenti/package-lock.json
+agenti/node_modules/
