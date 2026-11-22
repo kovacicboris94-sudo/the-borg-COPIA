@@ -1,3 +1,4 @@
+# SPENTO: per attivarlo spostalo in .github/workflows/ (rende pubblico l'archivio nel repo pubblico).
 name: Copia l'archivio di Ada e Teo
 
 # Due volte al giorno copia l'archivio dell'esperimento (/registro del servizio degli agenti)
