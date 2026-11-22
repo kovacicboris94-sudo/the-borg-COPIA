@@ -34,14 +34,14 @@ async function scorri(s, da, minuti, passoS = 30) { let t = da; for (let i = 0; 
   const s = nuovoStato(ROMA(23, 9));
   let r = giocatoreTerreno(s, 'Boris', { azione: 'compra', lotto: 'lotto2', soldi: 100 }, ROMA(23, 9));
   ok(!r.ok && /Costa/.test(r.motivo), 'senza soldi non si compra');
-  r = giocatoreTerreno(s, 'Boris', { azione: 'compra', lotto: 'lotto2', soldi: 5000 }, ROMA(23, 9));
+  r = giocatoreTerreno(s, 'Boris', { azione: 'compra', lotto: 'lotto2', soldi: 50000 }, ROMA(23, 9));
   ok(r.ok && r.spesa === LOTTI[1].prezzo, 'comprato, il gioco toglie il prezzo');
-  ok(!giocatoreTerreno(s, 'Boris', { azione: 'compra', lotto: 'lotto3', soldi: 5000 }, ROMA(23, 9)).ok, 'uno a testa');
-  ok(!giocatoreTerreno(s, 'Luca', { azione: 'compra', lotto: 'lotto2', soldi: 5000 }, ROMA(23, 9)).ok, 'un lotto venduto non si ricompra');
-  ok(!giocatoreTerreno(s, 'Boris', { azione: 'costruisci', tipo: 'negozio', soldi: 9999 }, ROMA(23, 9)).ok, 'il negozio deve dire cosa vende');
-  r = giocatoreTerreno(s, 'Boris', { azione: 'costruisci', tipo: 'negozio', genere: 'dolci', nome: 'Dolci di Boris', soldi: 9999 }, ROMA(23, 9));
+  ok(!giocatoreTerreno(s, 'Boris', { azione: 'compra', lotto: 'lotto3', soldi: 50000 }, ROMA(23, 9)).ok, 'uno a testa');
+  ok(!giocatoreTerreno(s, 'Luca', { azione: 'compra', lotto: 'lotto2', soldi: 50000 }, ROMA(23, 9)).ok, 'un lotto venduto non si ricompra');
+  ok(!giocatoreTerreno(s, 'Boris', { azione: 'costruisci', tipo: 'negozio', soldi: 99999 }, ROMA(23, 9)).ok, 'il negozio deve dire cosa vende');
+  r = giocatoreTerreno(s, 'Boris', { azione: 'costruisci', tipo: 'negozio', genere: 'dolci', nome: 'Dolci di Boris', soldi: 99999 }, ROMA(23, 9));
   ok(r.ok && r.spesa === costoProgetto('negozio') && r.nome === 'Dolci di Boris', 'cantiere aperto');
-  ok(!giocatoreTerreno(s, 'Boris', { azione: 'costruisci', tipo: 'casa', soldi: 9999 }, ROMA(23, 9)).ok, 'una sola costruzione per lotto');
+  ok(!giocatoreTerreno(s, 'Boris', { azione: 'costruisci', tipo: 'casa', soldi: 99999 }, ROMA(23, 9)).ok, 'una sola costruzione per lotto');
   // a cantiere aperto il negozio non c'e' ancora
   sincronizzaTerreni(s); ok(!NEGOZI.some(q => q.id === 'lotto2'), 'niente negozio finche\' il cantiere non finisce');
   // il tempo: si fa finire saltando i giorni (passoCantieri direttamente, poi il motore)
@@ -75,17 +75,17 @@ async function scorri(s, da, minuti, passoS = 30) { let t = da; for (let i = 0; 
   Object.values(s.agenti).forEach(a => { a.prossimoPensiero = ROMA(30, 9); });   // nessun pensiero durante la prova: solo le azioni date
   ok(SCHEMA.properties.azioni.items.properties.tipo.enum.includes('terreno') && SCHEMA.properties.azioni.items.properties.tipo.enum.includes('edifica'), 'azioni nello schema');
   ok(/"tipo":"terreno"/.test(promptDiSistema(ada)) && /"tipo":"edifica"/.test(promptDiSistema(ada)), 'le azioni sono spiegate agli agenti');
-  ok(/TERRENI DEL BORGO: in vendita lotto1/.test(percezione(s, ada, ROMA(23, 9))), 'l\'agente vede i lotti in vendita');
+  ok(/TERRENI E CASE DEL BORGO: terreni in vendita: lotto1/.test(percezione(s, ada, ROMA(23, 9))), 'l\'agente vede i lotti in vendita');
   ok(normalizzaAzione({ tipo: 'terreno', nome: 'Lotto 1' }).lotto === 'lotto1' && normalizzaAzione({ tipo: 'edifica', nome: 'casa' }).progetto === 'casa', 'azioni normalizzate');
   ada.starlight = 200;
   ada.coda = [normalizzaAzione({ tipo: 'terreno', nome: 'lotto1' })];
   let t = await scorri(s, ROMA(23, 9), 2);
   ok(!s.terreni.lotto1 && ada.esiti.some(e => new RegExp('Costa ' + LOTTI[0].prezzo).test(e)), 'senza soldi: rifiutato (dopo esserci andata)');
-  ada.starlight = 8000; ada.coda = [normalizzaAzione({ tipo: 'terreno', nome: 'lotto1' }), normalizzaAzione({ tipo: 'edifica', nome: 'casa' })];
+  ada.starlight = 80000; ada.coda = [normalizzaAzione({ tipo: 'terreno', nome: 'lotto1' }), normalizzaAzione({ tipo: 'edifica', nome: 'casa' })];
   t = await scorri(s, t, 2);
   ok(s.terreni.lotto1 && s.terreni.lotto1.chi === 'ada', 'Ada ha comprato il lotto 1');
   ok(s.terreni.lotto1.progetto && s.terreni.lotto1.progetto.tipo === 'casa', 'e aperto il cantiere della casa');
-  ok(Math.round(ada.starlight) === 8000 - LOTTI[0].prezzo - costoProgetto('casa'), 'ha pagato terreno e casa: ' + ada.starlight);
+  ok(Math.round(ada.starlight) === 80000 - LOTTI[0].prezzo - costoProgetto('casa'), 'ha pagato terreno e casa: ' + ada.starlight);
   ok(/Cantiere di "Casa di Ada"/.test(percezione(s, ada, t)), 'vede il suo cantiere');
   // non si costruiscono oggetti sopra un lotto
   ada.x = ada.tx = -10; ada.z = ada.tz = 55; ada.stanza = null;

@@ -23,6 +23,13 @@
     { muro: '#e8d6b6', muroSopra: '#f1e3c8', tetto: '#8a4a2a', persiane: '#2f4aa3', tendaB: '#d9a03a' },
     { muro: '#d9c2e0', muroSopra: '#efe2f4', tetto: '#3a2f6a', persiane: '#6a8a3a', tendaB: '#b0507a' }
   ];
+  // la villa: colori piu' chiari ed eleganti
+  const VILLA = [
+    { muro: '#f4efe6', muroSopra: '#fbf8f2', tetto: '#b5523b', persiane: '#3f6a4a', tendaB: '#2f5a7a' },
+    { muro: '#f0e2c8', muroSopra: '#faf1de', tetto: '#8a3a2a', persiane: '#2f4a6a', tendaB: '#7a2f3a' },
+    { muro: '#e6ece8', muroSopra: '#f6f9f7', tetto: '#4a5a6a', persiane: '#6a4a2f', tendaB: '#3f6a5a' }
+  ];
+  const LOTTO_D = r => r.z1 - r.z0;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const nomeMoneta = () => (B.ECONOMIA ? B.ECONOMIA.moneta.nome : 'Starlight');
   const fmt = n => Number(n).toLocaleString('it-IT');
@@ -30,6 +37,8 @@
   const mioNick = () => (B.AgentiIA && B.AgentiIA.mioNick ? B.AgentiIA.mioNick() : '');
   const sonoIo = c => !!(c && c.vero && mioNick() && c.nome.toLowerCase() === mioNick().toLowerCase());
   const mioLotto = () => S.dati.find(l => sonoIo(l.chi));
+  const abitazione = t => t === 'casa' || t === 'villa';
+  const NOME_TIPO = { casa: 'casa', villa: 'villa', negozio: 'negozio' };
 
   /* ---------- disegno ---------- */
   function cartello(testo, sotto, col) {
@@ -48,7 +57,7 @@
     for (let i = 0; i < 900; i++) { const v = Math.random(); x.fillStyle = prato ? (v < 0.5 ? '#5f7a3e' : '#86a05a') : (v < 0.5 ? '#6a543d' : v < 0.85 ? '#8c7356' : '#a8977e'); x.fillRect(Math.random() * 256, Math.random() * 256, 2 + Math.random() * 4, 2 + Math.random() * 3); }
     const t = B.tex(cv, true); t.repeat.set(2, 2.5); terre[k] = t; return t;
   }
-  function chiave(l) { const p = l.progetto; return [l.chi ? l.chi.id : '', p ? p.tipo + p.nome + p.fase + (p.finito ? 'F' : Math.floor(p.fatte / p.ore * 20)) : ''].join('|'); }
+  function chiave(l) { const p = l.progetto; return [l.chi ? l.chi.id : '', l.asta ? 'A' + l.prezzo : '', p ? p.tipo + p.nome + p.fase + (p.finito ? 'F' : Math.floor(p.fatte / p.ore * 20)) : ''].join('|'); }
 
   function costruisciLotto(l) {
     const app = S.app, g = new T.Group(), geo = l.geo, r = geo.rect, p = l.progetto, ost = [];
@@ -68,10 +77,10 @@
     const cx = geo.cartello.x, cz = geo.cartello.z - 0.2;
     box(0.1, 1.6, 0.1, legnoS, cx - 0.55, 0.8, cz); box(0.1, 1.6, 0.1, legnoS, cx + 0.55, 0.8, cz);
     let titolo, sotto, col;
-    if (!l.chi) { titolo = 'In vendita'; sotto = fmt(l.prezzo) + ' ' + nomeMoneta() + '\ntocca per comprare'; col = '#fff3c4'; }
+    if (!l.chi) { titolo = l.asta ? 'All\'asta' : 'In vendita'; sotto = fmt(l.prezzo) + ' ' + nomeMoneta() + (l.asta && p ? '\ncon ' + p.nome : '\ntocca per comprare'); col = l.asta ? '#ffd0c0' : '#fff3c4'; }
     else if (!p) { titolo = 'Terreno di ' + l.chi.nome; sotto = 'ancora vuoto'; }
     else if (!p.finito) { titolo = 'Cantiere'; sotto = p.nome + '\n' + Math.round(p.fatte / p.ore * 100) + '% · ' + p.fase; col = '#ffe0a8'; }
-    else { titolo = p.nome; sotto = (p.tipo === 'casa' ? 'casa di ' : 'negozio di ') + l.chi.nome; }
+    else { titolo = p.nome; sotto = NOME_TIPO[p.tipo] + ' di ' + l.chi.nome; }
     const tav = new T.Mesh(new T.PlaneGeometry(1.6, 0.8), new T.MeshBasicMaterial({ map: cartello(titolo, sotto, col) }));
     tav.position.set(cx, 1.4, cz - 0.07); tav.rotation.y = PI; g.add(tav);
     box(1.7, 0.9, 0.06, legnoS, cx, 1.4, cz);
@@ -106,15 +115,25 @@
       box(0.8, 0.4, 0.8, '#b0563a', r.x1 - 1, 0.2, r.z0 + 1.5);
       ost.push({ t: 'b', x0: e.x - e.w / 2 - 0.6, x1: e.x + e.w / 2 + 0.6, z0: e.z - e.d / 2 - 0.6, z1: e.z + e.d / 2 + 0.6 });
     } else if (p && p.finito && B.edificioPiazza) {
-      const c = COLORI[p.colore % COLORI.length];
-      edificio = B.edificioPiazza({ x: e.x, z: e.z, rot: PI, w: e.w, d: e.d, nome: p.nome, muro: c.muro, muroSopra: c.muroSopra, tetto: c.tetto, persiane: c.persiane, tendaA: '#f6e8cc', tendaB: c.tendaB, porta: 0, tendaLarg: 3.4 });
+      const c = p.tipo === 'villa' ? VILLA[p.colore % VILLA.length] : COLORI[p.colore % COLORI.length];
+      edificio = B.edificioPiazza({ x: e.x, z: e.z, rot: PI, w: e.w, d: e.d, nome: p.nome, muro: c.muro, muroSopra: c.muroSopra, tetto: c.tetto, persiane: c.persiane, tendaA: '#f6e8cc', tendaB: c.tendaB, porta: 0, tendaLarg: p.tipo === 'villa' ? 4.2 : 3.4 });
+      if (p.tipo === 'villa') {
+        // la villa: piscinetta in giardino, siepi lungo il recinto, colonnine e lampioncini al vialetto
+        const px = l.x - 2.1, pz = r.z0 + 2.2;
+        box(2.6, 0.25, 2.0, '#e8e2d4', px, 0.12, pz, 0.012);
+        const acqua = new T.Mesh(new T.PlaneGeometry(2.2, 1.6), new T.MeshToonMaterial({ color: new T.Color('#4fc3e8'), gradientMap: M('#fff').gradientMap, emissive: new T.Color('#2a8ab0'), emissiveIntensity: 0.35 }));
+        acqua.rotation.x = -PI / 2; acqua.position.set(px, 0.26, pz); g.add(acqua);
+        ost.push({ t: 'b', x0: px - 1.3, x1: px + 1.3, z0: pz - 1.0, z1: pz + 1.0 });
+        [r.x0 + 0.35, r.x1 - 0.35].forEach(x => box(0.5, 0.8, LOTTO_D(r) - 1.2, '#4f7a3a', x, 0.4, (r.z0 + r.z1) / 2 + 0.4, 0.012));
+        [-1, 1].forEach(sg => { box(0.14, 1.1, 0.14, '#3a3a3a', l.x + sg * 1.0, 0.55, r.z0 + 0.3, 0.008); const lu = new T.Mesh(new T.SphereGeometry(0.12, 10, 8), B.Mluce ? B.Mluce('#ffd98a', 0.9) : M('#ffd98a')); lu.position.set(l.x + sg * 1.0, 1.2, r.z0 + 0.3); g.add(lu); });
+      }
     }
     app.gP.add(g);
     ost.forEach(o => app.piazza.ostacoli.push(o));
     // la porta dell'edificio finito
     let porta = null;
     if (p && p.finito) {
-      porta = { id: 'porta-' + l.id, nome: p.nome, x: geo.porta.x, z: geo.porta.z, r: 1.35, testo: p.tipo === 'casa' ? (sonoIo(l.chi) ? 'Entra in casa tua' : 'Bussa a ' + p.nome) : 'Guarda ' + p.nome, fn: () => portaLotto(l.id) };
+      porta = { id: 'porta-' + l.id, nome: p.nome, x: geo.porta.x, z: geo.porta.z, r: 1.35, testo: !l.chi ? 'All\'asta: ' + p.nome : abitazione(p.tipo) ? (sonoIo(l.chi) ? 'Entra in casa tua' : 'Bussa a ' + p.nome) : 'Guarda ' + p.nome, fn: () => portaLotto(l.id) };
       app.piazza.porte.push(porta);
     }
     return { g, tocco, ost: ost.concat(edificio ? edificio.ost : []), edificio, porta };
@@ -128,15 +147,21 @@
   }
 
   /* ---------- porte: la casa del lotto e le casette lasciate vuote ---------- */
+  // si entra nella casa del gioco e uscendo si torna da dove si e' entrati (il lotto in piazza o il piano della Torre)
+  function entraCasaDa(verso, arrivo) {
+    const app = S.app, u = uscitaDi('casa');
+    if (u) { if (!u.arrivoBorgo) { u.arrivoBorgo = u.arrivo; u.versoBorgo = u.verso; } u.verso = verso; u.arrivo = arrivo; S.casaDaLotto = true; }
+    G.emetti('transizione', () => app.entraStanza('casa', app.stanze.casa.spawn));
+  }
   function uscitaDi(stanza) { const st = S.app.stanze[stanza]; return st && (st.porte || []).find(q => q.id === 'porta-uscita'); }
   function portaLotto(id) {
     const l = S.dati.find(q => q.id === id); if (!l || !l.progetto) return;
     const p = l.progetto, app = S.app, geo = l.geo;
+    if (!l.chi) return apri(id);
     if (p.tipo === 'negozio') { const b = (B.AgentiIA && B.AgentiIA.apriBancone); if (b) b(id); return; }
     if (sonoIo(l.chi)) {
       // la mia casa: si entra nella casa del gioco e uscendo si torna qui
-      const u = uscitaDi('casa'); if (u) { if (!u.arrivoBorgo) u.arrivoBorgo = u.arrivo; u.arrivo = { x: geo.ritorno.x, z: geo.ritorno.z, yaw: PI }; S.casaDaLotto = true; }
-      G.emetti('transizione', () => app.entraStanza('casa', app.stanze.casa.spawn));
+      entraCasaDa('piazza', { x: geo.ritorno.x, z: geo.ritorno.z, yaw: PI });
       return;
     }
     if (!l.chi.vero && app.stanze['casa_' + l.chi.id]) { G.emetti('transizione', () => app.entraStanza('casa_' + l.chi.id, { x: 0, z: 2.4, yaw: PI })); return; }
@@ -145,23 +170,24 @@
   // un abitante IA che si e' trasferito: la sua casetta del borgo resta vuota e l'uscita della sua stanza porta alla casa nuova
   function aggiornaTraslochi() {
     const app = S.app, mossi = {};
-    S.dati.forEach(l => { if (l.chi && !l.chi.vero && l.progetto && l.progetto.finito && l.progetto.tipo === 'casa') mossi['casa_' + l.chi.id] = l; });
+    S.dati.forEach(l => { if (l.chi && !l.chi.vero && l.progetto && l.progetto.finito && abitazione(l.progetto.tipo)) mossi['casa_' + l.chi.id] = { lotto: l, nome: l.chi.nome, dove: 'nella ' + l.progetto.tipo + ' nuova sul ' + l.id.replace('lotto', 'lotto '), verso: 'piazza', arrivo: { x: l.geo.ritorno.x, z: l.geo.ritorno.z, yaw: PI } }; });
+    ((S.extra && S.extra.appartamenti) || []).forEach(a => { if (a.chi && !a.chi.vero) mossi['casa_' + a.chi.id] = { nome: a.chi.nome, dove: 'nell\'appartamento al ' + a.piano + '° piano della Torre', verso: a.id, arrivo: { x: -6.4, z: 1.5, yaw: PI / 2 } }; });
     (app.piazza.porte || []).forEach(p => {
       if (!p.verso || p.verso.indexOf('casa_') !== 0 || p.id.indexOf('porta-lotto') === 0) return;
       const l = mossi[p.verso];
-      if (l && !p.fnBorgo) { p.fnBorgo = true; p.testo0 = p.testo; p.testo = 'Casetta del borgo (vuota)'; p.fn = () => G.emetti('toast', 'Casetta vuota: ' + l.chi.nome + ' ora abita nella casa nuova sul ' + l.id.replace('lotto', 'lotto ')); }
+      if (l) { if (!p.fnBorgo) { p.fnBorgo = true; p.testo0 = p.testo; p.testo = 'Casetta del borgo (vuota)'; } p.fn = () => G.emetti('toast', 'Casetta vuota: ' + l.nome + ' ora abita ' + l.dove); }
       if (!l && p.fnBorgo) { p.fnBorgo = false; p.testo = p.testo0; delete p.fn; }
     });
     Object.keys(app.stanze).filter(k => k.indexOf('casa_') === 0).forEach(k => {
-      const u = uscitaDi(k); if (!u) return; if (!u.arrivoBorgo) u.arrivoBorgo = u.arrivo;
-      const l = mossi[k]; u.arrivo = l ? { x: l.geo.ritorno.x, z: l.geo.ritorno.z, yaw: PI } : u.arrivoBorgo;
+      const u = uscitaDi(k); if (!u) return; if (!u.arrivoBorgo) { u.arrivoBorgo = u.arrivo; u.versoBorgo = u.verso; }
+      const l = mossi[k]; u.arrivo = l ? l.arrivo : u.arrivoBorgo; u.verso = l ? l.verso : u.versoBorgo;
     });
   }
 
   /* ---------- dati dal servizio ---------- */
-  function applica(lista, listino, app) {
-    S.app = app; S.dati = lista || []; if (listino) S.listino = listino;
-    if (!S.agganciato && G.su) { S.agganciato = true; G.su('stanza', e => { if (e && e.id === 'casa' && !S.casaDaLotto) { const u = uscitaDi('casa'); if (u && u.arrivoBorgo) u.arrivo = u.arrivoBorgo; } S.casaDaLotto = false; }); }
+  function applica(lista, listino, app, extra) {
+    S.app = app; S.dati = lista || []; if (listino) S.listino = listino; if (extra) S.extra = extra;
+    if (!S.agganciato && G.su) { S.agganciato = true; G.su('stanza', e => { if (e && e.id === 'casa' && !S.casaDaLotto) { const u = uscitaDi('casa'); if (u && u.arrivoBorgo) { u.arrivo = u.arrivoBorgo; u.verso = u.versoBorgo; } } S.casaDaLotto = false; }); }
     const visti = new Set();
     S.dati.forEach(l => {
       visti.add(l.id);
@@ -173,6 +199,7 @@
     S.lotti.forEach((v, id) => { if (!visti.has(id)) { smonta(v); S.lotti.delete(id); } });
     aggiornaTraslochi();
     if (S.pannello) disegna();
+    if (extra && B.Banca) B.Banca.applica(extra, app);
   }
   const toccabili = () => [...S.lotti.entries()].map(([id, v]) => ({ obj: v.tocco, fn: () => apri(id) }));
 
@@ -200,27 +227,32 @@
     const p = l.progetto, L = S.listino, mio = sonoIo(l.chi), haGia = mioLotto();
     let h = `<div style="font-size:19px;font-weight:700">🏗️ ${esc(l.nome)}</div><div style="opacity:.8;font-size:12px;margin-bottom:8px">${l.w} × ${l.d} m · ${l.w * l.d} m²</div>`;
     if (!l.chi) {
-      h += `<div>Un terreno recintato del borgo. Comprandolo diventa tuo: poi ci fai costruire <b>una casa</b> o <b>un negozio</b> dall'impresa del borgo.</div>
-        <div style="margin-top:6px">Prezzo: <b>${fmt(l.prezzo)} ${SL()}</b> · ne hai ${fmt(B.Eco ? B.Eco.coins : 0)}</div>`;
-      if (L) h += `<div style="opacity:.8;font-size:12px;margin-top:4px">Poi: casa ${fmt(L.progetti.casa.costo)} ${SL()} (${L.progetti.casa.ore} ore di cantiere) · negozio ${fmt(L.progetti.negozio.costo)} ${SL()} (${L.progetti.negozio.ore} ore). Il cantiere lavora dal lunedì al sabato, dalle 8 alle 17.</div>`;
-      h += haGia ? `<div style="margin-top:8px;opacity:.85">Hai già un terreno (${esc(haGia.nome)}): se ne può avere uno solo.</div>` : btn('tr-compra', `Compra per ${fmt(l.prezzo)} ${SL()}`, true);
+      const casaMia = B.Banca && B.Banca.mioAppartamento && B.Banca.mioAppartamento();
+      h += l.asta ? `<div>All'asta: la banca l'ha pignorato${l.asta.era ? ' a ' + esc(l.asta.era) : ''} e lo rivende al 70% del valore${p ? ', con sopra <b>' + esc(p.nome) + '</b>' + (p.finito ? '' : ' (cantiere fermo al ' + Math.round(p.fatte / p.ore * 100) + '%)') : ''}.</div>`
+        : `<div>Un terreno recintato del borgo. Comprandolo diventa tuo: poi ci fai costruire <b>una casa</b>, <b>una villa</b> o <b>un negozio</b> dall'impresa del borgo.</div>`;
+      h += `<div style="margin-top:6px">Prezzo: <b>${fmt(l.prezzo)} ${SL()}</b> · ne hai ${fmt(B.Eco ? B.Eco.coins : 0)}</div>`;
+      if (L && !p) h += `<div style="opacity:.8;font-size:12px;margin-top:4px">Poi: casa ${fmt(L.progetti.casa.costo)} ${SL()} (${L.progetti.casa.ore} ore di cantiere) · villa ${fmt(L.progetti.villa.costo)} ${SL()} (${L.progetti.villa.ore} ore) · negozio ${fmt(L.progetti.negozio.costo)} ${SL()} (${L.progetti.negozio.ore} ore). Il cantiere lavora dal lunedì al sabato, dalle 8 alle 17.</div>`;
+      if (haGia || casaMia) h += `<div style="margin-top:8px;opacity:.85">Hai già ${haGia ? 'un terreno (' + esc(haGia.nome) + ')' : 'un appartamento nella Torre'}: si può avere una sola proprietà.</div>`;
+      else { h += btn('tr-compra', `Compra in contanti: ${fmt(l.prezzo)} ${SL()}`, true); if (B.Banca) h += btn('tr-mutuo', '🏦 Compra con il mutuo (anticipo 20%)', false); }
     } else if (!p) {
       h += `<div>Di <b>${esc(l.chi.nome)}</b>${l.chi.vero ? '' : ' 🤖'}. Ancora vuoto.</div>`;
       if (mio && L) {
-        const c = L.progetti.casa, n = L.progetti.negozio;
+        const c = L.progetti.casa, n = L.progetti.negozio;   // la villa costa di piu' (L.progetti.villa)
         h += `<div style="margin-top:8px;font-weight:700">Cosa ci costruisci?</div>
           <div style="display:flex;gap:6px;margin-top:6px">
             <button class="tr-tipo" data-t="casa" style="flex:1;padding:10px;border-radius:10px;border:2px solid #f2c76e;background:${S.scelta === 'casa' ? '#f2c76e' : 'none'};color:${S.scelta === 'casa' ? '#2a1a2e' : '#ffe9c4'};font-weight:700;cursor:pointer">🏠 Casa<br><span style="font-weight:400;font-size:12px">${fmt(c.costo)} ${SL()}</span></button>
+            <button class="tr-tipo" data-t="villa" style="flex:1;padding:10px;border-radius:10px;border:2px solid #f2c76e;background:${S.scelta === 'villa' ? '#f2c76e' : 'none'};color:${S.scelta === 'villa' ? '#2a1a2e' : '#ffe9c4'};font-weight:700;cursor:pointer">🏡 Villa<br><span style="font-weight:400;font-size:12px">${fmt(L.progetti.villa.costo)} ${SL()}</span></button>
             <button class="tr-tipo" data-t="negozio" style="flex:1;padding:10px;border-radius:10px;border:2px solid #f2c76e;background:${S.scelta === 'negozio' ? '#f2c76e' : 'none'};color:${S.scelta === 'negozio' ? '#2a1a2e' : '#ffe9c4'};font-weight:700;cursor:pointer">🏪 Negozio<br><span style="font-weight:400;font-size:12px">${fmt(n.costo)} ${SL()}</span></button>
           </div>`;
         if (S.scelta) {
           const q = L.progetti[S.scelta];
           h += `<div style="margin-top:8px;font-size:13px">${esc(q.descr)}. Materiali ${fmt(q.materiali)} ${SL()} + ${q.operai} operai per ${q.ore} ore (${fmt(q.costo - q.materiali)} ${SL()}). Si paga tutto subito. Il cantiere lavora dal lunedì al sabato dalle 8 alle 17: ci vogliono circa ${Math.ceil(q.ore / 9)} giorni di lavoro.</div>`;
-          h += S.scelta === 'casa' ? `<div style="margin-top:6px;font-size:13px;opacity:.9">Finita, è l'ingresso in piazza della tua casa, con il tuo nome sopra.</div>`
+          h += S.scelta !== 'negozio' ? `<div style="margin-top:6px;font-size:13px;opacity:.9">Finita, è l'ingresso in piazza della tua casa, con il tuo nome sopra.${S.scelta === 'villa' ? ' Più grande e più bella, con la piscinetta in giardino.' : ''}</div>`
             : `<div style="margin-top:8px">Cosa vende? <select class="tr-genere" style="padding:6px;border-radius:8px;font-size:15px">${Object.entries(L.generi).map(([k, g]) => `<option value="${k}">${g.icona} ${esc(g.nome)}</option>`).join('')}</select></div>
-               <input class="tr-nome" maxlength="28" placeholder="Nome del negozio (es. Dolci di ${esc(mioNick())})" style="width:100%;box-sizing:border-box;margin-top:6px;padding:8px 10px;border-radius:10px;border:0;font-size:16px">
+               <input class="tr-nome" maxlength="28" placeholder="Nome del negozio (es. Dolci di ${esc(mioNick())})" style="width:100%;box-sizing:border-box;margin-top:6px;padding:8px 10px;border-radius:10px;border:0;font-size:16px;color:#111;background:#fff">
                <div style="margin-top:6px;font-size:13px;opacity:.9">Finito, ha un bancone davanti: ci lavori solo tu, convinci i clienti del borgo e tieni l'80% di ogni vendita.</div>`;
           h += btn('tr-costruisci', `Fai costruire per ${fmt(q.costo)} ${SL()}`, true);
+          if (B.Banca) h += btn('tr-mutuo', '🏦 Fai costruire con il mutuo', false);
         }
       }
     } else if (!p.finito) {
@@ -230,8 +262,8 @@
         <div style="margin-top:4px;font-size:13px">${k}% · ${esc(p.fase)} · ${Math.round(p.fatte)} ore su ${p.ore}</div>
         <div style="margin-top:4px;font-size:13px;opacity:.9">Pronto circa ${esc(quando(p.fine))}. Il cantiere lavora dal lunedì al sabato, dalle 8 alle 17.</div>`;
     } else {
-      h += `<div><b>${esc(p.nome)}</b>: ${p.tipo === 'casa' ? 'la casa' : 'il negozio'} di <b>${esc(l.chi.nome)}</b>${l.chi.vero ? '' : ' 🤖'}.</div>`;
-      if (p.tipo === 'casa' && mio) h += btn('tr-entra', '🏠 Entra in casa', true);
+      h += `<div><b>${esc(p.nome)}</b>: ${({ casa: 'la casa', villa: 'la villa', negozio: 'il negozio' })[p.tipo]} di <b>${esc(l.chi.nome)}</b>${l.chi.vero ? '' : ' 🤖'}.</div>`;
+      if (abitazione(p.tipo) && mio) h += btn('tr-entra', '🏠 Entra in casa', true);
       if (p.tipo === 'negozio') h += btn('tr-bancone', p.icona + ' Vai al bancone', true);
     }
     if (corpo.dataset.h === h) return;   // niente di nuovo: non si ridisegna (cosi' un tocco su un pulsante non si perde)
@@ -240,6 +272,7 @@
     on('.tr-compra', () => compra(l));
     corpo.querySelectorAll('.tr-tipo').forEach(b => b.addEventListener('click', () => { S.scelta = b.dataset.t; disegna(); }));
     on('.tr-costruisci', () => costruisci(l));
+    on('.tr-mutuo', () => { const t = S.scelta || 'casa'; chiudi(); B.Banca.apri({ bene: l.id, tipo: t }); });
     on('.tr-entra', () => { chiudi(); portaLotto(l.id); });
     on('.tr-bancone', () => { chiudi(); const b = B.AgentiIA && B.AgentiIA.apriBancone; if (b) b(l.id); });
   }
@@ -272,5 +305,5 @@
     G.emetti('toast', '🏗️ Cantiere aperto: ' + r.nome); S.scelta = null; nota(''); if (B.AgentiIA.aggiorna) B.AgentiIA.aggiorna();
   }
 
-  B.Terreni = { applica, toccabili, apri, chiudi, stato: S };
+  B.Terreni = { applica, toccabili, apri, chiudi, stato: S, entraCasaDa };
 })();

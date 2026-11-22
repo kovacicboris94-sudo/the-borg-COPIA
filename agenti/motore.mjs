@@ -17,7 +17,8 @@
 
 import { cosaDi, manuale, merceDi, mobileDi, portafoglio, SEDUTE } from './borgo-cose.mjs';
 import { NEGOZI, CLIENTI, REGOLE_NEGOZI as RN, negozioDi, prodottoDi, decide } from './negozi.mjs';
-import { LOTTI, lottoDi, geometria, compraLotto, avviaCantiere, passoCantieri, negoziDeiLotti, vistaTerreni, listinoTerreni, terrenoDi, costoProgetto, PROGETTI, GENERI, faseDi, finePrevista, REGOLE_TERRENI as RT } from './terreni.mjs';
+import { LOTTI, lottoDi, geometria, compraLotto, avviaCantiere, passoCantieri, negoziDeiLotti, vistaTerreni, listinoTerreni, terrenoDi, costoProgetto, PROGETTI, GENERI, faseDi, finePrevista, REGOLE_TERRENI as RT, tipoDi, abitazione, UN, APPARTAMENTI, appartamentoDato, appartamentoDi, compraAppartamento, immobileDi, prezzoAppartamento, vistaAppartamenti } from './terreni.mjs';
+import { BANCA, REGOLE_BANCA as RB, passoBanca, maturaGiocatore, chiediMutuo, chiediPrestito, rimborsa, vistaConto, vistaBanca, pianoMutuo, contoDi } from './banca.mjs';
 import { passoVita, azioneVita, occupato, percezioneAgente, routineVita, normalizzaAzioneVita, promptVita, TIPI_VITA, bisognoUrgente, pianoPerMotore, vistaVita } from './vita/aggancio.mjs';
 export const MODELLO = 'claude-haiku-5-5';
 
@@ -77,7 +78,8 @@ export const LUOGHI = [
   { nome: 'Biblioteca', x: -27.7, z: -3 },
   { nome: 'Laugh Tale Collectibles', x: -40, z: -3 },
   { nome: 'Fioraio', x: 47, z: 50 },
-  { nome: 'Arredamenti', x: -47, z: 4 }
+  { nome: 'Arredamenti', x: -47, z: 4 },
+  { nome: 'Banca del Borgo', x: 32, z: 43 }
 ];
 // Gli edifici in cui si puo' entrare (stesse misure del gioco, src/borgo/programma-principale.js).
 // Dentro, x e z sono quelle della stanza. "porta": dove si entra (in piazza, o dentro la stanza "da").
@@ -248,11 +250,18 @@ export function normalizzaAzione(a, regole = REGOLE) {
   if (tipo === 'esci') return { tipo };
   if (tipo === 'terreno') { const l = lottoDi(a.nome || a.luogo || a.testo); return l ? { tipo, lotto: l.id } : { errore: 'terreno: lotto sconosciuto (in vendita: ' + LOTTI.map(q => q.id).join(', ') + ')' }; }
   if (tipo === 'edifica') {
-    const n = String(a.nome || '').toLowerCase();
-    const t = n.includes('neg') || n.includes('bottega') ? 'negozio' : n.includes('cas') ? 'casa' : null;
-    if (!t) return { errore: 'edifica: in "nome" metti casa oppure negozio' };
+    const t = tipoDi(a.nome);
+    if (!t) return { errore: 'edifica: in "nome" metti casa, villa oppure negozio' };
     return { tipo, progetto: t, titolo: testo(a.testo, 28), genere: a.forma ? testo(a.forma, 20) : null };
   }
+  if (tipo === 'appartamento') { const q = appartamentoDato(a.nome || a.luogo || a.testo); return q ? { tipo, piano: q.piano } : { errore: 'appartamento: in "nome" metti il piano (da 1 a 15)' }; }
+  if (tipo === 'mutuo') {
+    const bene = testo(a.nome || a.luogo, 30); if (!bene) return { errore: 'mutuo: in "nome" metti il terreno (lotto1...) o il piano dell\'appartamento ("piano 7")' };
+    const f = String(a.forma || '').toLowerCase().split(/[\s,]+/);
+    return { tipo, bene, progetto: f[0] || null, genere: f[1] || null, titolo: testo(a.testo, 28), anticipo: num(a.prezzo, 0), durata: num(a.minuti, 240) };
+  }
+  if (tipo === 'prestito') { const p = num(a.prezzo, 0); if (!(p > 0)) return { errore: 'prestito: in "prezzo" metti quanti Starlight chiedi' }; return { tipo, importo: p, durata: num(a.minuti, 24) }; }
+  if (tipo === 'rimborsa') { const p = num(a.prezzo, 0); if (!(p > 0)) return { errore: 'rimborsa: in "prezzo" metti quanti Starlight restituisci' }; return { tipo, importo: p }; }
   if (tipo === 'lavora') {
     const n = String(a.nome || a.luogo || a.testo || '').toLowerCase();
     if (/smett|basta|fine|stop/.test(n)) return { tipo, smetti: true };
@@ -334,6 +343,7 @@ function postoValido(stato, o, ignoraId) {
   if (pz) return 'troppo vicino a ' + luogoVicino(pz).nome + ' (zona da lasciare libera)';
   const lt = LOTTI.find(l => { const g = geometria(l).rect; return o.x + r > g.x0 && o.x - r < g.x1 && o.z + r > g.z0 && o.z - r < g.z1; });
   if (lt) return 'dentro ' + lt.nome + ' (i terreni in vendita si comprano, non ci si costruisce sopra)';
+  if (o.x + r > BANCA.x - BANCA.w / 2 - 1 && o.x - r < BANCA.x + BANCA.w / 2 + 1 && o.z + r > BANCA.z - BANCA.d / 2 - 3 && o.z - r < BANCA.z + BANCA.d / 2 + 1) return 'troppo vicino alla Banca del Borgo';
   if (o.y > 0.05) {
     // sollevato: deve poggiare su qualcosa (niente oggetti sospesi nel vuoto)
     const sotto = stato.oggetti.find(q => q.id !== ignoraId && q.pronto && Math.hypot(q.x - o.x, q.z - o.z) < raggioOggetto(q) + 0.3 && Math.abs((q.y + q.h) - o.y) < 0.35);
@@ -368,6 +378,7 @@ export async function passo(stato, adesso, cervello, opz = {}) {
   if (regole.vita) passoVita(stato, adesso);
   sincronizzaTerreni(stato);
   for (const id of passoCantieri(stato, adesso, dt)) cantiereFinito(stato, id, adesso);
+  for (const f of passoBanca(stato, adesso, id => stato.agenti[id] && !stato.agenti[id].morto ? portafoglio(stato.agenti[id]) : null)) fattoBanca(stato, f, adesso);
   // 1) il tempo scorre: si cammina, si costruisce, si eseguono le azioni in coda
   for (const ag of agenti) avanza(stato, ag, dt, adesso, regole);
   controllaGiochi(stato, adesso, regole);
@@ -511,6 +522,7 @@ function esegui(stato, ag, a, adesso, regole) {
   if (a.tipo === 'lavora') return lavora(stato, ag, a, adesso, regole);
   if (a.tipo === 'vendi') return vendiAgente(stato, ag, a, adesso);
   if (a.tipo === 'terreno' || a.tipo === 'edifica') return terrenoAgente(stato, ag, a, adesso, regole);
+  if (a.tipo === 'appartamento' || a.tipo === 'mutuo' || a.tipo === 'prestito' || a.tipo === 'rimborsa') return bancaAgente(stato, ag, a, adesso, regole);
   if (a.vita) return eseguiVita(stato, ag, a, adesso, regole);
   if (a.tipo === 'vai') {
     // un luogo della piazza da dentro un edificio: prima si esce dalla porta
@@ -845,8 +857,14 @@ IMPORTANTE, vale per tutto: le azioni di un pensiero (fino a ${regole.maxAzioni}
 ${regole.giochi ? '' : '<<SENZA-GIOCHI>>'}- {"tipo":"gioco","forma":"quiz","testo":"la domanda","nome":"la risposta giusta"} oppure {"tipo":"gioco","forma":"tesoro","testo":"un indizio","x":..,"z":..} oppure {"tipo":"gioco","forma":"gara","testo":"l'annuncio","luogo":"Belvedere"}: inventi e lanci un gioco per chi e' nel borgo (persone vere e agenti). Il codice lo arbitra: nel quiz vince chi scrive per primo la risposta giusta; nel tesoro nascondi una sfera d'oro entro ${regole.portata} m da te e vince chi la raggiunge; nella gara vince chi arriva per primo al punto. Dura ${regole.giocoMin} minuti, uno alla volta. Chi vince prende un punto nella classifica del borgo.
 - {"tipo":"gesto","testo":"saluta"}: un gesto del corpo, visibile a chi e' vicino: ${Object.keys(GESTI).join(', ')}. Dura qualche secondo.
 - {"tipo":"abitudine","testo":"mattina: Fontana; pomeriggio: Mercatino; sera: Laghetto; notte: Fontana"}: ti dai una routine con i luoghi che conosci. Da quel momento ci vai da solo a ogni momento della giornata, senza pensarci e gratis, finche' non la cambi (o scrivi "nessuna" per toglierla). Le azioni che decidi pensando vengono sempre prima dell'abitudine.
-- {"tipo":"terreno","nome":"lotto1"}: compri un terreno del borgo (vai tu fin li', paghi in Starlight; uno a testa). I lotti in vendita e i prezzi li vedi in TERRENI.
-- {"tipo":"edifica","nome":"casa"} oppure {"tipo":"edifica","nome":"negozio","forma":"bar|forno|fiori|dolci|alimentari|bottega","testo":"il nome del negozio"}: sul tuo terreno l'impresa del borgo costruisce una casa (${costoProgetto('casa')} Starlight, ${PROGETTI.casa.ore} ore di cantiere) o un negozio (${costoProgetto('negozio')} Starlight, ${PROGETTI.negozio.ore} ore). Paghi subito; il cantiere lavora dal lunedi' al sabato dalle 8 alle 17, quindi ci vogliono giorni. La casa finita diventa la tua casa (ti trasferisci li'). Nel tuo negozio lavori solo tu, con "lavora", e tieni l'${Math.round(RT.quotaProprietario * 100)}% di ogni vendita.
+- {"tipo":"terreno","nome":"lotto1"}: compri un terreno del borgo in contanti (vai tu fin li', paghi in Starlight). Si puo' avere una sola proprieta': un terreno oppure un appartamento. I prezzi li vedi in TERRENI E CASE.
+- {"tipo":"edifica","nome":"casa"} oppure "villa", oppure {"tipo":"edifica","nome":"negozio","forma":"bar|forno|fiori|dolci|alimentari|bottega","testo":"il nome del negozio"}: sul tuo terreno l'impresa del borgo costruisce una casa (${costoProgetto('casa')} Starlight, ${PROGETTI.casa.ore} ore di cantiere), una villa piu' grande e bella (${costoProgetto('villa')} Starlight, ${PROGETTI.villa.ore} ore) o un negozio (${costoProgetto('negozio')} Starlight, ${PROGETTI.negozio.ore} ore). Paghi subito; il cantiere lavora dal lunedi' al sabato dalle 8 alle 17, quindi ci vogliono giorni. La casa o la villa finita diventa la tua casa (ti trasferisci li'). Nel tuo negozio lavori solo tu, con "lavora", e tieni l'${Math.round(RT.quotaProprietario * 100)}% di ogni vendita.
+- {"tipo":"appartamento","nome":"piano 7"}: compri in contanti un appartamento nella Torre della Cometa (dal 1° al 15° piano: piu' in alto e' piu' bello e costa di piu', da ${prezzoAppartamento({}, 'torre1')} a ${prezzoAppartamento({}, 'torre15')} Starlight). Si firma alla ${BANCA.nome} (ci vai tu). Poi abiti li': ci entri con "entra" in casa tua (ascensore fino al tuo piano).
+- LA BANCA (${BANCA.nome}, ci vai di persona): funziona come una banca vera. Ogni giorno nel borgo vale un mese: le rate sono una al giorno.
+  {"tipo":"mutuo","nome":"lotto3","forma":"casa|villa|negozio bar","testo":"nome della casa o del negozio","prezzo":anticipo,"minuti":numero di rate (60, 120 o 240)} oppure {"tipo":"mutuo","nome":"piano 7","prezzo":anticipo,"minuti":240}: la banca ti presta fino all'${Math.round((1 - RB.anticipoMin) * 100)}% per comprare il terreno e costruirci (o per l'appartamento): il resto (almeno il ${Math.round(RB.anticipoMin * 100)}%) lo metti tu come anticipo. Tasso fisso ${RB.tanMutuo * 100}% all'anno. Compri e il cantiere parte subito. Uno alla volta.
+  {"tipo":"prestito","prezzo":1000,"minuti":24}: prestito personale da ${RB.prestitoMin} a ${RB.prestitoMax} Starlight, tasso ${RB.tanPrestito * 100}%, ${RB.duratePrestito.join(', ')} rate. I soldi arrivano subito.
+  {"tipo":"rimborsa","prezzo":500}: paghi le rate arretrate e, se avanza, restituisci in anticipo (senza penali: la rata scende).
+  Le rate la banca le prende da sola dal tuo conto ogni giorno. Se non hai i soldi la rata resta non pagata e ci corrono gli interessi di mora (${RB.tanMora * 100}%). Dopo ${RB.rateSollecito} rate non pagate arriva una lettera; dopo ${RB.ratePignoramento} la banca pignora la casa e la vende all'asta (e se il ricavato non basta devi ancora il resto), o per un prestito devi restituire tutto subito. Chi non paga e' segnalato come cattivo pagatore e non riceve altri prestiti.
 - {"tipo":"proponi","testo":"..."}: il borgo e' un gioco fatto da persone. Tu non puoi cambiarne il codice, gli edifici originali o i minigiochi, ma puoi proporre a chi lo crea un miglioramento o un'idea (al massimo ${regole.proposteAlGiorno} al giorno). La legge una persona e decide lei; non saprai subito se l'ha accettata.
 
 ${regole.vita ? promptVita() + '\nI bisogni urgenti (sete forte, bagno, sonno di notte, fame vera, freddo) li soddisfa il tuo corpo da solo, gratis, quando non hai altro in coda; ma sei tu a decidere come guadagnarti da vivere, cosa comprare e cucinare, e se morire di fame o di freddo: la morte e\' vera e non si torna indietro.\n\n' : ''}RISPOSTA: solo un oggetto JSON, niente altro testo:
@@ -924,7 +942,7 @@ export const SCHEMA = {
     azioni: { type: 'array', items: {
       type: 'object', additionalProperties: false,
       required: ['tipo', 'luogo', 'x', 'z', 'y', 'testo', 'id', 'nome', 'forma', 'larghezza', 'altezza', 'profondita', 'colore', 'rotazione', 'prezzo', 'minuti'],
-      properties: { tipo: { type: 'string', enum: ['vai', 'entra', 'esci', 'di', 'scrivi', 'costruisci', 'sposta', 'rimuovi', 'proponi', 'abitudine', 'gesto', 'gioco', 'usa', 'metti', 'lavora', 'vendi', 'terreno', 'edifica', ...TIPI_VITA] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
+      properties: { tipo: { type: 'string', enum: ['vai', 'entra', 'esci', 'di', 'scrivi', 'costruisci', 'sposta', 'rimuovi', 'proponi', 'abitudine', 'gesto', 'gioco', 'usa', 'metti', 'lavora', 'vendi', 'terreno', 'edifica', 'appartamento', 'mutuo', 'prestito', 'rimborsa', ...TIPI_VITA] }, luogo: STR_O_NULL, x: NUM_O_NULL, z: NUM_O_NULL, y: NUM_O_NULL,
         testo: STR_O_NULL, id: STR_O_NULL, nome: STR_O_NULL, forma: STR_O_NULL, larghezza: NUM_O_NULL, altezza: NUM_O_NULL, profondita: NUM_O_NULL, colore: STR_O_NULL, rotazione: NUM_O_NULL, prezzo: NUM_O_NULL, minuti: NUM_O_NULL } } }
   }
 };
@@ -1244,7 +1262,7 @@ export function vistaPubblica(stato, adesso, regole = REGOLE) {
         chi: t ? { id: t[0], nome: nomeDi(stato, t[0]), vero: t[0].indexOf('g:') === 0, fine: t[1].fine } : null,
         ospite: c ? { id: c.id, demo: c.demo, nome: c.nome, vede: (CLIENTI.find(q => q.demo === c.demo) || {}).vede, soldi: c.soldi, tentativi: c.tentativi, via: c.via, detto: c.detto, servito: !!c.servito } : null }; }),
     giochi: (stato.giochi || []).filter(g => !g.finito || adesso - (g.fineVera || g.fine) < 60000).map(g => ({ id: g.id, chi: nomeDi(stato, g.chi), forma: g.forma, testo: g.testo, x: g.forma === 'quiz' ? null : g.x, z: g.forma === 'quiz' ? null : g.z, dove: g.dove, fine: g.fine, finito: g.finito, vincitore: g.vincitore })),
-    terreni: vistaTerreni(stato, adesso), listinoTerreni: listinoTerreni(),
+    terreni: vistaTerreni(stato, adesso), listinoTerreni: listinoTerreni(), appartamenti: vistaAppartamenti(stato), banca: vistaBanca(stato),
     classifica: Object.entries(stato.punti || {}).sort((a, b) => b[1] - a[1]).slice(0, 10),
     vita: vistaVita(stato),
     eventi: stato.eventi.slice(-30),
@@ -1267,15 +1285,23 @@ export function cronaca(stato, da = 0, max = 300) {
 export function sincronizzaTerreni(stato) {
   for (let i = NEGOZI.length - 1; i >= 0; i--) if (NEGOZI[i].lotto) NEGOZI.splice(i, 1);
   NEGOZI.push(...negoziDeiLotti(stato));
+  const torre = stanzaDi('torre0');
   for (const st of STANZE) {
     if (!st.casa) continue;
     if (!st.portaBorgo) { st.portaBorgo = st.porta; st.ritornoBorgo = st.ritorno; }
     const e = terrenoDi(stato, st.casa), p = e && e[1].progetto;
-    const mia = p && p.finito && p.tipo === 'casa';
-    const g = mia ? geometria(lottoDi(e[0])) : null;
-    st.porta = mia ? g.porta : st.portaBorgo; st.ritorno = mia ? g.ritorno : st.ritornoBorgo; st.lotto = mia ? e[0] : null;
+    const mia = p && p.finito && abitazione(p.tipo);
+    const app = !mia && appartamentoDi(stato, st.casa);
+    const g = mia ? geometria(lottoDi(e[0]), p.tipo) : null;
+    if (app) {
+      // l'appartamento nella Torre: si entra dal pianerottolo del suo piano (porta sulla parete ovest)
+      st.da = app[0]; st.porta = { x: -7.4, z: 1.5 }; st.ritorno = { x: -6.4, z: 1.5 }; st.lotto = null; st.appartamento = app[0];
+    } else {
+      delete st.da; delete st.appartamento;
+      st.porta = mia ? g.porta : st.portaBorgo; st.ritorno = mia ? g.ritorno : st.ritornoBorgo; st.lotto = mia ? e[0] : null;
+    }
     const k = stato.vita && stato.vita.case && stato.vita.case[st.casa];
-    if (k) k.porta = { x: st.porta.x, z: st.porta.z };
+    if (k) k.porta = app ? { x: torre.porta.x, z: torre.porta.z } : { x: st.porta.x, z: st.porta.z };   // per la vita: dove si va per tornare a casa (in piazza)
   }
 }
 function cantiereFinito(stato, id, adesso) {
@@ -1285,7 +1311,7 @@ function cantiereFinito(stato, id, adesso) {
   evento(stato, { chi: t.chi, tipo: 'finito', testo: p.nome, x: l.x, z: l.z });
   stato.ora = prima;
   if (ag) {
-    annota(ag, adesso, p.tipo === 'casa' ? `La mia casa nuova su ${l.nome} e' finita: ora abito li' (la casetta del borgo resta vuota).` : `Il mio negozio "${p.nome}" su ${l.nome} e' finito: posso lavorarci con {"tipo":"lavora","nome":"${p.nome}"} e tengo l'${Math.round(RT.quotaProprietario * 100)}% di ogni vendita.`);
+    annota(ag, adesso, abitazione(p.tipo) ? `La mia ${p.tipo} nuova su ${l.nome} e' finita: ora abito li' (la casetta del borgo resta vuota).` : `Il mio negozio "${p.nome}" su ${l.nome} e' finito: posso lavorarci con {"tipo":"lavora","nome":"${p.nome}"} e tengo l'${Math.round(RT.quotaProprietario * 100)}% di ogni vendita.`);
     esito(ag, `cantiere su ${id}: ${p.nome} e' finito!`);
     svegliaPerVoce(ag, adesso, REGOLE);
   }
@@ -1308,7 +1334,7 @@ function terrenoAgente(stato, ag, a, adesso, regole) {
     const r = compraLotto(stato, ag.id, ag.nome, l.id, w.starlight, adesso);
     if (!r.ok) return esito(ag, 'terreno: rifiutata, ' + r.motivo);
     w.starlight = Math.round((w.starlight - r.prezzo) * 100) / 100;
-    annota(ag, adesso, `Ho comprato ${l.nome} per ${r.prezzo} Starlight. Ci posso costruire una casa (${costoProgetto('casa')} S) o un negozio (${costoProgetto('negozio')} S).`);
+    annota(ag, adesso, `Ho comprato ${l.nome} per ${r.prezzo} Starlight.` + (r.asta ? ' Era all\'asta, con la costruzione sopra.' : ` Ci posso costruire una casa (${costoProgetto('casa')} S), una villa (${costoProgetto('villa')} S) o un negozio (${costoProgetto('negozio')} S).`));
     evento(stato, { chi: ag.id, tipo: 'usa', testo: 'ha comprato ' + l.nome, x: ag.x, z: ag.z });
     return esito(ag, `terreno: hai comprato ${l.nome} per ${r.prezzo} Starlight (ora ne hai ${w.starlight})`);
   }
@@ -1320,17 +1346,86 @@ function terrenoAgente(stato, ag, a, adesso, regole) {
   return esito(ag, `edifica: cantiere di "${r.nome}" aperto (${r.costo} Starlight, ora ne hai ${w.starlight}); finisce circa ${dataBreve(r.fine)}`);
 }
 function percezioneTerreni(stato, ag, adesso) {
-  const mio = terrenoDi(stato, ag.id), liberi = LOTTI.filter(l => !(stato.terreni || {})[l.id]);
-  let s = 'TERRENI DEL BORGO: ';
+  const mio = terrenoDi(stato, ag.id), app = appartamentoDi(stato, ag.id), liberi = LOTTI.filter(l => !(stato.terreni || {})[l.id]);
+  const costi = `casa ${costoProgetto('casa')} S (${PROGETTI.casa.ore} ore di cantiere), villa ${costoProgetto('villa')} S (${PROGETTI.villa.ore} ore), negozio ${costoProgetto('negozio')} S (${PROGETTI.negozio.ore} ore)`;
+  let s = 'TERRENI E CASE DEL BORGO: ';
   if (mio) {
     const [id, t] = mio, p = t.progetto, l = lottoDi(id);
-    s += `hai ${l.nome} (x=${l.x} z=${l.z}). ` + (!p ? `E' ancora vuoto: puoi costruirci una casa (${costoProgetto('casa')} Starlight, ${PROGETTI.casa.ore} ore di cantiere) o un negozio (${costoProgetto('negozio')} Starlight, ${PROGETTI.negozio.ore} ore).`
-      : p.finito ? (p.tipo === 'casa' ? `Ci hai la tua casa "${p.nome}": abiti li'.` : `Ci hai il tuo negozio "${p.nome}" (${GENERI[p.genere].nome}): lavoraci con {"tipo":"lavora","nome":"${p.nome}"}, tieni l'${Math.round(RT.quotaProprietario * 100)}% di ogni vendita.`)
+    s += `hai ${l.nome} (x=${l.x} z=${l.z}). ` + (!p ? `E' ancora vuoto: puoi costruirci ${costi}.`
+      : p.finito ? (abitazione(p.tipo) ? `Ci hai la tua ${p.tipo} "${p.nome}": abiti li'.` : `Ci hai il tuo negozio "${p.nome}" (${GENERI[p.genere].nome}): lavoraci con {"tipo":"lavora","nome":"${p.nome}"}, tieni l'${Math.round(RT.quotaProprietario * 100)}% di ogni vendita.`)
       : `Cantiere di "${p.nome}": ${faseDi(p)}, ${Math.round(p.fatte)} ore su ${p.ore}, finisce circa ${dataBreve(finePrevista(p.ore - p.fatte, adesso))}.`);
-  } else s += liberi.length ? 'in vendita ' + liberi.map(l => `${l.id} "${l.nome}" ${l.prezzo} Starlight`).join('; ') + `. Poi ci costruisci una casa (${costoProgetto('casa')} S) o un negozio (${costoProgetto('negozio')} S).` : 'sono stati venduti tutti.';
+  } else if (app) {
+    const q = APPARTAMENTI.find(x => x.id === app[0]);
+    s += `abiti nel tuo appartamento al ${q.piano}° piano della Torre della Cometa (${q.m2} m2): per andarci {"tipo":"entra","luogo":"Casa di ${ag.nome}"}.`;
+  } else {
+    s += liberi.length ? 'terreni in vendita: ' + liberi.map(l => `${l.id} "${l.nome}" ${(stato.aste || {})[l.id] ? (stato.aste[l.id].prezzo + ' S ALL\'ASTA' + (stato.aste[l.id].progetto ? ' con sopra ' + stato.aste[l.id].progetto.nome : '')) : l.prezzo + ' S'}`).join('; ') + `. Sul terreno ci costruisci: ${costi}.` : 'i terreni sono stati venduti tutti.';
+    const ap = vistaAppartamenti(stato).filter(q => !q.chi);
+    if (ap.length) s += ` Appartamenti nella Torre in vendita (si comprano in banca): ${ap.length} liberi, dal ${ap[0].piano}° piano a ${ap[0].prezzo} S fino al ${ap[ap.length - 1].piano}° a ${ap[ap.length - 1].prezzo} S (piu' in alto = piu' bello e piu' caro).`;
+  }
   const altri = Object.entries(stato.terreni || {}).filter(([, t]) => t.chi !== ag.id).map(([id, t]) => `${id} di ${t.nomeChi}` + (t.progetto ? (t.progetto.finito ? ` (${t.progetto.nome})` : ` (cantiere: ${t.progetto.nome})`) : ''));
-  if (altri.length) s += ' Gia\' venduti: ' + altri.join(', ') + '.';
+  if (altri.length) s += ' Terreni gia\' venduti: ' + altri.join(', ') + '.';
+  const vic = Object.entries(stato.appartamenti || {}).filter(([, a]) => a.chi !== ag.id).map(([id, a]) => `${id.slice(5)}° piano: ${a.nomeChi}`);
+  if (vic.length) s += ' Abitano nella Torre: ' + vic.join(', ') + '.';
+  return s + '\n' + percezioneBanca(stato, ag, adesso);
+}
+function percezioneBanca(stato, ag, adesso) {
+  const c = vistaConto(stato, ag.id), w = portafoglio(ag);
+  let s = `BANCA (${BANCA.nome}, x=${BANCA.x} z=${BANCA.z - 5}): `;
+  if (!c.prestiti.length) s += 'non hai debiti.';
+  else s += c.prestiti.map(L => L.tipo === 'debito' ? `devi ancora ${L.scaduto} S alla banca dopo il pignoramento`
+    : `${L.tipo} ${L.bene ? 'per ' + L.bene + ' ' : ''}: debito residuo ${L.residuo} S, rata ${L.rata} S al giorno (${L.pagate} pagate su ${L.n}), prossima rata ${dataBreve(L.prossima)}` + (L.scaduto > 0.5 ? `, NON PAGATE ${L.insolute} rate (${L.scaduto} S)` : '')).join('; ') + '. La banca prende le rate dal tuo conto ogni giorno, se ci sono i soldi.' + (c.segnalato ? ' SEI SEGNALATO COME CATTIVO PAGATORE: niente nuovi prestiti finche\' non paghi tutto.' : '');
+  if (c.storia.length) s += ' Ultima comunicazione della banca: ' + c.storia[c.storia.length - 1].s;
+  const P = 25000, pi = pianoMutuo(P, RB.tanMutuo, 240);
+  s += ` Esempio: un mutuo di ${P} S in 240 rate e' ${pi.rata} S al giorno (restituisci ${pi.totale}); serve l'anticipo del ${Math.round(RB.anticipoMin * 100)}%. Hai ${Math.round(w.starlight)} S.`;
   return s;
+}
+// la banca: si va allo sportello di persona
+function bancaAgente(stato, ag, a, adesso, regole) {
+  const w = portafoglio(ag), dove = BANCA.sportello, nomeA = { appartamento: 'appartamento', mutuo: 'mutuo', prestito: 'prestito', rimborsa: 'rimborsa' }[a.tipo];
+  if (ag.stanza) { ag.coda.unshift(a); return esegui(stato, ag, { tipo: 'esci', auto: true }, adesso, regole); }
+  if (Math.hypot(ag.x - dove.x, ag.z - dove.z) > 2) {
+    if (!a.inCammino) esito(ag, `${nomeA}: in cammino verso la ${BANCA.nome}`);
+    ag.tx = dove.x; ag.tz = dove.z; ag.ancora = null; ag.esplora = null; ag.meta = BANCA.nome; ag.bici = false;
+    ag.coda.unshift(Object.assign({}, a, { inCammino: true })); return 'cammina';
+  }
+  ag.meta = null; ag.ancora = { x: dove.x, z: dove.z };
+  const soldi = Math.max(0, w.starlight), paga = n => { w.starlight = Math.round((w.starlight - n) * 100) / 100; };
+  if (a.tipo === 'appartamento') {
+    const r = compraAppartamento(stato, ag.id, ag.nome, 'piano ' + a.piano, soldi, adesso);
+    if (!r.ok) return esito(ag, 'appartamento: rifiutata, ' + r.motivo);
+    paga(r.prezzo); sincronizzaTerreni(stato);
+    annota(ag, adesso, `Ho comprato l'appartamento al ${r.piano}° piano della Torre per ${r.prezzo} Starlight: ora abito li' (la casetta del borgo resta vuota).`);
+    evento(stato, { chi: ag.id, tipo: 'usa', testo: 'ha comprato ' + r.nome, x: ag.x, z: ag.z });
+    return esito(ag, `appartamento: comprato ${r.nome} per ${r.prezzo} Starlight (ora ne hai ${w.starlight})`);
+  }
+  if (a.tipo === 'mutuo') {
+    const r = chiediMutuo(stato, ag.id, ag.nome, { bene: a.bene, progetto: a.progetto, genere: a.genere, nome: a.titolo, anticipo: a.anticipo, durata: a.durata }, soldi, adesso);
+    if (!r.ok) return esito(ag, 'mutuo: rifiutato, ' + r.motivo);
+    paga(r.anticipo); sincronizzaTerreni(stato);
+    annota(ag, adesso, `Mutuo approvato per ${r.nomeBene}${r.tipo ? ' (' + UN[r.tipo] + ')' : ''}: ho messo ${r.anticipo} Starlight di anticipo, la banca ne presta ${r.capitale}. Rata ${r.rata} al giorno per ${r.durata} giorni: in tutto restituisco ${r.totale} (${r.interessi} di interessi).` + (r.fine ? ` Il cantiere finisce circa ${dataBreve(r.fine)}.` : ''));
+    evento(stato, { chi: ag.id, tipo: 'usa', testo: 'ha firmato un mutuo per ' + r.nomeBene, x: ag.x, z: ag.z });
+    return esito(ag, `mutuo: approvato, anticipo ${r.anticipo}, rata ${r.rata} S al giorno per ${r.durata} giorni (ora hai ${w.starlight} S)`);
+  }
+  if (a.tipo === 'prestito') {
+    const r = chiediPrestito(stato, ag.id, ag.nome, a.importo, a.durata, adesso);
+    if (!r.ok) return esito(ag, 'prestito: rifiutato, ' + r.motivo);
+    w.starlight = Math.round((w.starlight + r.accredito) * 100) / 100;
+    annota(ag, adesso, `La banca mi ha prestato ${r.accredito} Starlight: ${r.durata} rate da ${r.rata} al giorno, in tutto restituisco ${r.totale}.`);
+    return esito(ag, `prestito: ricevuti ${r.accredito} S, rata ${r.rata} al giorno per ${r.durata} giorni (ora hai ${w.starlight} S)`);
+  }
+  const r = rimborsa(stato, ag.id, a.importo, soldi, adesso, false);
+  if (!r.ok) return esito(ag, 'rimborsa: rifiutata, ' + r.motivo);
+  paga(r.spesa);
+  for (const f of r.fatti) fattoBanca(stato, f, adesso);
+  annota(ag, adesso, `Ho restituito alla banca ${r.spesa} Starlight. Devo ancora ${r.debito}.`);
+  return esito(ag, `rimborsa: pagati ${r.spesa} S, debito che resta ${r.debito} S`);
+}
+// una notizia della banca (rata presa, lettera, pignoramento...) nel diario dell'agente
+function fattoBanca(stato, f, adesso) {
+  const ag = stato.agenti[f.chi]; if (!ag) return;
+  annota(ag, adesso, f.testo);
+  if (f.tipo !== 'addebito') { esito(ag, 'banca: ' + f.testo); svegliaPerVoce(ag, adesso, REGOLE); }
+  if (f.tipo === 'pignoramento') { sincronizzaTerreni(stato); const prima = stato.ora; stato.ora = adesso; evento(stato, { chi: f.chi, tipo: 'usa', testo: 'ha perso la casa: pignorata dalla banca', x: ag.x, z: ag.z }); stato.ora = prima; }
 }
 
 // Una persona vera compra un lotto o avvia il cantiere (dal gioco). Gli Starlight li toglie il gioco, dal suo portafoglio:
@@ -1339,15 +1434,42 @@ export function giocatoreTerreno(stato, nick, d, adesso) {
   d = d || {};
   const n = testo(nick, 20).replace(/[^\p{L}\p{N}_ .-]/gu, '');
   if (!n) return { ok: false, motivo: 'Serve il tuo nome nel gioco.' };
+  if (!chiaveOk(stato, n, d.chiave)) return { ok: false, motivo: 'Questo nome e\' gia\' usato da un\'altra persona sul borgo: le sue proprieta\' e il suo conto in banca sono suoi.' };
   const chi = 'g:' + n, soldi = d.soldi == null ? null : num(d.soldi, 0);
+  const fatti = maturaGiocatore(stato, chi, adesso);   // si gioca: se e' il momento scade una rata
+  if (d.azione === 'banca') {
+    const c = vistaConto(stato, chi), acc = (stato.banca && stato.banca.conti[chi] || {}).accredito || 0;
+    if (acc) stato.banca.conti[chi].accredito = 0;
+    return { ok: true, conto: c, accredito: acc, fatti: fatti.map(f => f.testo), immobile: immobileDi(stato, chi) };
+  }
   const r = d.azione === 'compra' ? compraLotto(stato, chi, n, d.lotto, soldi, adesso)
     : d.azione === 'costruisci' ? avviaCantiere(stato, chi, { tipo: d.tipo, nome: testo(d.nome, 28), genere: testo(d.genere, 20) }, soldi, adesso)
-      : { ok: false, motivo: 'Azione sconosciuta.' };
+      : d.azione === 'appartamento' ? compraAppartamento(stato, chi, n, 'piano ' + num(d.piano, 0), soldi, adesso)
+        : d.azione === 'mutuo' ? chiediMutuo(stato, chi, n, { bene: testo(d.bene, 30), progetto: testo(d.tipo, 12), genere: testo(d.genere, 20), nome: testo(d.nome, 28), anticipo: num(d.anticipo, 0), durata: num(d.durata, 240) }, soldi, adesso)
+          : d.azione === 'prestito' ? chiediPrestito(stato, chi, n, num(d.importo, 0), num(d.durata, 24), adesso)
+            : d.azione === 'paga' || d.azione === 'rimborsa' ? rimborsa(stato, chi, num(d.importo, 0), soldi, adesso, d.azione === 'paga')
+              : { ok: false, motivo: 'Azione sconosciuta.' };
   if (r.ok) {
-    const l = lottoDi(r.lotto), prima = stato.ora; stato.ora = adesso;
-    evento(stato, { chi, tipo: d.azione === 'compra' ? 'usa' : 'costruisce', testo: d.azione === 'compra' ? 'ha comprato ' + l.nome : r.nome, x: l.x, z: l.z });
+    const prima = stato.ora; stato.ora = adesso;
+    const l = r.lotto ? lottoDi(r.lotto) : null, dove = l ? { x: l.x, z: l.z } : { x: BANCA.sportello.x, z: BANCA.sportello.z };
+    const cosa = { compra: 'ha comprato ' + (l && l.nome), costruisci: r.nome, appartamento: 'ha comprato ' + r.nome, mutuo: 'ha firmato un mutuo per ' + r.nomeBene }[d.azione];
+    if (cosa) evento(stato, { chi, tipo: d.azione === 'costruisci' ? 'costruisce' : 'usa', testo: cosa, x: dove.x, z: dove.z });
     stato.ora = prima;
-    r.spesa = d.azione === 'compra' ? r.prezzo : r.costo;
+    if (d.azione === 'compra' || d.azione === 'appartamento') r.spesa = r.prezzo;
+    if (d.azione === 'costruisci') r.spesa = r.costo;
+    if (d.azione === 'prestito') r.spesa = 0;
+    if (r.fatti) r.fatti = r.fatti.map(f => f.testo);
+    if (d.azione !== 'paga' && d.azione !== 'rimborsa') r.conto = vistaConto(stato, chi);
   }
   return r;
+}
+// Una persona vera e' riconosciuta da una chiave segreta che il suo gioco si inventa la prima volta (resta nel suo telefono):
+// cosi' nessuno puo' fare debiti o comprare case a nome di un altro.
+function chiaveOk(stato, nick, chiave) {
+  const K = stato.chiavi || (stato.chiavi = {}), k = nick.toLowerCase(), c = typeof chiave === 'string' ? chiave.slice(0, 64) : '';
+  if (!c) return !K[k];
+  let h = 2166136261; for (let i = 0; i < c.length; i++) { h ^= c.charCodeAt(i); h = Math.imul(h, 16777619); }
+  const hh = (h >>> 0).toString(36) + c.length;
+  if (!K[k]) { K[k] = hh; return true; }
+  return K[k] === hh;
 }

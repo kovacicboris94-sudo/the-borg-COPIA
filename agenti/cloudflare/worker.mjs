@@ -4,7 +4,7 @@
 //  - una sveglia (alarm) ogni 30 secondi fa scorrere il tempo e pensare gli agenti;
 //  - AGENTI_PAUSA = 1 (variabile nel pannello di Cloudflare) li mette in pausa: niente pensieri, niente spese;
 //  - la chiave di Anthropic sta nei segreti di Cloudflare (ANTHROPIC_API_KEY),
-//    il gioco non la vede mai: riceve solo /stato e manda /parla, /regala, /turno, /vendi e /terreno;
+//    il gioco non la vede mai: riceve solo /stato e manda /parla, /regala, /turno, /vendi, /terreno e /banca;
 //  - /registro e' l'archivio dell'esperimento: tutto quello che dicono, pensano e fanno, per sempre
 //    (tabella SQLite del Durable Object, nessun costo di modello).
 // =====================================================================
@@ -101,10 +101,10 @@ export class Borgo extends DurableObject {
       if (r.ok) await this.ctx.storage.put('stato', s);
       return json(r);
     }
-    if (url.pathname === '/terreno' && req.method === 'POST') {
-      // comprare un terreno o aprire un cantiere (al massimo una richiesta ogni 5 secondi)
+    if ((url.pathname === '/terreno' || url.pathname === '/banca') && req.method === 'POST') {
+      // comprare un terreno, aprire un cantiere, la banca (al massimo una richiesta ogni 2 secondi)
       const chi = 'l' + (req.headers.get('CF-Connecting-IP') || 'x'), ora = Date.now();
-      if (ora - (this.voci.get(chi) || 0) < 5000) return json({ ok: false, motivo: 'Piano, un attimo.' }, 429);
+      if (ora - (this.voci.get(chi) || 0) < 2000) return json({ ok: false, motivo: 'Piano, un attimo.' }, 429);
       this.voci.set(chi, ora); if (this.voci.size > 500) this.voci.clear();
       let d = {}; try { d = await req.json(); } catch (e) { /* vuoto */ }
       const r = giocatoreTerreno(s, d.nick, d, ora);

@@ -249,10 +249,11 @@
     const qui = app.stanza().id, el = pannello();
     const voci = [{ id: 'tetto', testo: 'Tetto · telescopio 🔭' }];
     for (let n = TORRE.piani - 1; n >= 0; n--) voci.push({ id: 'torre' + n, testo: (n ? n + '°' + (negozio(n) ? ' piano' : '') : 'Ingresso · piazza') + (negozio(n) ? ' · ' + negozio(n).nome : '') });
+    if (B.Banca && B.Banca.vociAscensore) voci.unshift(...B.Banca.vociAscensore());   // il tuo appartamento, se ne hai uno
     el.innerHTML = '<div style="width:min(90vw,340px);max-height:82vh;display:flex;flex-direction:column;background:#141a33;border:2px solid ' + ciano + ';border-radius:18px;box-shadow:0 0 24px rgba(127,227,255,.35);color:#e8f6ff;padding:14px">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><b style="font-size:18px">🛗 Ascensore</b><button data-chiudi aria-label="Chiudi" style="background:none;border:0;color:#e8f6ff;font-size:24px;cursor:pointer">×</button></div>' +
       '<div style="overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px">' + voci.map(v => {
-        const io = v.id === qui, largo = v.id === 'tetto' || v.id === 'torre0' || negozio(+v.id.slice(5));
+        const io = v.id === qui, largo = v.largo || v.id === 'tetto' || v.id === 'torre0' || negozio(+v.id.slice(5));
         return '<button data-p="' + v.id + '"' + (largo ? ' data-largo' : '') + (io ? ' disabled' : '') + ' style="text-align:left;padding:11px 14px;border-radius:12px;border:1px solid ' + (io ? oro : '#3a4a7a') + ';background:' + (io ? '#2a3156' : '#1d2547') + ';color:' + (io ? oro : '#e8f6ff') + ';font-size:15px;font-weight:600;cursor:' + (io ? 'default' : 'pointer') + (largo ? ';grid-column:1 / -1' : '') + '">' + v.testo + (io ? ' · qui' : '') + '</button>';
       }).join('') + '</div></div>';
     el.querySelector('[data-chiudi]').addEventListener('click', Asc.chiudi);
@@ -261,7 +262,9 @@
   };
   Asc.chiudi = function () { if (Asc.el) Asc.el.style.display = 'none'; };
   Asc.vai = function (id) {
-    const app = B.app; Asc.chiudi(); if (!app || !app.stanze[id]) return;
+    const app = B.app; Asc.chiudi();
+    if (id === 'mia-casa') { if (B.Banca) B.Banca.entraAppartamento(); return; }
+    if (!app || !app.stanze[id]) return;
     const arrivo = id === 'tetto' ? B.TettoTorre.spawn : ASC.arrivo;
     const G = app.G || window.Gioco;
     G.emetti('transizione', () => { app.entraStanza(id, arrivo); G.emetti('toast', '🛗 Ding! ' + (id === 'tetto' ? 'Tetto della Torre' : nomePiano(+id.slice(5)))); });
