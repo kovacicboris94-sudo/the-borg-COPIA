@@ -69,7 +69,7 @@
     A.agenti.forEach((e, id) => { if (!visti.has(id)) { app.gP.remove(e.av.root); B.liberaAvatar(e.av); A.agenti.delete(id); } });
     aggiornaOggetti(d.oggetti || []);
     aggiornaNegozi(d.negozi || []);
-    if (B.Terreni) B.Terreni.applica(d.terreni || [], d.listinoTerreni || null, app);
+    if (B.Terreni) B.Terreni.applica(d.terreni || [], d.listinoTerreni || null, app, d);
     messaggiPerMe(d.messaggi || []);
     if (A.scheda) disegnaScheda();
   }
@@ -382,8 +382,12 @@
     return `<b>${esc(o.nome)}</b>: sembra ${esc(o.vede || '')}.<br><span style="opacity:.8;font-size:12px">In tasca circa ${Math.round(o.soldi / 5) * 5} Starlight · ti ascolta ancora ${Math.max(0, 2 - o.tentativi)} ${2 - o.tentativi === 1 ? 'volta' : 'volte'} · aspetta fino alle ${new Date(o.via).toTimeString().slice(0, 5)}</span>`;
   }
   const nota = t => { const x = pannello && pannello.querySelector('.bn-nota'); if (x) x.textContent = t; };
+  // la chiave segreta di questo giocatore sul borgo (nessun altro puo' fare debiti o comprare a suo nome)
+  function chiave() {
+    try { let k = localStorage.getItem('borg_chiave_borgo'); if (!k) { k = Array.from(crypto.getRandomValues(new Uint8Array(18)), b => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem('borg_chiave_borgo', k); } return k; } catch (e) { return ''; }
+  }
   async function chiama(via, corpo) {
-    const r = await fetch(A.url + via, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ nick: mioNick() }, corpo)) });
+    const r = await fetch(A.url + via, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ nick: mioNick(), chiave: chiave() }, corpo)) });
     return r.json().catch(() => ({ ok: false, motivo: 'Risposta strana dal borgo.' }));
   }
   async function iniziaTurno(n) {

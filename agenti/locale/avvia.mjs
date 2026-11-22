@@ -80,7 +80,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => { let d = {}; try { d = JSON.parse(corpo); } catch (e) { /* vuoto */ } const ora = Date.now(); const r = url.pathname === '/turno' ? giocatoreTurno(stato, d.nick, d.negozio, d.on !== false, ora) : giocatoreVende(stato, d.nick, d, ora); if (r.ok) salva(); manda(r); });
     return;
   }
-  if (url.pathname === '/terreno' && req.method === 'POST') {
+  if ((url.pathname === '/terreno' || url.pathname === '/banca') && req.method === 'POST') {
     let corpo = ''; req.on('data', c => { corpo += c; if (corpo.length > 4000) req.destroy(); });
     req.on('end', () => { let d = {}; try { d = JSON.parse(corpo); } catch (e) { /* vuoto */ } const r = giocatoreTerreno(stato, d.nick, d, Date.now()); if (r.ok) salva(); manda(r); });
     return;
