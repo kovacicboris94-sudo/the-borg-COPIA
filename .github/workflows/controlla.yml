@@ -27,6 +27,8 @@ jobs:
       - run: node test/registro.test.mjs
       - run: node test/terreni.test.mjs
       - run: node test/interni.test.mjs
+      - run: node test/banca.test.mjs
+      - run: node test/sponsor.test.mjs
       - run: bash server/test/produzione.test.sh
       - name: Controlla la configurazione del server online
         run: |

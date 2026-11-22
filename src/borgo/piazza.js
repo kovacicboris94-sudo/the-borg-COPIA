@@ -112,7 +112,7 @@
       val.position.set(px, 1.82, zb + 0.55 + L * Math.cos(tilt) / 2 + 0.02); val.castShadow = true; g.add(val);
       // insegna
       const IW = o.insegnaGiochi ? 5.7 : o.insegnaLtc ? 5.4 : o.insegnaScacchi ? 5.0 : 3.0, IH = o.insegnaGiochi ? 1.5 : o.insegnaLtc ? 0.98 : o.insegnaScacchi ? 1.0 : 0.72;
-      const ins = new T.Mesh(new T.PlaneGeometry(IW, IH), new T.MeshBasicMaterial({ map: o.insegnaGiochi ? B.texInsegnaGiochi(1024, 270) : o.insegnaLtc ? B.texInsegnaLTC(1024, 186) : o.insegnaScacchi && B.texInsegnaScacchi ? B.texInsegnaScacchi(1024, 205) : B.texInsegna(o.senzaNome ? '' : o.nome, 512, 123, o.insegnaStile), transparent: true }));
+      const ins = new T.Mesh(new T.PlaneGeometry(IW, IH), new T.MeshBasicMaterial({ map: o.insegnaGiochi ? B.texInsegnaGiochi(1024, 270) : o.insegnaLtc ? B.texInsegnaLTC(1024, 186) : o.insegnaScacchi && B.texInsegnaScacchi ? B.texInsegnaScacchi(1024, 205) : (o.insegnaTex || B.texInsegna(o.senzaNome ? '' : o.nome, 512, 123, o.insegnaStile)), transparent: true }));
       ins.position.set(px, h1 + 0.5, zt + 0.27); g.add(ins);   // davanti ai davanzali delle finestre di sopra
       if (o.insegnaGiochi) { // alone luminoso dietro l'insegna
         const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const cx = cv.getContext('2d');

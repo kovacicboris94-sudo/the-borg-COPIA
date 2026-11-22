@@ -58,7 +58,7 @@
     for (let i = 0; i < 900; i++) { const v = Math.random(); x.fillStyle = prato ? (v < 0.5 ? '#5f7a3e' : '#86a05a') : (v < 0.5 ? '#6a543d' : v < 0.85 ? '#8c7356' : '#a8977e'); x.fillRect(Math.random() * 256, Math.random() * 256, 2 + Math.random() * 4, 2 + Math.random() * 3); }
     const t = B.tex(cv, true); t.repeat.set(2, 2.5); terre[k] = t; return t;
   }
-  function chiave(l) { const p = l.progetto; return [l.chi ? l.chi.id : '', l.asta ? 'A' + l.prezzo : '', p ? p.tipo + p.nome + p.fase + p.colore + (p.insegna || '') + (p.squadra ? 's' + Math.min(1, p.squadra.length) : '') + (p.finito ? 'F' : Math.floor(p.fatte / p.ore * 20)) : ''].join('|'); }
+  function chiave(l) { const p = l.progetto; return [l.chi ? l.chi.id : '', l.asta ? 'A' + l.prezzo : '', p ? p.tipo + p.nome + p.fase + p.colore + (p.insegna || '') + (p.squadra ? 's' + Math.min(1, p.squadra.length) : '') + (p.finito ? 'F' : Math.floor(p.fatte / p.ore * 20)) : '', B.Sponsor && p && p.finito && p.tipo === 'negozio' ? B.Sponsor.firma(l.id) : ''].join('|'); }
 
   // il cantiere a fasi, come uno vero (Boris: "si veda che si sta costruendo una vera e propria costruzione"):
   // scavo con la ruspa, getto delle fondamenta con la betoniera, muri di mattoni che salgono fila per fila,
@@ -259,7 +259,10 @@
       };
     } else if (p && p.finito && B.edificioPiazza) {
       const c = p.tipo === 'villa' ? VILLA[p.colore % VILLA.length] : COLORI[p.colore % COLORI.length];
-      edificio = B.edificioPiazza({ x: e.x, z: e.z, rot: PI, w: e.w, d: e.d, nome: p.nome, muro: c.muro, muroSopra: c.muroSopra, tetto: c.tetto, persiane: c.persiane, tendaA: '#f6e8cc', tendaB: c.tendaB, porta: 0, insegnaStile: p.insegna, tendaLarg: p.tipo === 'villa' ? 4.2 : 3.4 });
+      // la vetrina aziendale approvata (src/borgo/sponsor.js): insegna col logo e tenda nei colori dell'azienda, bandiera alla porta
+      const sp = p.tipo === 'negozio' && B.Sponsor ? B.Sponsor.facciata(l.id) : null;
+      edificio = B.edificioPiazza(Object.assign({ x: e.x, z: e.z, rot: PI, w: e.w, d: e.d, nome: p.nome, muro: c.muro, muroSopra: c.muroSopra, tetto: c.tetto, persiane: c.persiane, tendaA: '#f6e8cc', tendaB: c.tendaB, porta: 0, insegnaStile: p.insegna, tendaLarg: p.tipo === 'villa' ? 4.2 : 3.4 }, sp || {}));
+      if (sp) { anim = B.Sponsor.bandiera(g, l.id, geo.porta.x + 2.3, geo.porta.z + 0.2); ost.push({ t: 'c', x: geo.porta.x + 2.3, z: geo.porta.z + 0.2, r: 0.2 }); }
       if (p.tipo === 'villa') {
         // la villa: piscinetta in giardino, siepi lungo il recinto, colonnine e lampioncini al vialetto
         const px = l.x - 2.1, pz = r.z0 + 2.2;
@@ -305,7 +308,9 @@
     if (!l.chi) return apri(id);
     // il negozio ha l'interno (src/borgo/interni.js): si entra e il bancone e' dentro
     if (p.tipo === 'negozio') {
-      const sid = 'bottega_' + id, st = app.stanze[sid] || (app.aggiungiInterno && app.aggiungiInterno(sid, { nome: p.nome, tipo: B.tipoInterno ? B.tipoInterno(p.genere) : 'bottega', arredo: p.arredo, fuori: { x: geo.ritorno.x, z: geo.ritorno.z, yaw: PI } }));
+      const sid = 'bottega_' + id, def = { nome: p.nome, tipo: B.tipoInterno ? B.tipoInterno(p.genere) : 'bottega', arredo: p.arredo, fuori: { x: geo.ritorno.x, z: geo.ritorno.z, yaw: PI } };
+      let st = app.stanze[sid];
+      if (!st && app.aggiungiInterno) { st = app.aggiungiInterno(sid, B.Sponsor ? B.Sponsor.defInterno(sid, def) : def); if (st && B.Sponsor) B.Sponsor.creato(sid); }
       if (st) { G.emetti('transizione', () => app.entraStanza(sid, { x: 0, z: 3.6, yaw: PI })); return; }
       const b = (B.AgentiIA && B.AgentiIA.apriBancone); if (b) b(id); return;
     }
@@ -404,6 +409,9 @@
         if (p.listino) h += listinoHtml(p, mio);
         if (mio && p.listino) h += btn('tr-listino', '💾 Salva i nuovi prezzi', false);
         h += btn('tr-bancone', p.icona + (mio ? ' Entra e lavora al bancone' : ' Entra nel negozio'), true);
+        const V = B.Sponsor && B.Sponsor.vetrine()[l.id];
+        if (mio && B.Sponsor) h += btn('tr-vetrina', '🏢 Vetrina aziendale: il tuo marchio e il tuo sito', false);
+        else if (V && V.profilo) h += btn('tr-scopri', '🏢 Scopri ' + esc(V.profilo.azienda), false);
       }
     }
     if (corpo.dataset.h === h) return;   // niente di nuovo: non si ridisegna (cosi' un tocco su un pulsante non si perde)
@@ -416,6 +424,8 @@
     agganciProgettista(corpo, l);
     on('.tr-mutuo', () => { const b = S.bozza; chiudi(); B.Banca.apri({ bene: l.id, tipo: b && b.tipo || 'casa', bozza: b && b.tipo ? datiBozza(b) : null }); });
     on('.tr-entra', () => { chiudi(); portaLotto(l.id); });
+    on('.tr-vetrina', () => { chiudi(); B.Sponsor.editor(l.id); });
+    on('.tr-scopri', () => { chiudi(); B.Sponsor.scheda(l.id); });
     on('.tr-bancone', () => { chiudi(); const b = B.AgentiIA && B.AgentiIA.apriBancone; if (b) b(l.id); });
   }
 
