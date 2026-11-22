@@ -313,26 +313,30 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   ok(normalizzaAzione({ tipo: 'usa', nome: 'telescopio' }).cosa === 'telescopio' && normalizzaAzione({ tipo: 'usa', nome: 'aereo' }).errore, 'usa: cose conosciute');
   const via = (ag, l) => { ag.coda = l.map(normalizzaAzione); ag.tx = ag.x; ag.tz = ag.z; };
   via(ada, [{ tipo: 'usa', nome: 'Pesca' }]);
-  let t = await scorri(s, T0, 40, c);
-  ok(/Hai pescato|non ha abboccato/.test(ada.diario.map(d => d.s).join()) && ada.stanza == null, 'Ada va al Laghetto e pesca ' + JSON.stringify(ada.esiti));
+  let t = T0;
+  for (let i = 0; i < 80 && !/Pesca: /.test(ada.diario.map(d => d.s).join()); i++) t = await scorri(s, t, 0.5, c);
+  ok(/Pesca: (hai preso|non hai preso)/.test(ada.diario.map(d => d.s).join()) && ada.stanza == null, 'Ada va al Laghetto e pesca davvero ' + JSON.stringify(ada.esiti));
+  ada.prossimoPensiero = T0 + 1e12;   // finita una partita si ripensa subito: qui no, la prova decide le azioni
   via(ada, [{ tipo: 'usa', nome: 'Telescopio' }]);
   t = await scorri(s, t, 15, c);
   ok(ada.stanza === 'tetto' && /Dall'alto vedi tutto il borgo. In piazza: Teo vicino a/.test(ada.diario.map(d => d.s).join()), 'dal Laghetto al telescopio sul tetto ' + JSON.stringify([ada.stanza, ada.esiti]));
   via(ada, [{ tipo: 'usa', nome: 'Belinverse 2' }]);
-  t = await scorri(s, t, 25, c);
-  ok(ada.stanza === 'tcg' && /Belinverse 2: hai/.test(ada.esiti.join()), 'dal tetto alla Sala TCG passando da Laugh Tale ' + JSON.stringify([ada.stanza, ada.esiti]));
+  for (let i = 0; i < 120 && !/Belinverse 2 contro/.test(ada.esiti.join()); i++) t = await scorri(s, t, 0.5, c);
+  ada.prossimoPensiero = T0 + 1e12;
+  ok(ada.stanza === 'tcg' && /Belinverse 2 contro il computer: (hai vinto|hai perso|nessuno)/.test(ada.esiti.join()), 'dal tetto alla Sala TCG passando da Laugh Tale ' + JSON.stringify([ada.stanza, ada.esiti]));
   // la bici: tre volte piu' veloce, e si scende entrando
   via(teo, [{ tipo: 'usa', nome: 'bici' }, { tipo: 'vai', luogo: 'Belvedere' }]);
   t = await scorri(s, t, 1, c);
   ok(teo.bici && teo.z > 45, 'Teo in bici arriva al Belvedere in un minuto ' + JSON.stringify([teo.x, teo.z]));
   ok(vistaPubblica(s, t).agenti.find(a => a.id === 'teo').bici, 'il gioco vede la bici');
   // scacchi: Teo raggiunge Ada al tavolo e giocano insieme
-  via(ada, [{ tipo: 'usa', nome: 'Scacchi' }]); via(teo, [{ tipo: 'usa', nome: 'scacchi' }]);
-  for (let i = 0; i < 60 && !(teo.lavoro && teo.lavoro.compagno); i++) t = await scorri(s, t, 0.5, c);
-  ok(!teo.bici && teo.lavoro && teo.lavoro.compagno === 'ada' && ada.lavoro.compagno === 'teo', 'Ada e Teo giocano a scacchi insieme ' + JSON.stringify([ada.stanza, teo.stanza, ada.esiti, teo.esiti]));
-  t = await scorri(s, t, 16, c);
-  ok(/Partita a scacchi contro Teo/.test(ada.esiti.join()) && /Partita a scacchi contro Ada/.test(teo.esiti.join()), 'il risultato arriva a tutti e due');
-  ok(/usa: Scacchi|ha finito\. Partita a scacchi/.test(percezione(s, ada, t)), 'chi e\' vicino vede cosa fanno gli altri');
+  via(ada, [{ tipo: 'usa', nome: 'Scacchi', testo: 'aspetto un avversario' }]); via(teo, [{ tipo: 'usa', nome: 'scacchi', testo: 'cerco un avversario' }]);
+  for (let i = 0; i < 60 && !(teo.partita && teo.partita === ada.partita); i++) t = await scorri(s, t, 0.5, c);
+  ok(!teo.bici && teo.partita && teo.partita === ada.partita && s.partite[ada.partita].g.slice().sort().join() === 'ada,teo', 'Ada e Teo giocano a scacchi insieme ' + JSON.stringify([ada.stanza, teo.stanza, ada.esiti, teo.esiti]));
+  ok(/sta giocando a Scacchi/.test(percezione(s, ada, t)), 'chi e\' vicino vede che stanno giocando');
+  for (let i = 0; i < 300 && ada.partita; i++) t = await scorri(s, t, 0.5, c);
+  ok(/Scacchi contro Teo: (hai vinto|hai perso|patta)/.test(ada.esiti.join()) && /Scacchi contro Ada: (hai vinto|hai perso|patta)/.test(teo.esiti.join()), 'il risultato arriva a tutti e due ' + JSON.stringify([ada.esiti, teo.esiti]));
+  ok(ada.giochi.scacchi.g === 1 && teo.giochi.scacchi.g === 1 && ada.giochi.scacchi.elo, 'statistiche ed Elo');
 }
 
 // 18) gli Starlight: si parte con 150, si guadagnano (pesci, giochi) e si spendono al Mercatino e in Sala TCG

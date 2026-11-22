@@ -9,6 +9,7 @@
 //    pensiero  ogni pensiero con le azioni decise, cosa annotare e quanto e' costato
 //    diario    ogni riga che l'agente annota nel suo diario (anche i bisogni del corpo)
 //    memoria   ogni volta che l'agente riscrive la sua memoria (il testo intero)
+//    mossa     ogni mossa pensata in una partita a un minigioco (gioco, mossa, pensiero, situazione)
 //    foto      ogni ora: dove sono, soldi, zaino, corpo, casa, budget
 // =====================================================================
 import { budget, REGOLE } from './motore.mjs';
@@ -45,6 +46,10 @@ export function osserva(stato, memo, adesso, regole = REGOLE) {
     const d = Object.assign({}, e); delete d.t; delete d.chi;
     righe.push({ t: e.t, tipo: 'cronaca', chi: e.chi || null, dati: d });
   }
+
+  // ogni mossa pensata nelle partite ai minigiochi (agenti/giochi/): la scelta, il pensiero, cosa c'era da scegliere
+  const mo = nuove(stato.mosse, m.mosse); m.mosse = mo.segno;
+  for (const x of mo.fuori) { const d = Object.assign({}, x); delete d.t; delete d.chi; righe.push({ t: x.t, tipo: 'mossa', chi: x.chi || null, dati: d }); }
 
   for (const ag of Object.values(stato.agenti || {})) {
     const a = m.agenti[ag.id] || (m.agenti[ag.id] = { diario: null, memoria: null, decisione: 0 });
