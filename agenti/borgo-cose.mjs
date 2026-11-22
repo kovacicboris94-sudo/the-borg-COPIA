@@ -59,7 +59,7 @@ function pacchetto(c) {
 }
 
 // i pesci del Laghetto (src/borgo/attivita-piazza.js): peso = quanto e' facile, quando = solo in quel momento
-const PESCI = [
+export const PESCI = [
   ['Carpa dorata', 'comune', 52, 20, 45, 6], ['Pesce gatto', 'comune', 52, 25, 60, 7], ['Persico sole', 'comune', 52, 10, 22, 5], ['Alborella', 'comune', 52, 8, 15, 4],
   ['Trota arcobaleno', 'non comune', 24, 25, 55, 15], ['Luccio', 'non comune', 24, 40, 90, 18], ['Koi bianca e rossa', 'non comune', 24, 30, 60, 20],
   ['Koi drago', 'raro', 11, 40, 70, 40], ['Pesce lanterna', 'raro', 11, 10, 20, 45, 'notte'], ['Anguilla di luna', 'raro', 11, 50, 110, 40, 'sera'],
@@ -102,7 +102,7 @@ const LETTURE = [
 ];
 
 export const COSE = [
-  { id: 'pesca', nome: 'Pesca', dove: null, luogo: 'Laghetto', min: 6, icona: '🎣', posti: [{ x: 28.1, z: 32 }, { x: 41.1, z: 24.5 }, { x: 47.8, z: 33.6 }],
+  { id: 'pesca', gioco: 'pesca', nome: 'Pesca', dove: null, luogo: 'Laghetto', min: 6, icona: '🎣', posti: [{ x: 28.1, z: 32 }, { x: 41.1, z: 24.5 }, { x: 47.8, z: 33.6 }],
     riga: 'sugli sgabelli del Laghetto peschi (di sera e di notte escono pesci rari)', fai: pesca },
   { id: 'ruota', nome: 'Ruota panoramica', dove: null, min: 4, icona: '🎡', posti: [{ x: 34, z: 5.9 }],
     riga: 'un giro in cabina: vedi dall\'alto tutto il borgo e chi c\'e\'', fai: panorama },
@@ -113,26 +113,27 @@ export const COSE = [
   { id: 'cometa', nome: 'Storia della Cometa', dove: null, min: 2, icona: '📜', posti: [{ x: -33, z: 40 }],
     riga: 'il cartello del Cratere racconta come e\' nato il borgo',
     fai: () => 'Il cartello racconta: una notte una cometa si schianto\' qui e scavo\' il cratere. La sua roccia e\' piena di cristalli che brillano sempre, gli Starlight: diventarono la moneta del borgo. Non si staccano con le mani: la cometa ne libera uno quando qualcuno gioca, vince una sfida o aiuta il borgo.' },
-  { id: 'cripta', nome: 'Cripta', dove: null, min: 15, icona: '⚔️', posti: [{ x: -35, z: 52 }],
+  { id: 'cripta', gioco: 'cripta', nome: 'Cripta', dove: null, min: 15, icona: '⚔️', posti: [{ x: -35, z: 52 }],
     riga: 'dal Portale scendi a combattere il Re senza Luce, che ha rubato gli Starlight',
     fai: partita('Cripta del Re senza Luce', ['hai attraversato le sale e sconfitto il Re senza Luce!', 'sei arrivato fino al trono ma il Re senza Luce ti ha battuto.', 'i suoi servitori ti hanno respinto alla seconda sala.'], 30) },
   { id: 'bici', nome: 'Bici', dove: null, min: 0, icona: '🚲', posti: [],
     riga: 'in piazza sali o scendi dalla bici: vai 3 volte piu\' veloce (entrando in un edificio scendi)' },
   { id: 'leggio', nome: 'Leggio', dove: 'biblioteca', min: 5, icona: '📖', posti: [{ x: 0, z: 4.9 }],
     riga: 'nella Biblioteca leggi una poesia', fai: c => 'Hai letto ' + LETTURE[(c.ag.letture = ((c.ag.letture || 0) + 1)) % LETTURE.length] + bibliotecario(c) },
-  { id: 'scacchi', nome: 'Scacchi', dove: 'scacchi', min: 15, icona: '♞', posti: [{ x: -6.4, z: 1.8 }, { x: 6.4, z: 1.8 }],
+  { id: 'scacchi', gioco: 'scacchi', nome: 'Scacchi', dove: 'scacchi', min: 15, icona: '♞', posti: [{ x: -6.4, z: 1.8 }, { x: 6.4, z: 1.8 }],
     riga: 'nella Casa degli Scacchi: contro il computer, o contro un abitante che e\' gia\' al tavolo',
     fai: c => c.compagno ? c.risultato + guadagna(c.ag, /vinto/.test(c.risultato) ? 10 : 2) : partita('Partita a scacchi contro il computer', ['hai vinto!', 'hai perso.', 'patta.'])(c) },
-  { id: 'paintball', nome: 'Paintball', dove: 'sala', min: 8, icona: '🎯', posti: [{ x: -23.6, z: 1 }], riga: 'nella Sala Giochi, a squadre',
+  { id: 'paintball', gioco: 'paintball', nome: 'Paintball', dove: 'sala', min: 8, icona: '🎯', posti: [{ x: -23.6, z: 1 }], riga: 'nella Sala Giochi, a squadre',
     fai: partita('Paintball', ['la tua squadra ha vinto!', 'la tua squadra ha perso per un soffio.', 'sei stato il migliore della tua squadra, ma avete perso.']) },
-  { id: 'kart', nome: 'Go-Kart', dove: 'sala', min: 8, icona: '🏎️', posti: [{ x: 23.8, z: 1 }], riga: 'nella Sala Giochi, corsa sulla pista',
+  { id: 'kart', gioco: 'kart', nome: 'Go-Kart', dove: 'sala', min: 8, icona: '🏎️', posti: [{ x: 23.8, z: 1 }], riga: 'nella Sala Giochi, corsa sulla pista',
     fai: c => { const k = 1 + Math.floor(Math.random() * 6); return `Go-Kart: sei arrivato ${k}° su 6.` + guadagna(c.ag, k === 1 ? 10 : k <= 3 ? 5 : 2); } },
-  { id: 'nascondino', nome: 'Nascondino', dove: 'sala', min: 8, icona: '🙈', posti: [{ x: -9.5, z: -9.4 }], riga: 'nella Sala Giochi, ti trasformi in un oggetto per nasconderti',
+  { id: 'nascondino', gioco: 'nascondino', nome: 'Nascondino', dove: 'sala', min: 8, icona: '🙈', posti: [{ x: -9.5, z: -9.4 }], riga: 'nella Sala Giochi, ti trasformi in un oggetto per nasconderti',
     fai: partita('Nascondino', ['nessuno ti ha trovato, hai vinto!', 'ti hanno trovato subito.', 'ti hanno scoperto proprio alla fine.']) },
-  { id: 'fronte', nome: 'Fronte della Cometa', dove: 'sala', min: 8, icona: '🪖', posti: [{ x: 9.5, z: -9.4 }], riga: 'nella Sala Giochi, battaglia a squadre',
+  { id: 'fronte', gioco: 'fronte', nome: 'Fronte della Cometa', dove: 'sala', min: 8, icona: '🪖', posti: [{ x: 9.5, z: -9.4 }], riga: 'nella Sala Giochi, battaglia a squadre',
     fai: partita('Fronte della Cometa', ['la tua squadra ha conquistato il fronte!', 'la tua squadra ha perso.', 'pareggio, nessuno ha ceduto.']) },
-  { id: 'belinverse', nome: 'Belinverse 2', dove: 'tcg', min: 10, icona: '🃏', posti: [{ x: 0, z: 10.6 }], riga: 'nella Sala TCG, gioco di carte contro il computer',
+  { id: 'belinverse', gioco: 'belinverse', nome: 'Belinverse 2', dove: 'tcg', min: 10, icona: '🃏', posti: [{ x: 0, z: 10.6 }], riga: 'nella Sala TCG, gioco di carte contro il computer',
     fai: partita('Belinverse 2', ['hai vinto la partita a carte!', 'hai perso la partita a carte.']) },
+  { id: 'bubble', gioco: 'bubble', cabinato: true, nome: 'Borg Bubble', dove: null, min: 0, icona: '🫧', posti: [], riga: 'il gioco del Cabinato arcade: si gioca a un cabinato posato in piazza (vai da solo al piu\' vicino)', fai: partita('Borg Bubble', ['hai finito tutti i livelli!', 'game over.']) },
   { id: 'pescheria', nome: 'Pescheria', dove: null, min: 1, icona: '🐟', posti: [{ x: -13.5, z: 6.9 }], riga: 'banco del Mercatino: vendi tutti i pesci del secchio (max 600 Starlight al giorno)', fai: pescheria },
   { id: 'usato', nome: 'Mobili usati', dove: null, min: 2, icona: '🛒', posti: [{ x: -6.5, z: 6.9 }], riga: 'banco del Mercatino, compri un mobile: metti il nome in "testo"', fai: compra('usato') },
   { id: 'luci', nome: 'Luci e decorazioni', dove: null, min: 2, icona: '💡', posti: [{ x: 6.5, z: 6.9 }], riga: 'banco del Mercatino, compri una decorazione: nome in "testo"', fai: compra('luci') },
@@ -184,6 +185,7 @@ export const cosaDi = nome => {
 export const manuale = (nomeStanza) => `MANUALE DEL BORGO
 - {"tipo":"usa","nome":"<cosa>"}: usi una cosa del borgo. Ci vai da solo (entrando o uscendo dagli edifici, anche con l'ascensore) e resti occupato qualche minuto; com'e' andata lo scopri al pensiero dopo. Mettila in fila alle altre azioni. Cose:
 ${COSE.map(c => `  ${c.nome}${c.min ? ` (${c.min} min)` : ''}: ${c.riga}`).join('\n')}
+- I MINIGIOCHI (Pesca, Scacchi, Belinverse 2, Go-Kart, Paintball, Nascondino, Fronte, Cripta, Borg Bubble) li giochi DAVVERO: seduto al gioco, ti chiedo le scelte una alla volta con domande corte (costano poco, circa un decimo di un pensiero) finche' la partita finisce; vinci o perdi per come giochi, e con l'esperienza migliori. Mentre giochi non pensi ad altro. In "testo" puoi dire: a Scacchi e Belinverse "aspetto un avversario" (un altro abitante puo' sedersi contro di te, se no giochi contro il computer); al Go-Kart la pista (Prato Lume, Canyon, Ghiaccio, Autodromo); al Nascondino "mi nascondo" o "cerco".
 - STARLIGHT: la moneta del borgo. Ne parti con ${STARLIGHT_INIZIALI}, poi te li guadagni: vendendo i pesci alla Pescheria e giocando (2 a partita, 10 se vinci, 30 se batti il Re della Cripta). Li spendi al Mercatino e per i pacchetti di Belinverse. Quanti ne hai, cosa hai nel secchio e nello zaino te lo dico ogni volta.
 - Si compra cosi': {"tipo":"usa","nome":"Mobili usati","testo":"Poltrona"}. In vendita (Starlight):
   Mobili usati: ${MERCE.usato.map(m => m[0] + ' ' + m[1]).join(', ')}

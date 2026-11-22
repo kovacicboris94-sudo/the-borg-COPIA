@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="cb919e74b39d">
+  <meta name="versione" content="b6ebda9593b0">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -32611,7 +32611,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     const v = A.dati && A.dati.vita && A.dati.vita.corpi[s.id];
     if (v && v.fa && v.fa !== 'morto') return FA[v.fa] || v.fa;
     if (s.modo === 'automatico') return s.motivo === 'budget-finito' ? 'Ha finito il budget del mese: vive in automatico fino al mese prossimo' : 'Vive in automatico (il cervello non è collegato)';
-    if (s.lavoro && s.lavoro.tipo === 'usa') return 'Sta usando: ' + s.lavoro.nome + ' ' + (s.lavoro.icona || '');
+    if (s.lavoro && s.lavoro.tipo === 'usa') return (s.lavoro.partita ? 'Sta giocando a ' : 'Sta usando: ') + s.lavoro.nome + ' ' + (s.lavoro.icona || '');
     if (s.lavoro) { const o = A.oggetti.get(s.lavoro.id); return (s.lavoro.tipo === 'costruisci' ? 'Sta costruendo ' : 'Sta smontando ') + (o ? '"' + o.d.nome + '"' : ''); }
     if (Math.hypot(s.tx - s.x, s.tz - s.z) > 0.5) return 'Sta camminando';
     const m = Math.max(0, Math.round((s.prossimo - ora()) / 60000));
@@ -32626,6 +32626,29 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
       barra('Fame', v.fame, '#e8873a') + barra('Sete', v.sete, '#7ec8e3') + barra('Sonno', v.sonno, '#7a4fb8') +
       (casa ? `<div style="font-size:12px;opacity:.85;margin-top:3px">Casa: ${casa.T} °C${casa.fornello ? ' · fornello acceso 🔥' : ''}${casa.bolletta != null ? ' · ultima bolletta ' + casa.bolletta + ' Starlight' : ''}${casa.staccato ? ' · gas e luce staccati!' : ''}</div>` : '');
   }
+  // la partita a un minigioco: chi contro chi, a che punto e' (con la scacchiera per gli scacchi), le ultime mosse e cosa pensa
+  const PZ = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙', k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+  function scacchiera(fen, nero) {
+    const righe = fen.split(' ')[0].split('/').map(r => r.replace(/\d/g, d => '.'.repeat(+d)).split(''));
+    if (nero) { righe.reverse(); righe.forEach(r => r.reverse()); }
+    return '<div style="display:inline-grid;grid-template-columns:repeat(8,22px);border:1px solid #6b5a8a;margin:4px 0">' + righe.map((r, y) => r.map((c, x) => `<span style="width:22px;height:22px;line-height:22px;text-align:center;font-size:17px;color:#111;background:${(x + y) % 2 ? '#b58863' : '#f0d9b5'}">${PZ[c] || ''}</span>`).join('')).join('') + '</div>';
+  }
+  function partita(s) {
+    const tutte = (A.dati.partite || {}), p = (tutte.inCorso || []).find(q => q.g.includes(s.id));
+    const ultime = (tutte.finite || []).filter(q => q.g.includes(s.id)).slice(-3).reverse();
+    const giochi = Object.entries(s.giochi || {}).filter(([, v]) => v.g).map(([k, v]) => `${k} ${v.v}/${v.g}${v.elo ? ' (Elo ' + v.elo + ')' : ''}`).join(' · ');
+    let h = '';
+    if (p) {
+      const i = p.g.indexOf(s.id), altro = p.g.length > 1 ? p.nomi[1 - i] : null;
+      h += `<div style="margin:8px 0 4px;padding:8px;border-radius:10px;background:#2a2340"><b>${p.icona || '🎮'} Sta giocando a ${esc(p.nome)}${altro ? ' contro ' + esc(altro) : ''}</b><div style="font-size:12px;opacity:.85">${esc(p.stato)}</div>` +
+        (p.tavola && p.tavola.fen ? scacchiera(p.tavola.fen, p.tavola.bianco !== i) : '') +
+        (p.pensieri && p.pensieri[s.id] ? `<div style="margin-top:4px;font-size:13px"><i>"${esc(p.pensieri[s.id])}"</i></div>` : '') +
+        `<div style="font-size:12px;opacity:.8;margin-top:4px">${(p.log || []).slice(-5).map(l => esc(l.s)).join('<br>')}</div></div>`;
+    }
+    if (ultime.length) h += `<details style="margin-top:6px"><summary style="cursor:pointer"><b>Ultime partite</b></summary><div style="font-size:12px;opacity:.9;margin-top:4px">${ultime.map(q => `${q.icona || ''} ${esc(q.nome)}${q.g.length > 1 ? ' contro ' + esc(q.nomi[1 - q.g.indexOf(s.id)] || '') : ''}: <b>${esc((q.esiti || [])[q.g.indexOf(s.id)] || '')}</b> (${q.mosse} mosse)`).join('<br>')}</div></details>`;
+    if (giochi) h += `<div style="font-size:12px;opacity:.75;margin-top:4px">Vinte/giocate: ${esc(giochi)}</div>`;
+    return h;
+  }
   function disegnaScheda() {
     const el = A.scheda; if (!el) return;
     const s = A.dati && A.dati.agenti.find(a => a.id === el.dataset.id); if (!s) { chiudiScheda(); return; }
@@ -32637,6 +32660,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
        <div style="margin:6px 0"><b>Adesso:</b> ${esc(cosaFa(s))}</div>
        <div style="margin:6px 0"><b>Dove:</b> ${esc(s.stanza === 'tetto' ? 'sul tetto della Torre della Cometa' : s.stanza ? 'dentro ' + ({ negozio: 'Negozio TCG', tcg: 'Sala TCG' }[s.stanza] || (app.stanze[s.stanza] || {}).nome || s.stanza) : 'in piazza')}</div>
        ${corpo(s)}
+       ${partita(s)}
        ${s.starlight != null ? `<div style="margin:8px 0 4px"><b>Starlight:</b> ${s.starlight}${Object.keys(s.zaino || {}).length ? ' · zaino: ' + esc(Object.keys(s.zaino).join(', ')) : ''}</div>` : ''}
        <div style="margin:8px 0 4px"><b>Budget del mese:</b> ${euro(b.spesi)} su ${euro(b.tetto)} · ${b.pensieri} pensieri · restano ${b.giorni} giorni</div>
        <div style="height:10px;border-radius:5px;background:#3d3355;overflow:hidden"><div style="height:100%;width:${pc.toFixed(1)}%;background:${pc > 85 ? '#e0675c' : '#7ec8e3'}"></div></div>
