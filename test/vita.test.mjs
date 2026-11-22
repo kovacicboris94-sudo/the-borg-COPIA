@@ -251,11 +251,11 @@ ok(normalizzaAzioneVita({ tipo: 'mangia', nome: 'Pane' }).cosa === 'pane' && nor
   const { MESTIERI, pagaOraria, competenza } = await import('../agenti/vita/mestieri.mjs');
   ok(vicino(pagaOraria(MESTIERI.barista, 0), 24, 0.01) && vicino(pagaOraria(MESTIERI.barista, 2000), 36, 0.1), 'la paga sale con l\'esperienza (da 80% a 120%)');
   ok(vicino(competenza(200), 0.632, 0.001), 'curva di apprendimento: 63% dopo 200 ore');
-  const m = nuovoMondo({ adesso: T0, seme: 2, posizioni: { ada: { x: 18, z: -3 }, teo: { x: 18, z: -2 } } });
+  const m = nuovoMondo({ adesso: T0, seme: 2, posizioni: { ada: { x: -1.6, z: -3.6, stanza: 'caffetteria' }, teo: { x: 0, z: 2, stanza: 'caffetteria' } } });   // dal 22/11/2026 il barista lavora dentro la Caffetteria
   const notte = Date.UTC(2026, 10, 21, 3, 0);
   ok(!eseguiAzioneVita(m, 'ada', { tipo: 'turno', nome: 'barista', quanto: 3 }, notte).ok, 'la Caffetteria di notte non assume');
   const r = eseguiAzioneVita(m, 'ada', { tipo: 'turno', nome: 'barista', quanto: 3 }, T0);
-  ok(r.ok && m.corpi.ada.lavoro.tipo === 'lavora', 'turno da barista iniziato');
+  ok(r.ok && m.corpi.ada.lavoro.tipo === 'lavora', 'turno da barista iniziato ' + JSON.stringify([r, m.corpi.ada.stanza]));
   ok(!eseguiAzioneVita(m, 'teo', { tipo: 'turno', nome: 'barista', quanto: 3 }, T0).ok, 'un solo posto da barista: Teo non entra');
   ok(!eseguiAzioneVita(m, 'ada', { tipo: 'raccogli', cosa: 'rami' }, T0).ok && eseguiAzioneVita(m, 'ada', { tipo: 'bagno' }, T0).ok, 'durante il turno si puo\' andare in bagno ma non fare altro');
   const s0 = m.corpi.ada.starlight, paga = m.corpi.ada.lavoro.paga;

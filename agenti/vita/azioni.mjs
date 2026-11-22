@@ -22,6 +22,7 @@ const num = (v, d) => (typeof v === 'number' && isFinite(v) ? v : (typeof v === 
 const lim = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const oraRoma = ms => +new Date(ms).toLocaleString('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false }) % 24;
+const giornoRoma = ms => ({ Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 })[new Date(ms).toLocaleString('en-GB', { timeZone: 'Europe/Rome', weekday: 'short' })];
 
 // ---- descrizione per il prompt degli agenti ----
 export const TIPI_VITA = ['bevi', 'mangia', 'raccogli', 'pesca', 'accendi', 'alimenta', 'metti_sul_fuoco', 'togli_dal_fuoco', 'riempi', 'aggiungi', 'impasta', 'modella', 'dormi', 'riposa', 'semina', 'annaffia', 'prendi', 'lascia', 'dai',
@@ -478,16 +479,17 @@ const AZIONI = {
   turno(mondo, c, a, t) {
     const id = cercaMestiere(a.nome || a.luogo); if (!id) return no('che mestiere? ' + Object.keys(MESTIERI).join(', '));
     const M = MESTIERI[id];
-    const posto = { nome: M.luogo, x: M.x, z: M.z, raggio: 5 };
-    if (!(M.alChiuso && c.stanza === 'biblioteca') && (c.stanza || Math.hypot(c.x - M.x, c.z - M.z) > 5)) return vaiA(posto, 'vado al lavoro: ' + M.luogo);
+    if (id === 'muratore' && !M.lotto) return no(M.chiuso);   // il cantiere aperto lo sceglie il motore (agenti/lavori.mjs)
+    if (M.giorni && !M.giorni.includes(giornoRoma(t))) return no(`${M.luogo}: il ${M.nome} lavora solo dal lunedi' al sabato`);
+    // chi lavora dentro un edificio ci entra (il motore sa la strada); chi lavora fuori va li'
+    if (M.stanza ? c.stanza !== M.stanza : (c.stanza || Math.hypot(c.x - M.x, c.z - M.z) > 5)) return { vai: { x: M.x, z: M.z, nome: M.luogo, entra: M.stanza || null }, esito: 'vado al lavoro: ' + M.luogo };
     const h = oraRoma(t), oreMax = Math.min(lim(a.quanto ?? 4, 0.5, 10), M.alle - h - (new Date(t).getUTCMinutes() / 60), ORE_MAX_GIORNO - (c.oreLavoroOggi || 0));
     if (h < M.dalle || h >= M.alle) return no(`${M.luogo} cerca un ${M.nome} solo dalle ${M.dalle} alle ${M.alle}`);
     if (oreMax < 0.25) return no((c.oreLavoroOggi || 0) >= ORE_MAX_GIORNO ? `oggi hai gia' lavorato ${ORE_MAX_GIORNO} ore` : 'il turno sta finendo, non ha senso cominciare ora');
     const occupati = Object.values(mondo.corpi).filter(o => o !== c && o.lavoro && o.lavoro.tipo === 'lavora' && o.lavoro.mestiere === id).length;
     if (occupati >= M.posti) return no(`il posto di ${M.nome} e' gia' occupato`);
     if (c.sonno > 1.4 || c.salute < 30) return no('non ce la fai a lavorare in queste condizioni');
-    if (M.alChiuso) c.stanza = 'biblioteca';
-    const r = lavoro(c, t, 'lavora', oreMax * 60, 'lavorare', { mestiere: id, met: M.met, paga: pagaOraria(M, (c.esperienza || {})[id]) });
+    const r = lavoro(c, t, 'lavora', oreMax * 60, 'lavorare', { mestiere: id, met: M.met, paga: pagaOraria(M, (c.esperienza || {})[id]), lotto: M.lotto || null });
     return { ok: true, esito: `turno da ${M.nome} iniziato: ${oreMax.toFixed(1)} ore a ${r && c.lavoro.paga} Starlight l'ora`, minuti: oreMax * 60 };
   },
 
@@ -615,7 +617,6 @@ export function completaLavoro(mondo, c, L, t) {
     c.starlight = Math.round(((c.starlight ?? 0) + paga) * 100) / 100;
     c.esperienza = c.esperienza || {}; c.esperienza[L.mestiere] = (c.esperienza[L.mestiere] || 0) + ore * rendimento(c);
     c.oreLavoroOggi = (c.oreLavoroOggi || 0) + ore;
-    if (M.alChiuso && c.stanza === 'biblioteca') c.stanza = null;
     for (const [cosa, kg] of Object.entries(M.extra || {})) deponi(c.zaino, nuovaCosa(mondo, cosa, kg, { T: tempo.tAria, guasto: 0.1 }));
     soddisfa(c, 0.12);
     return `turno da ${M.nome} finito: ${ore.toFixed(1)} ore, pagati ${paga} Starlight (ora ne hai ${Math.floor(c.starlight)}). Esperienza da ${M.nome}: ${Math.round(competenza(c.esperienza[L.mestiere]) * 100)}%` + (M.extra ? ', e ti hanno dato il pane avanzato' : '');

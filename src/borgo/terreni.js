@@ -8,8 +8,9 @@
    c'e' la scheda del lotto: compra, scegli cosa costruire, guarda il cantiere.
    - La casa finita di una persona vera e' l'ingresso in piazza della sua casa
      del gioco; quella di un abitante IA diventa la sua casa.
-   - Il negozio finito ha un bancone davanti (lo disegna agenti-ia.js come gli
-     altri banconi): ci lavora solo il proprietario e tiene l'80%.
+   - Il negozio finito ha l'interno (src/borgo/interni.js) con il bancone dentro
+     (lo disegna agenti-ia.js come gli altri): ci lavora solo il proprietario e
+     tiene l'80%.
    ===================================================================== */
 (function () {
   'use strict';
@@ -133,7 +134,7 @@
     // la porta dell'edificio finito
     let porta = null;
     if (p && p.finito) {
-      porta = { id: 'porta-' + l.id, nome: p.nome, x: geo.porta.x, z: geo.porta.z, r: 1.35, testo: !l.chi ? 'All\'asta: ' + p.nome : abitazione(p.tipo) ? (sonoIo(l.chi) ? 'Entra in casa tua' : 'Bussa a ' + p.nome) : 'Guarda ' + p.nome, fn: () => portaLotto(l.id) };
+      porta = { id: 'porta-' + l.id, nome: p.nome, x: geo.porta.x, z: geo.porta.z, r: 1.35, testo: !l.chi ? 'All\'asta: ' + p.nome : abitazione(p.tipo) ? (sonoIo(l.chi) ? 'Entra in casa tua' : 'Bussa a ' + p.nome) : 'Entra: ' + p.nome, fn: () => portaLotto(l.id) };
       app.piazza.porte.push(porta);
     }
     return { g, tocco, ost: ost.concat(edificio ? edificio.ost : []), edificio, porta };
@@ -158,7 +159,12 @@
     const l = S.dati.find(q => q.id === id); if (!l || !l.progetto) return;
     const p = l.progetto, app = S.app, geo = l.geo;
     if (!l.chi) return apri(id);
-    if (p.tipo === 'negozio') { const b = (B.AgentiIA && B.AgentiIA.apriBancone); if (b) b(id); return; }
+    // il negozio ha l'interno (src/borgo/interni.js): si entra e il bancone e' dentro
+    if (p.tipo === 'negozio') {
+      const sid = 'bottega_' + id, st = app.stanze[sid] || (app.aggiungiInterno && app.aggiungiInterno(sid, { nome: p.nome, tipo: B.tipoInterno ? B.tipoInterno(p.genere) : 'bottega', fuori: { x: geo.ritorno.x, z: geo.ritorno.z, yaw: PI } }));
+      if (st) { G.emetti('transizione', () => app.entraStanza(sid, { x: 0, z: 3.6, yaw: PI })); return; }
+      const b = (B.AgentiIA && B.AgentiIA.apriBancone); if (b) b(id); return;
+    }
     if (sonoIo(l.chi)) {
       // la mia casa: si entra nella casa del gioco e uscendo si torna qui
       entraCasaDa('piazza', { x: geo.ritorno.x, z: geo.ritorno.z, yaw: PI });

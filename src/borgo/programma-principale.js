@@ -78,6 +78,22 @@
   // il tetto della torre e' un pezzo di piazza (stesso gruppo, stessa chat, gli amici ti vedono lassu')
   if (B.TettoTorre) { const tt = B.TettoTorre; stanze.tetto = { id: 'tetto', luogo: 'piazza', nome: tt.nome, pubblica: true, gruppo: gP, m: piazza, ostacoli: tt.ostacoli, porte: tt.porte, sedili: [], toccabili: [],
     area: tt.area, alt: tt.alt, zoom: 0.5, az: -PI / 2, spawn: tt.spawn, rect: stanze.piazza.rect, edifici: piazza.edifici, sfondo: stanze.piazza.sfondo }; }
+  // gli interni dei negozi e degli edifici (src/borgo/interni.js): un gruppo per interno.
+  // Quelli della piazza ci sono da subito; quelli dei negozi costruiti sui terreni si aggiungono quando servono.
+  const interni = {};
+  function aggiungiInterno(id, def) {
+    if (interni[id]) return stanze[id];
+    if (!B.costruisciInterno) return null;
+    const g = new T.Group(); g.visible = false; scene.add(g);
+    const m = B.costruisciInterno(g, Object.assign({ id }, def));
+    [g].forEach(q => { q.updateMatrix(); q.matrixAutoUpdate = false; q.matrixWorldNeedsUpdate = true; });
+    interni[id] = { g, m };
+    stanze[id] = { id, nome: def.nome, pubblica: true, interno: true, gruppo: g, m, ostacoli: m.ostacoli, porte: m.porte, sedili: m.sedili, toccabili: m.toccabili,
+      area: m.area, alt: () => 0, zoom: m.w > 12 ? 0.72 : 0.8, spawn: { x: 0, z: m.d / 2 - 1.4, yaw: PI }, rect: m.rect, edifici: [], sfondo: '#2a2040' };
+    if (G.stato.atmosfera) m.atm(G.stato.atmosfera);
+    return stanze[id];
+  }
+  Object.entries(B.INTERNI || {}).forEach(([id, def]) => aggiungiInterno(id, def));
   let stanza = stanze.piazza;
   const luci = piazza.luci;                       // 6 luci puntiformi condivise tra le stanze
   const LUCE_CASA = { giorno: 0.35, tramonto: 0.9, notte: 1.3 };
@@ -126,7 +142,7 @@
     B.finestreMat.forEach(m => { m.emissiveIntensity = a.finestre; });
     const k = clamp(a.lampioni / 1.6, 0, 1) * 0.95;
     piazza.aloni.forEach(s => { s.material.opacity = k; });
-    casa.atm(nome); if (stanze.ospite) stanze.ospite.m.atm(nome); negozio.atm(nome); sala.atm(nome); coll.atm(nome); tcgR.atm(nome); bib.atm(nome); scac.atm(nome); Object.values(casette).forEach(c => c.m.atm(nome)); assegnaLuci();
+    casa.atm(nome); if (stanze.ospite) stanze.ospite.m.atm(nome); negozio.atm(nome); sala.atm(nome); coll.atm(nome); tcgR.atm(nome); bib.atm(nome); scac.atm(nome); Object.values(casette).forEach(c => c.m.atm(nome)); Object.values(interni).forEach(c => c.m.atm(nome)); assegnaLuci();
     piani.forEach(m => m.atm(nome));
   }
 
@@ -293,7 +309,7 @@
   function entraStanza(id, arrivo) {
     stanza = stanze[id]; io.st = stanza; io.seduto = null; G.stato.stanzaId = id;
     if (stanza.m && stanza.m.alPiano && stanza.piano != null) stanza.m.alPiano(stanza.piano);   // piani della torre che condividono il gruppo
-    gP.visible = stanza.gruppo === gP; gTorre.forEach(g => { g.visible = stanza.gruppo === g; }); gC.visible = id === 'casa'; gN.visible = id === 'negozio'; gS.visible = id === 'sala'; gL.visible = id === 'collectibles'; gT.visible = id === 'tcg'; gB.visible = id === 'biblioteca'; gK.visible = id === 'scacchi'; gO.visible = id === 'ospite'; for (const [k, c] of Object.entries(casette)) c.g.visible = id === k;
+    gP.visible = stanza.gruppo === gP; gTorre.forEach(g => { g.visible = stanza.gruppo === g; }); gC.visible = id === 'casa'; gN.visible = id === 'negozio'; gS.visible = id === 'sala'; gL.visible = id === 'collectibles'; gT.visible = id === 'tcg'; gB.visible = id === 'biblioteca'; gK.visible = id === 'scacchi'; gO.visible = id === 'ospite'; for (const [k, c] of Object.entries(casette)) c.g.visible = id === k; for (const c of Object.values(interni)) c.g.visible = stanza.gruppo === c.g;
     const sp = arrivo || stanza.spawn;
     io.x = sp.x; io.z = sp.z; io.vx = io.vz = 0; io.yaw = sp.yaw === undefined ? 0 : sp.yaw; io.y = stanza.alt(io.x, io.z);
     C.azT = C.az = stanza.az === undefined ? PI / 4 : stanza.az; impostaZoom(stanza.zoom); if (stanza.elev) { C.elev = stanza.elev; C.elevAuto = true; } else if (C.elevAuto) { C.elev = 28; C.elevAuto = false; } C.tx = io.x; C.tz = io.z; C.ty = 1.0 + io.y;
@@ -536,7 +552,7 @@
   { const bb = $('#btn-bici'); if (bb) bb.addEventListener('click', () => setBici(!io.bici)); }
   { const bc = $('#btn-corri'); if (bc) bc.addEventListener('click', () => { io.corre = !io.corre; bc.classList.toggle('attivo', io.corre); G.emetti('toast', io.corre ? 'Corsa attiva: ti muovi più veloce' : 'Si torna a camminare'); }); }
   B.app = {
-    io, gC, gP, piazza, libero, muovi, vistaAlto, assegnaLuci, ricostruisciCasa, casaOspite, setBici, creaBici, npc, C, cam, scene, renderer, stanze, G, joy, entraStanza, usaPorta, portaVicina, misura, atmosfera, impostaZoom,
+    aggiungiInterno, io, gC, gP, piazza, libero, muovi, vistaAlto, assegnaLuci, ricostruisciCasa, casaOspite, setBici, creaBici, npc, C, cam, scene, renderer, stanze, G, joy, entraStanza, usaPorta, portaVicina, misura, atmosfera, impostaZoom,
     inclina, emote, mostraBolla, ruota: d => { C.azT += d * PI / 2; setSegui(false); },
     stanza: () => stanza, gioco: () => giocoAttivo,
     rivesti: () => { if (G.stato.giocatore && io.av) costruisciIo(G.stato.giocatore.look); }

@@ -396,7 +396,7 @@ async function scorri(s, da, minuti, cervello, passoS = 30) { let t = da; for (l
   ok(/c'e' seduto qualcuno/.test(teo.esiti.join()), 'non si smonta con qualcuno seduto sopra');
   t = await scorri(s, t, 11, c);
   ok(!ada.lavoro && /ti sei alzato/.test(ada.esiti.join()), 'dopo 10 minuti si alza');
-  teo.x = teo.tx = -8; teo.z = teo.tz = 16; teo.coda = [normalizzaAzione({ tipo: 'rimuovi', id: o.id })]; t = await scorri(s, t, 6, c);
+  teo.x = teo.tx = -8; teo.z = teo.tz = 16; teo.stanza = null; teo.coda = [normalizzaAzione({ tipo: 'rimuovi', id: o.id })]; t = await scorri(s, t, 6, c);
   ok(!s.oggetti.includes(o) && ada.zaino.Poltrona === 1, 'smontata torna nello zaino di Ada');
   ada.x = ada.tx = -8; ada.z = ada.tz = 16;
   ada.coda = [normalizzaAzione({ tipo: 'metti', nome: 'Poltrona', x: -8, z: 19 })]; t = await scorri(s, t, 1, c);

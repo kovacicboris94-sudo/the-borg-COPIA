@@ -82,7 +82,7 @@ export function nuovoMondo({ adesso, seme = 12345, abitanti = ['ada', 'teo'], po
   mondo.fuochi.push({ id: 'forno', nome: 'forno del Forno', fisso: true, struttura: 'forno_pane', x: POSTI.forno.x, z: POSTI.forno.z, legna: [], T: null, sopra: [] });
   for (const id of abitanti) {
     const p = posizioni[id] || { x: 0, z: 34 };
-    mondo.corpi[id] = Object.assign(nuovoCorpo(CORPI_ABITANTI[id] || {}), { id, x: p.x, z: p.z, stanza: null, zaino: [], lavoro: null, abilita: { pesca: 0, fuoco: 0, argilla: 0, cucina: 0 },
+    mondo.corpi[id] = Object.assign(nuovoCorpo(CORPI_ABITANTI[id] || {}), { id, x: p.x, z: p.z, stanza: p.stanza || null, zaino: [], lavoro: null, abilita: { pesca: 0, fuoco: 0, argilla: 0, cucina: 0 },
       starlight: STARLIGHT_INIZIALI, umano: nuovoUmano(), esperienza: {}, oreLavoroOggi: 0, cloBase: null });
   }
   // ognuno ha la sua casetta, con il fornello a gas in cucina
@@ -326,6 +326,7 @@ function finisciLavoro(mondo, c, t, eventi) {
   if (t >= c.lavoro.fine) {
     const L = c.lavoro; c.lavoro = null; c.attivita = 'riposare';
     const esito = completaLavoro(mondo, c, L, t);
-    if (esito) { const e = { chi: c.id, tipo: 'lavoro_finito', lavoro: L.tipo, esito }; registra(mondo, e); eventi.push(e); (c.esiti || (c.esiti = [])).push(esito); if (c.esiti.length > 8) c.esiti.shift(); }
+    // un turno da dipendente: il motore applica al borgo quello che si e' prodotto (agenti/lavori.mjs)
+    if (esito) { const e = { chi: c.id, tipo: 'lavoro_finito', lavoro: L.tipo, esito }; if (L.mestiere) Object.assign(e, { mestiere: L.mestiere, ore: (L.fine - L.inizio) / 3600000, lotto: L.lotto || null }); registra(mondo, e); eventi.push(e); (c.esiti || (c.esiti = [])).push(esito); if (c.esiti.length > 8) c.esiti.shift(); }
   }
 }

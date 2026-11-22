@@ -4,12 +4,12 @@
 //  - una sveglia (alarm) ogni 30 secondi fa scorrere il tempo e pensare gli agenti;
 //  - AGENTI_PAUSA = 1 (variabile nel pannello di Cloudflare) li mette in pausa: niente pensieri, niente spese;
 //  - la chiave di Anthropic sta nei segreti di Cloudflare (ANTHROPIC_API_KEY),
-//    il gioco non la vede mai: riceve solo /stato e manda /parla, /regala, /turno, /vendi, /terreno e /banca;
+//    il gioco non la vede mai: riceve solo /stato e manda /parla, /regala, /turno, /vendi, /dipendente, /terreno e /banca;
 //  - /registro e' l'archivio dell'esperimento: tutto quello che dicono, pensano e fanno, per sempre
 //    (tabella SQLite del Durable Object, nessun costo di modello).
 // =====================================================================
 import { DurableObject } from 'cloudflare:workers';
-import { nuovoStato, passo, vistaPubblica, giocatoreParla, giocatoreRegala, giocatoreTurno, giocatoreVende, giocatoreTerreno, cronaca, proposte } from '../motore.mjs';
+import { nuovoStato, passo, vistaPubblica, giocatoreParla, giocatoreRegala, giocatoreTurno, giocatoreVende, giocatoreTerreno, giocatoreDipendente, cronaca, proposte } from '../motore.mjs';
 import { cervelloClaude, cervelloFinto } from '../cervello.mjs';
 import { osserva } from '../registro.mjs';
 
@@ -98,6 +98,16 @@ export class Borgo extends DurableObject {
       this.voci.set(chi, ora); if (this.voci.size > 500) this.voci.clear();
       let d = {}; try { d = await req.json(); } catch (e) { /* vuoto */ }
       const r = url.pathname === '/turno' ? giocatoreTurno(s, d.nick, d.negozio, d.on !== false, ora) : giocatoreVende(s, d.nick, d, ora);
+      if (r.ok) await this.ctx.storage.put('stato', s);
+      return json(r);
+    }
+    if (url.pathname === '/dipendente' && req.method === 'POST') {
+      // il turno da dipendente di una persona vera (fornaio, barista, spazzino...): inizio, conferma ogni 90 s, fine
+      const chi = 'd' + (req.headers.get('CF-Connecting-IP') || 'x'), ora = Date.now();
+      if (ora - (this.voci.get(chi) || 0) < 3000) return json({ ok: false, motivo: 'Piano, un attimo.' }, 429);
+      this.voci.set(chi, ora); if (this.voci.size > 500) this.voci.clear();
+      let d = {}; try { d = await req.json(); } catch (e) { /* vuoto */ }
+      const r = giocatoreDipendente(s, d.nick, d, ora);
       if (r.ok) await this.ctx.storage.put('stato', s);
       return json(r);
     }
