@@ -32,14 +32,19 @@ const quasi = (a, b, e = 0.05) => Math.abs(a - b) <= e;
   ok(geometria(LOTTI[2], 'villa').edificio.w > geometria(LOTTI[2], 'casa').edificio.w, 'la villa e\' piu\' grande');
   ok(!giocatoreTerreno(s, 'Boris', { azione: 'appartamento', piano: 3, soldi: 1e6, chiave: 'k-boris' }, t0).ok, 'una sola proprieta\'');
   ok(!giocatoreTerreno(s, 'Boris', { azione: 'mutuo', bene: 'piano 2', soldi: 1e6, chiave: 'k-boris' }, t0).ok, 'un solo mutuo');
-  // gioca il giorno dopo: scade una rata (una sola, anche se e' stato via tanto)
-  let b = giocatoreTerreno(s, 'Boris', { azione: 'banca', chiave: 'k-boris' }, t0 + 5 * 864e5);
+  // sta via 5 giorni: le rate scadono lo stesso (Boris: cosi' la gente e' invogliata a giocare)
+  let b = giocatoreTerreno(s, 'Boris', { azione: 'banca', chiave: 'k-boris' }, t0 + 5 * 864e5 + 1000);
   const L = b.conto.prestiti[0];
-  ok(b.ok && L.pagate === 1 && quasi(L.scaduto, L.rata, 0.02), 'dopo 5 giorni via: una rata sola da pagare');
+  ok(b.ok && L.pagate === 5 && L.insolute === 5, 'dopo 5 giorni via: 5 rate da pagare');
   b = giocatoreTerreno(s, 'Boris', { azione: 'banca', chiave: 'k-boris' }, t0 + 5 * 864e5 + 3600e3);
-  ok(b.conto.prestiti[0].pagate === 1, 'nello stesso giorno non ne scade un\'altra');
+  ok(b.conto.prestiti[0].pagate === 5, 'nello stesso giorno non ne scade un\'altra');
+  // chi non entra proprio: il borgo fa scadere le rate lo stesso e dopo 10 pignora
+  { const s2 = nuovoStato(t0); giocatoreTerreno(s2, 'Ugo', { azione: 'appartamento', piano: 1, soldi: 0 }, t0);
+    giocatoreTerreno(s2, 'Ugo', { azione: 'mutuo', bene: 'piano 2', soldi: 1e6 }, t0);
+    for (let i = 1; i <= 11; i++) passoBanca(s2, t0 + i * 864e5 + 1000, () => null);
+    ok(!s2.appartamenti.torre2 && s2.aste.torre2, 'giocatore assente 11 giorni: casa pignorata'); }
   r = giocatoreTerreno(s, 'Boris', { azione: 'paga', importo: 99999, soldi: 99999, chiave: 'k-boris' }, t0 + 5 * 864e5 + 3700e3);
-  ok(r.ok && quasi(r.spesa, L.rata, 0.02), '"paga" paga solo la rata scaduta');
+  ok(r.ok && quasi(r.spesa, L.scaduto, 0.05), '"paga" paga solo le rate scadute');
   const prima = vistaConto(s, 'g:Boris').prestiti[0];
   r = giocatoreTerreno(s, 'Boris', { azione: 'rimborsa', importo: 10000, soldi: 10000, chiave: 'k-boris' }, t0 + 5 * 864e5 + 3800e3);
   const dopo = vistaConto(s, 'g:Boris').prestiti[0];

@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="versione" content="f14969e1c344">
+  <meta name="versione" content="a18d20320a2c">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -32820,7 +32820,7 @@ body.orizz #pagina-zaino .zn-carte{grid-template-columns:repeat(auto-fill,minmax
     if (dovuto > 0.01) h += btn('bk-paga', `Paga le rate arretrate (${fmt(dovuto)} ${SL()})`, true);
     if (c.prestiti.some(L => L.residuo > 0)) h += `<div style="margin-top:10px">Restituisci in anticipo (senza penali, la rata scende):</div><input class="bk-rimb" type="number" min="1" step="100" placeholder="quanti ${SL()}" style="width:100%;box-sizing:border-box;margin-top:4px;padding:8px 10px;border-radius:10px;border:0;font-size:16px;color:#111;background:#fff">` + btn('bk-rimborsa', 'Restituisci', false);
     if (c.storia && c.storia.length) h += `<div style="margin-top:10px;font-weight:700">Lettere della banca</div>` + c.storia.slice().reverse().map(q => `<div style="font-size:12px;opacity:.85;margin-top:4px">${esc(quando(q.t))}: ${esc(q.s)}</div>`).join('');
-    h += `<div style="font-size:12px;opacity:.75;margin-top:10px">Come funziona: ogni giorno nel borgo vale un mese, quindi le rate sono una al giorno; per te scade una rata in ogni giorno in cui giochi e il gioco la paga da solo se hai gli ${SL()}. Sulle rate non pagate corrono gli interessi di mora (${r.tanMora * 100}%). Dopo ${r.rateSollecito} rate non pagate arriva una lettera; dopo ${r.ratePignoramento} la banca pignora la casa e la vende all'asta al ${Math.round(r.astaQuota * 100)}% del valore.</div>`;
+    h += `<div style="font-size:12px;opacity:.75;margin-top:10px">Come funziona: ogni giorno nel borgo vale un mese, quindi le rate sono una al giorno; le rate scadono ogni giorno anche quando non giochi: appena entri il gioco paga da solo quelle scadute se hai gli ${SL()}, quindi non stare via troppo! Sulle rate non pagate corrono gli interessi di mora (${r.tanMora * 100}%). Dopo ${r.rateSollecito} rate non pagate arriva una lettera; dopo ${r.ratePignoramento} la banca pignora la casa e la vende all'asta al ${Math.round(r.astaQuota * 100)}% del valore.</div>`;
     return h;
   }
 
