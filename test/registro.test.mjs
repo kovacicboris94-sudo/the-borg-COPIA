@@ -1,7 +1,7 @@
 // Prove dell'archivio dell'esperimento (agenti/registro.mjs), senza chiave e senza spendere niente.
 //   node test/registro.test.mjs
 import assert from 'node:assert/strict';
-import { nuovoStato, passo, giocatoreParla } from '../agenti/motore.mjs';
+import { nuovoStato, passo, giocatoreParla, percezione } from '../agenti/motore.mjs';
 import { osserva, FOTO_OGNI_MS } from '../agenti/registro.mjs';
 import { copia } from '../strumenti/copia-registro.mjs';
 import fs from 'node:fs';
@@ -77,6 +77,15 @@ ok(JSON.stringify(memo).length < 2000, 'memo piccolo');
   ok(fs.existsSync(path.join(dir, '2026-11', '2026-11-22.jsonl')), 'le 23:30 UTC del 21 sono il 22 a Roma');
   const lette = fs.readdirSync(path.join(dir, '2026-11')).flatMap(f => fs.readFileSync(path.join(dir, '2026-11', f), 'utf8').trim().split('\n'));
   ok(lette.length === righe.length, 'tutte le righe nei file');
+}
+
+// 7) chi si siede non "sta smontando qualcosa" (la falsa accusa di Ada a Teo nasceva da qui)
+{
+  const s2 = nuovoStato(T0), a = s2.agenti.ada, t = s2.agenti.teo;
+  t.x = a.x + 3; t.z = a.z; t.tx = t.x; t.tz = t.z;
+  t.lavoro = { tipo: 'usa', id: 'o5', nome: 'Sedia', inizio: T0, fine: T0 + 600000 };
+  const p = percezione(s2, a, T0 + 1000);
+  ok(/Teo, a 3 m, sta usando: Sedia/.test(p) && !/smontando/.test(p), 'Teo seduto si vede seduto');
 }
 
 console.log(`registro: ${n} prove superate`);

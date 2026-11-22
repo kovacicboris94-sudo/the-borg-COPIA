@@ -840,6 +840,13 @@ Scrivi "memoria_nuova" solo quando te lo chiedo: e' la tua memoria riscritta e r
 }
 
 // Quello che l'agente percepisce adesso: lo costruisce il codice dallo stato vero.
+// cosa si vede fare a un altro abitante (prima ogni lavoro che non era "costruisci" sembrava "sta smontando qualcosa")
+function descriviLavoro(L) {
+  if (L.tipo === 'costruisci') return ', sta costruendo';
+  if (L.tipo === 'rimuovi') return ', sta smontando qualcosa';
+  if (L.tipo === 'usa') return L.nome ? `, sta usando: ${L.nome}` : ', e\' occupato';
+  return ', e\' occupato';
+}
 export function percezione(stato, ag, adesso, regole = REGOLE) {
   const b = budget(ag, adesso, regole), vicino = luogoVicino(ag);
   const righe = [];
@@ -866,7 +873,7 @@ export function percezione(stato, ag, adesso, regole = REGOLE) {
   const visti = [];
   for (const altro of Object.values(stato.agenti)) {
     if (altro === ag) continue; const d = dist(altro, ag);
-    if (d <= regole.vista) visti.push(`- ${altro.nome}, a ${Math.round(d)} m` + (altro.lavoro ? (altro.lavoro.tipo === 'costruisci' ? ', sta costruendo' : ', sta smontando qualcosa') : (Math.hypot(altro.tx - altro.x, altro.tz - altro.z) > 0.5 ? ', sta camminando' : '')));
+    if (d <= regole.vista) visti.push(`- ${altro.nome}, a ${Math.round(d)} m` + (altro.lavoro ? descriviLavoro(altro.lavoro) : (Math.hypot(altro.tx - altro.x, altro.tz - altro.z) > 0.5 ? ', sta camminando' : '')));
   }
   const giocatori = new Map();
   stato.eventi.filter(e => e.chi && e.chi.indexOf('g:') === 0 && e.tipo !== 'scrivi' && adesso - e.t < 5 * 60000 && dist(e, ag) <= regole.vista).forEach(e => giocatori.set(e.chi, e));
