@@ -4,6 +4,8 @@
 //   node test/azioni.test.mjs
 import assert from 'node:assert/strict';
 import { nuovoStato, passo, esitoFallito, firmaAzione, FRENO } from '../agenti/motore.mjs';
+import { assicuraVita } from '../agenti/vita/aggancio.mjs';
+import { nuovaCosa } from '../agenti/vita/mondo.mjs';
 
 const T0 = Date.UTC(2026, 10, 22, 9, 0, 0);
 let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -91,6 +93,14 @@ for (const tipo of ['lascia', 'vendi_al_mercatino', 'butta']) {
 { const r = await prova([{ tipo: 'svago', luogo: 'Biblioteca' }]); riuscita(r, 'svago', /iniziato/); }
 { const r = await prova([{ tipo: 'entra', luogo: 'Caffetteria' }]); riuscita(r, 'entra', /sei dentro/); }
 { const r = await prova([{ tipo: 'entra', luogo: 'Castello' }]); ok(r.esiti.some(e => /edificio sconosciuto/.test(e) && esitoFallito(e)), 'entra in un posto che non c\'e\': motivo chiaro'); }
+
+// ---- dare una cosa del corpo (coperta) e chiacchierare con chi e' lontano: ci si avvicina da soli ----
+// (23/11/2026: Ada ha provato 6 volte a dare la coperta a Teo, "non e' abbastanza vicino", e il freno l'ha fermata)
+{ const r = await prova([{ tipo: 'dai', nome: 'coperta', id: 'ada' }], { prepara: (s, t, a) => { assicuraVita(s, T0); s.vita.corpi.teo.zaino.push(nuovaCosa(s.vita, 'coperta', 1.5)); a.x = a.tx = t.x - 15; a.z = a.tz = t.z + 5; } });
+  ok(r.s.vita.corpi.ada.zaino.some(q => q.cosa === 'coperta'), 'la coperta arriva ad Ada a 16 m: ' + r.esiti.join(' | '));
+  ok(!r.esiti.some(esitoFallito), 'nessun fallimento lungo la strada'); }
+{ const r = await prova([{ tipo: 'chiacchiera', id: 'ada' }], { prepara: (s, t, a) => { a.x = a.tx = t.x - 12; a.z = a.tz = t.z; } });
+  riuscita(r, 'chiacchiera', /iniziato/); }
 
 // ---- IL FRENO: 3 fallimenti di fila uguali -> bloccata per un'ora ----
 { const az = { tipo: 'lascia', nome: 'Cornetto' };
