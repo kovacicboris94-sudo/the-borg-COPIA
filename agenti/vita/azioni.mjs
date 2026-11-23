@@ -524,7 +524,7 @@ const AZIONI = {
   chiacchiera(mondo, c, a, t) {
     const altro = mondo.corpi[String(a.a || '').toLowerCase()] || Object.values(mondo.corpi).find(o => o !== c && !o.morto && (o.stanza || null) === (c.stanza || null) && dist(o, c) <= 4);
     if (!altro || altro === c || altro.morto) return no('non c\'e\' nessuno con cui parlare qui vicino');
-    if ((altro.stanza || null) !== (c.stanza || null) || dist(altro, c) > 4) return no(`${altro.id} e' troppo lontano per chiacchierare`);
+    if ((altro.stanza || null) !== (c.stanza || null) || dist(altro, c) > 4) return { vai: { x: altro.x, z: altro.z, nome: altro.id, entra: altro.stanza || null }, esito: `vado da ${altro.id}` };
     if (altro.addormentato || altro.svenuto) return no(`${altro.id} dorme`);
     const min = lim(a.quanto ?? 20, 5, 120);
     for (const o of [c, altro]) { o.umano.solitudine = Math.max(0, o.umano.solitudine - min / 60 * 0.6); soddisfa(o, 0.05); }
@@ -536,8 +536,10 @@ const AZIONI = {
   dai(mondo, c, a, t) {
     const altro = mondo.corpi[String(a.a || '').toLowerCase()];
     if (!altro || altro === c) return no('a chi? metti il suo nome in "id"');
-    if ((altro.stanza || null) !== (c.stanza || null) || dist(altro, c) > 3) return no(`${altro.id} non e' abbastanza vicino (serve stare entro 3 metri)`);
     if (!a.cosa) return no('cosa dai?');
+    if (altro.morto) return no(`${altro.id} non c'e' piu'`);
+    // lontano: ci si avvicina da soli e si riprova all'arrivo (prima falliva e basta: Ada ha provato 6 volte a dare la coperta, 23/11/2026)
+    if ((altro.stanza || null) !== (c.stanza || null) || dist(altro, c) > 3) return { vai: { x: altro.x, z: altro.z, nome: altro.id, entra: altro.stanza || null }, esito: `vado da ${altro.id}` };
     const p = preleva(mondo, c.zaino, a.cosa, OGGETTI[a.cosa] ? 1 : lim(a.quanto ?? 0.5, 0.01, 99));
     if (!p) return no(`non hai ${nomeDi(a.cosa)}`);
     deponi(altro.zaino, p);
